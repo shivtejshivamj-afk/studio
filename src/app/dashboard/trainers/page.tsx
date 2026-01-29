@@ -73,6 +73,7 @@ export default function TrainersPage() {
       description: 'The new trainer has been saved.',
     });
     setIsDialogOpen(false);
+    form.reset();
   };
 
   return (
@@ -128,10 +129,10 @@ export default function TrainersPage() {
                       id="phone"
                       name="phone"
                       type="tel"
-                      placeholder="123-456-7890"
+                      placeholder="1234567890"
                       className="col-span-3"
-                      pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
-                      title="Phone number should be in the format 123-456-7890."
+                      pattern="[0-9]{10}"
+                      title="Phone number must be 10 digits."
                       required
                     />
                   </div>
