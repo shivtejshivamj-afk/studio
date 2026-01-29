@@ -68,10 +68,6 @@ const expiringMembers = members.filter(
   (member) => member.status === 'Expiring Soon'
 );
 
-const newestMembers = [...members]
-  .sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime())
-  .slice(0, 5);
-
 export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
@@ -89,8 +85,8 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
           <CardHeader>
             <CardTitle>Expiring Soon</CardTitle>
             <CardDescription>
@@ -166,47 +162,6 @@ export default function DashboardPage() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
-        
-        <Card>
-            <CardHeader>
-                <CardTitle>Newest Members</CardTitle>
-                <CardDescription>The latest members to join your gym.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-6">
-                {newestMembers.map((member) => {
-                    const avatar = PlaceHolderImages.find(
-                    (img) => img.id === member.avatar
-                    );
-                    return (
-                    <div key={member.id} className="flex items-center gap-4">
-                        <Avatar className="h-10 w-10">
-                        {avatar && (
-                            <AvatarImage
-                            src={avatar.imageUrl}
-                            alt={member.name}
-                            width={40}
-                            height={40}
-                            data-ai-hint={avatar.imageHint}
-                            />
-                        )}
-                        <AvatarFallback>
-                            {member.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                        <div className="font-medium">{member.name}</div>
-                        <p className="text-sm text-muted-foreground">
-                            Joined on {member.joinDate}
-                        </p>
-                        </div>
-                        <Badge variant="outline">{member.plan}</Badge>
-                    </div>
-                    );
-                })}
-                </div>
-            </CardContent>
         </Card>
       </div>
     </div>
