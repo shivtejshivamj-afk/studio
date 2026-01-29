@@ -1,3 +1,5 @@
+'use client';
+
 import { MoreVertical, PlusCircle } from 'lucide-react';
 import Image from 'next/image';
 import { trainers } from '@/lib/data';
@@ -38,8 +40,22 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function TrainersPage() {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handleSaveTrainer = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: 'Trainer Added',
+      description: 'The new trainer has been saved.',
+    });
+    setIsDialogOpen(false);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -50,7 +66,7 @@ export default function TrainersPage() {
               Manage your gym's trainers and their profiles.
             </CardDescription>
           </div>
-          <Dialog>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1">
                 <PlusCircle className="h-4 w-4" />
@@ -58,41 +74,64 @@ export default function TrainersPage() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Trainer</DialogTitle>
-                <DialogDescription>
-                  Fill in the details for the new trainer.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input id="name" className="col-span-3" />
+              <form onSubmit={handleSaveTrainer}>
+                <DialogHeader>
+                  <DialogTitle>Add New Trainer</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details for the new trainer.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">
+                      Name
+                    </Label>
+                    <Input id="name" className="col-span-3" required />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="email" className="text-right">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="trainer@example.com"
+                      className="col-span-3"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="phone" className="text-right">
+                      Phone
+                    </Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="123-456-7890"
+                      className="col-span-3"
+                      pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                      title="Phone number should be in the format 123-456-7890."
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="specialization" className="text-right">
+                      Specialization
+                    </Label>
+                    <Input id="specialization" className="col-span-3" required />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
-                    Email
-                  </Label>
-                  <Input id="email" type="email" placeholder="trainer@example.com" className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="phone" className="text-right">
-                    Phone
-                  </Label>
-                  <Input id="phone" type="tel" placeholder="123-456-7890" className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="specialization" className="text-right">
-                    Specialization
-                  </Label>
-                  <Input id="specialization" className="col-span-3" />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit">Save Trainer</Button>
-              </DialogFooter>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Trainer</Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
@@ -102,7 +141,9 @@ export default function TrainersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Trainer</TableHead>
-              <TableHead className="hidden md:table-cell">Specialization</TableHead>
+              <TableHead className="hidden md:table-cell">
+                Specialization
+              </TableHead>
               <TableHead className="hidden sm:table-cell">Contact</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -120,7 +161,7 @@ export default function TrainersPage() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         {avatar && (
-                           <AvatarImage
+                          <AvatarImage
                             src={avatar.imageUrl}
                             alt={trainer.name}
                             width={40}
@@ -128,15 +169,21 @@ export default function TrainersPage() {
                             data-ai-hint={avatar.imageHint}
                           />
                         )}
-                        <AvatarFallback>{trainer.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>
+                          {trainer.name.charAt(0)}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="font-medium">{trainer.name}</div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">{trainer.specialization}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {trainer.specialization}
+                  </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <div>{trainer.email}</div>
-                    <div className="text-sm text-muted-foreground">{trainer.phone}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {trainer.phone}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
