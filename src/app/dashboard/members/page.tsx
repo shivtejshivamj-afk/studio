@@ -86,6 +86,7 @@ type MemberFormValues = z.infer<typeof memberFormSchema>;
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
@@ -176,26 +177,40 @@ export default function MembersPage() {
       closeDialogs();
     }
   };
+  
+  const filteredMembers = members.filter(
+    (member) =>
+      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Members</CardTitle>
               <CardDescription>
                 Manage your gym members and their details.
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              className="gap-1"
-              onClick={() => handleOpenDialog('add')}
-            >
-              <PlusCircle className="h-4 w-4" />
-              Add Member
-            </Button>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+               <Input
+                placeholder="Search by name or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:max-w-xs"
+              />
+              <Button
+                size="sm"
+                className="gap-1"
+                onClick={() => handleOpenDialog('add')}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Add Member
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -217,7 +232,7 @@ export default function MembersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {members.map((member) => {
+              {filteredMembers.map((member) => {
                 const avatar = PlaceHolderImages.find(
                   (img) => img.id === member.avatar
                 );
