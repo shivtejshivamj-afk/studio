@@ -35,6 +35,14 @@ export type Payment = {
   status: 'Paid' | 'Pending' | 'Failed';
 };
 
+export type Attendance = {
+  id: string;
+  memberName: string;
+  date: string;
+  checkInTime: string;
+  status: 'Checked-in' | 'Absent';
+};
+
 export const gymInfo = {
   name: 'GymTrack Pro',
   id: 'GYMT4587'
@@ -64,9 +72,18 @@ export const plans: Plan[] = [
 export const payments: Payment[] = [
   { id: 'pay01', memberName: 'Alicia Keys', planName: 'Annual', amount: 500, date: '2023-01-15', status: 'Paid' },
   { id: 'pay02', memberName: 'Ben Affleck', planName: 'Monthly', amount: 50, date: '2023-06-20', status: 'Paid' },
-  { id: 'pay03', name: 'Catherine Zeta', planName: 'Quarterly', amount: 135, date: '2023-04-10', status: 'Paid' },
+  { id: 'pay03', memberName: 'Catherine Zeta', planName: 'Quarterly', amount: 135, date: '2023-04-10', status: 'Paid' },
   { id: 'pay04', memberName: 'Eva Mendes', planName: 'Monthly', amount: 50, date: '2023-06-25', status: 'Paid' },
   { id: 'pay05', memberName: 'Frank Grillo', planName: 'Quarterly', amount: 135, date: '2023-05-30', status: 'Paid' },
+];
+
+export const attendance: Attendance[] = [
+    { id: 'att01', memberName: 'Alicia Keys', date: '2024-07-28', checkInTime: '08:15 AM', status: 'Checked-in' },
+    { id: 'att02', memberName: 'Ben Affleck', date: '2024-07-28', checkInTime: '09:00 AM', status: 'Checked-in' },
+    { id: 'att03', memberName: 'Catherine Zeta', date: '2024-07-28', checkInTime: 'N/A', status: 'Absent' },
+    { id: 'att04', memberName: 'Denzel Washington', date: '2024-07-27', checkInTime: '07:30 PM', status: 'Checked-in' },
+    { id: 'att05', memberName: 'Eva Mendes', date: '2024-07-27', checkInTime: '06:00 PM', status: 'Checked-in' },
+    { id: 'att06', memberName: 'Frank Grillo', date: '2024-07-27', checkInTime: 'N/A', status: 'Absent' },
 ];
 
 export const dashboardStats = {

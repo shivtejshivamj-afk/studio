@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   UserCircle,
+  CalendarCheck,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -30,6 +31,7 @@ const navItems = [
   { href: '/dashboard/trainers', icon: Dumbbell, label: 'Trainers' },
   { href: '/dashboard/plans', icon: Calendar, label: 'Plans' },
   { href: '/dashboard/payments', icon: CreditCard, label: 'Payments' },
+  { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
 ];
 
 export function DashboardNav() {
