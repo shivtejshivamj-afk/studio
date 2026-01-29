@@ -72,6 +72,18 @@ export default function TrainersPage() {
                   <Input id="name" className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">
+                    Email
+                  </Label>
+                  <Input id="email" type="email" placeholder="trainer@example.com" className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="phone" className="text-right">
+                    Phone
+                  </Label>
+                  <Input id="phone" type="tel" placeholder="123-456-7890" className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="specialization" className="text-right">
                     Specialization
                   </Label>
