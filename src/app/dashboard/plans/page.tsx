@@ -1,3 +1,5 @@
+'use client';
+
 import { MoreVertical, PlusCircle } from 'lucide-react';
 import { plans } from '@/lib/data';
 import {
@@ -34,9 +36,63 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
+
+const planFormSchema = z.object({
+  name: z.string().min(1, { message: 'Plan name is required.' }),
+  price: z.coerce
+    .number()
+    .positive({ message: 'Price must be a positive number.' }),
+  duration: z.coerce
+    .number()
+    .int()
+    .positive({ message: 'Duration must be a positive number of days.' }),
+});
+
+type PlanFormValues = z.infer<typeof planFormSchema>;
 
 export default function PlansPage() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<PlanFormValues>({
+    resolver: zodResolver(planFormSchema),
+    defaultValues: {
+      name: '',
+      price: 0,
+      duration: 0,
+    },
+  });
+
+  function handleSavePlan(values: PlanFormValues) {
+    console.log(values); // The data is not persistent, so just log it.
+    toast({
+      title: 'Plan Added',
+      description: `The new plan "${values.name}" has been saved.`,
+    });
+    setIsDialogOpen(false);
+    form.reset();
+  }
+
+  const handleOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      form.reset();
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -47,7 +103,7 @@ export default function PlansPage() {
               Manage your gym's membership plans.
             </CardDescription>
           </div>
-          <Dialog>
+          <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1">
                 <PlusCircle className="h-4 w-4" />
@@ -55,35 +111,79 @@ export default function PlansPage() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Plan</DialogTitle>
-                <DialogDescription>
-                  Define a new membership plan for your gym.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Plan Name
-                  </Label>
-                  <Input id="name" className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="price" className="text-right">
-                    Price ($)
-                  </Label>
-                  <Input id="price" type="number" className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="duration" className="text-right">
-                    Duration (days)
-                  </Label>
-                  <Input id="duration" type="number" className="col-span-3" />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit">Save Plan</Button>
-              </DialogFooter>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSavePlan)}>
+                  <DialogHeader>
+                    <DialogTitle>Add New Plan</DialogTitle>
+                    <DialogDescription>
+                      Define a new membership plan for your gym.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">
+                            Plan Name
+                          </FormLabel>
+                          <div className="col-span-3">
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">
+                            Price ($)
+                          </FormLabel>
+                          <div className="col-span-3">
+                            <FormControl>
+                              <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="duration"
+                      render={({ field }) => (
+                        <FormItem className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">
+                            Duration (days)
+                          </FormLabel>
+                          <div className="col-span-3">
+                            <FormControl>
+                              <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">Save Plan</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>

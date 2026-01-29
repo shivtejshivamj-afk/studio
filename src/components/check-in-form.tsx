@@ -1,33 +1,48 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { Dumbbell } from "lucide-react";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Dumbbell } from 'lucide-react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+
+const formSchema = z.object({
+  gymId: z.string().min(1, 'Gym ID is required.'),
+});
 
 export function CheckInForm() {
   const { toast } = useToast();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      gymId: '',
+    },
+  });
 
-  const handleCheckIn = (e: React.FormEvent) => {
-    e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const gymIdInput = form.elements.namedItem('gym-id') as HTMLInputElement;
-    
+  function onSubmit(values: z.infer<typeof formSchema>) {
     toast({
-      title: "Check-in Successful!",
-      description: `Welcome back, member ${gymIdInput.value}!`,
+      title: 'Check-in Successful!',
+      description: `Welcome back, member ${values.gymId}!`,
     });
-
     form.reset();
-  };
+  }
 
   return (
     <Card className="w-full max-w-md">
@@ -39,22 +54,33 @@ export function CheckInForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleCheckIn} className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="gym-id" className="sr-only">Gym ID</Label>
-            <Input
-              id="gym-id"
-              name="gym-id"
-              type="text"
-              placeholder="Enter your Gym ID (e.g., m001)"
-              required
-              className="text-center"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="gymId"
+              render={({ field }) => (
+                <FormItem className="grid gap-2">
+                  <FormLabel htmlFor="gym-id" className="sr-only">
+                    Gym ID
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      id="gym-id"
+                      placeholder="Enter your Gym ID (e.g., m001)"
+                      className="text-center"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <Button type="submit" className="w-full" size="lg">
-            Check In
-          </Button>
-        </form>
+            <Button type="submit" className="w-full" size="lg">
+              Check In
+            </Button>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );

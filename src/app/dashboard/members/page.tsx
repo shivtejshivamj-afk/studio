@@ -51,12 +51,38 @@ import {
 } from '@/components/ui/select';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 const statusVariant = {
   Active: 'default',
   Inactive: 'secondary',
   'Expiring Soon': 'destructive',
 } as const;
+
+const memberFormSchema = z.object({
+  name: z.string().min(1, 'Name is required.'),
+  email: z.string().email('Please enter a valid email.'),
+  phone: z
+    .string()
+    .length(10, 'Phone number must be 10 digits.')
+    .regex(/^\d+$/, 'Phone number must only contain digits.'),
+  plan: z.string({ required_error: 'Please select a plan.' }),
+  joinDate: z.string().min(1, 'Join date is required.'),
+  expiryDate: z.string().min(1, 'Expiry date is required.'),
+  status: z.enum(['Active', 'Inactive', 'Expiring Soon']),
+});
+
+type MemberFormValues = z.infer<typeof memberFormSchema>;
 
 export default function MembersPage() {
   const { toast } = useToast();
@@ -69,9 +95,26 @@ export default function MembersPage() {
     setIsClient(true);
   }, []);
 
+  const form = useForm<MemberFormValues>({
+    resolver: zodResolver(memberFormSchema),
+  });
+
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
     setSelectedMember(member || null);
     setActiveDialog(dialog);
+    if (dialog === 'edit' && member) {
+      form.reset(member);
+    } else if (dialog === 'add') {
+      form.reset({
+        name: '',
+        email: '',
+        phone: '',
+        plan: undefined,
+        joinDate: '',
+        expiryDate: '',
+        status: 'Active',
+      });
+    }
   };
 
   const closeDialogs = () => {
@@ -79,11 +122,10 @@ export default function MembersPage() {
     setSelectedMember(null);
   };
 
-  const handleSaveMember = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveMember = (values: MemberFormValues) => {
     toast({
       title: activeDialog === 'edit' ? 'Member Updated' : 'Member Added',
-      description: `The member details have been saved.`,
+      description: `The member details for ${values.name} have been saved.`,
     });
     closeDialogs();
   };
@@ -129,9 +171,6 @@ export default function MembersPage() {
                 <TableHead className="hidden md:table-cell">
                   Join Date
                 </TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Expiry Date
-                </TableHead>
                 <TableHead className="hidden lg:table-cell">Phone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -174,9 +213,6 @@ export default function MembersPage() {
                     <TableCell className="hidden md:table-cell">
                       {member.joinDate}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {member.expiryDate}
-                    </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       {member.phone}
                     </TableCell>
@@ -215,7 +251,7 @@ export default function MembersPage() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="h-10 w-10" />
+                        <div className="h-10 w-24" />
                       )}
                     </TableCell>
                   </TableRow>
@@ -236,114 +272,163 @@ export default function MembersPage() {
         }}
       >
         <DialogContent className="sm:max-w-[425px]">
-          <form onSubmit={handleSaveMember}>
-            <DialogHeader>
-              <DialogTitle>
-                {activeDialog === 'edit' ? 'Edit Member' : 'Add New Member'}
-              </DialogTitle>
-              <DialogDescription>
-                {activeDialog === 'edit'
-                  ? 'Update the details for this member.'
-                  : 'Fill in the details to add a new member.'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Name
-                </Label>
-                <Input
-                  id="name"
-                  defaultValue={selectedMember?.name}
-                  className="col-span-3"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSaveMember)}>
+              <DialogHeader>
+                <DialogTitle>
+                  {activeDialog === 'edit' ? 'Edit Member' : 'Add New Member'}
+                </DialogTitle>
+                <DialogDescription>
+                  {activeDialog === 'edit'
+                    ? 'Update the details for this member.'
+                    : 'Fill in the details to add a new member.'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Name</FormLabel>
+                      <div className="col-span-3">
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Email</FormLabel>
+                      <div className="col-span-3">
+                        <FormControl>
+                          <Input type="email" {...field} />
+                        </FormControl>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Phone</FormLabel>
+                      <div className="col-span-3">
+                        <FormControl>
+                          <Input type="tel" {...field} />
+                        </FormControl>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="plan"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Plan</FormLabel>
+                      <div className="col-span-3">
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a plan" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {plans.map((plan) => (
+                              <SelectItem key={plan.id} value={plan.name}>
+                                {plan.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="joinDate"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Join Date</FormLabel>
+                      <div className="col-span-3">
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="expiryDate"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Expiry Date</FormLabel>
+                      <div className="col-span-3">
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Status</FormLabel>
+                      <div className="col-span-3">
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Inactive">Inactive</SelectItem>
+                            <SelectItem value="Expiring Soon">
+                              Expiring Soon
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="mt-1" />
+                      </div>
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  defaultValue={selectedMember?.email}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">
-                  Phone
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  defaultValue={selectedMember?.phone}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="plan" className="text-right">
-                  Plan
-                </Label>
-                <Select defaultValue={selectedMember?.plan}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.name}>
-                        {plan.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="joinDate" className="text-right">
-                  Join Date
-                </Label>
-                <Input
-                  id="joinDate"
-                  type="date"
-                  defaultValue={selectedMember?.joinDate}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="expiryDate" className="text-right">
-                  Expiry Date
-                </Label>
-                <Input
-                  id="expiryDate"
-                  type="date"
-                  defaultValue={selectedMember?.expiryDate}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">
-                  Status
-                </Label>
-                <Select defaultValue={selectedMember?.status}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                    <SelectItem value="Expiring Soon">Expiring Soon</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialogs}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                Save {activeDialog === 'edit' ? 'Changes' : 'Member'}
-              </Button>
-            </DialogFooter>
-          </form>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeDialogs}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Save {activeDialog === 'edit' ? 'Changes' : 'Member'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
@@ -372,7 +457,9 @@ export default function MembersPage() {
                     }
                     alt={selectedMember.name}
                   />
-                  <AvatarFallback>{selectedMember.name.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>
+                    {selectedMember.name.charAt(0)}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="text-xl font-semibold">
