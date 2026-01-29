@@ -35,6 +35,11 @@ export type Payment = {
   status: 'Paid' | 'Pending' | 'Failed';
 };
 
+export const gymInfo = {
+  name: 'GymTrack Pro',
+  id: 'GYMT4587'
+};
+
 export const members: Member[] = [
   { id: 'm001', name: 'Alicia Keys', email: 'alicia@example.com', phone: '123-456-7890', plan: 'Annual', status: 'Active', joinDate: '2023-01-15', expiryDate: '2024-01-14', avatar: 'member-1' },
   { id: 'm002', name: 'Ben Affleck', email: 'ben@example.com', phone: '234-567-8901', plan: 'Monthly', status: 'Expiring Soon', joinDate: '2023-06-20', expiryDate: '2024-07-19', avatar: 'member-2' },
@@ -59,7 +64,7 @@ export const plans: Plan[] = [
 export const payments: Payment[] = [
   { id: 'pay01', memberName: 'Alicia Keys', planName: 'Annual', amount: 500, date: '2023-01-15', status: 'Paid' },
   { id: 'pay02', memberName: 'Ben Affleck', planName: 'Monthly', amount: 50, date: '2023-06-20', status: 'Paid' },
-  { id: 'pay03', memberName: 'Catherine Zeta', planName: 'Quarterly', amount: 135, date: '2023-04-10', status: 'Paid' },
+  { id: 'pay03', name: 'Catherine Zeta', planName: 'Quarterly', amount: 135, date: '2023-04-10', status: 'Paid' },
   { id: 'pay04', memberName: 'Eva Mendes', planName: 'Monthly', amount: 50, date: '2023-06-25', status: 'Paid' },
   { id: 'pay05', memberName: 'Frank Grillo', planName: 'Quarterly', amount: 135, date: '2023-05-30', status: 'Paid' },
 ];

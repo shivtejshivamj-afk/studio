@@ -6,9 +6,10 @@ import {
   DollarSign,
   Clock,
   MoreVertical,
+  Building,
 } from 'lucide-react';
 import Image from 'next/image';
-import { dashboardStats, members } from '@/lib/data';
+import { dashboardStats, members, gymInfo } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
@@ -38,6 +39,11 @@ import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const statCards = [
+  {
+    title: 'Gym ID',
+    value: gymInfo.id,
+    icon: Building,
+  },
   {
     title: 'Total Revenue',
     value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
@@ -90,7 +96,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {statCards.map((card) => (
           <Card key={card.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
