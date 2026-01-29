@@ -9,6 +9,7 @@ import {
   ClipboardCopy,
   Eye,
   Mail,
+  MoreVertical,
 } from 'lucide-react';
 import Image from 'next/image';
 import { dashboardStats, members, gymInfo, type Member } from '@/lib/data';
@@ -40,6 +41,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const statCards = [
   {
@@ -131,15 +138,17 @@ export default function DashboardPage() {
                 {card.title === 'Gym ID' ? (
                   <div className="flex items-center justify-between">
                     <div className="text-2xl font-bold">{card.value}</div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleCopy(card.value as string)}
-                      className="h-8 w-8"
-                    >
-                      <ClipboardCopy className="h-4 w-4" />
-                      <span className="sr-only">Copy Gym ID</span>
-                    </Button>
+                    {isClient && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCopy(card.value as string)}
+                        className="h-8 w-8"
+                      >
+                        <ClipboardCopy className="h-4 w-4" />
+                        <span className="sr-only">Copy Gym ID</span>
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="text-2xl font-bold">{card.value}</div>
@@ -163,9 +172,6 @@ export default function DashboardPage() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead className="hidden sm:table-cell">Plan</TableHead>
-                    <TableHead className="hidden md:table-cell">
-                      Expiry Date
-                    </TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -199,9 +205,6 @@ export default function DashboardPage() {
                         <TableCell className="hidden sm:table-cell">
                           {member.plan}
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {member.expiryDate}
-                        </TableCell>
                         <TableCell>
                           <Badge variant="destructive">{member.status}</Badge>
                         </TableCell>
@@ -209,20 +212,20 @@ export default function DashboardPage() {
                           {isClient ? (
                             <div className="flex items-center justify-end gap-2">
                               <Button
-                                variant="ghost"
-                                size="icon"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => handleSendReminder(member)}
                               >
                                 <Mail className="h-4 w-4" />
-                                <span className="sr-only">Send Reminder</span>
+                                <span className="hidden sm:inline ml-2">Send Reminder</span>
                               </Button>
                               <Button
-                                variant="ghost"
-                                size="icon"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => handleOpenDialog('view', member)}
                               >
                                 <Eye className="h-4 w-4" />
-                                <span className="sr-only">View Details</span>
+                                <span className="hidden sm:inline ml-2">View</span>
                               </Button>
                             </div>
                           ) : (
