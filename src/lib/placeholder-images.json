@@ -53,6 +53,12 @@
       "description": "Portrait of a fitness trainer",
       "imageUrl": "https://images.unsplash.com/photo-1758522274399-8d3fd26a02f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8dHJhaW5lciUyMHNtaWxpbmd8ZW58MHx8fHwxNzY5NjgxNzMyfDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "trainer smiling"
+    },
+    {
+      "id": "hero-background",
+      "description": "A modern gym with equipment",
+      "imageUrl": "https://images.unsplash.com/photo-1689877020200-403d8542d95d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxneW0lMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc2OTY4MTk0N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "gym background"
     }
   ]
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,11 +11,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 
-export function LoginForm() {
+export function SignupForm() {
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     router.push("/dashboard");
   };
@@ -24,35 +24,34 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle className="text-2xl">Admin Login</CardTitle>
+        <CardTitle className="text-2xl">Sign Up</CardTitle>
         <CardDescription>
-          Enter your email below to login to your account.
+          Enter your information to create an account.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleLogin} className="grid gap-4">
+        <form onSubmit={handleSignup} className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
               placeholder="m@example.com"
-              defaultValue="admin@gymtrack.pro"
               required
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" defaultValue="password" required />
+            <Input id="password" type="password" required />
           </div>
           <Button type="submit" className="w-full">
-            Sign in
+            Sign Up
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">
-          Don't have an account?{" "}
-          <Link href="/signup" className="underline">
-            Sign Up
+          Already have an account?{" "}
+          <Link href="/login" className="underline">
+            Log In
           </Link>
         </div>
       </CardContent>
