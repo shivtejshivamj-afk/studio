@@ -49,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
@@ -69,6 +69,11 @@ export default function MembersPage() {
   type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
     setSelectedMember(member || null);
@@ -187,32 +192,36 @@ export default function MembersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleOpenDialog('view', member)}
-                          >
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleOpenDialog('edit', member)}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleOpenDialog('delete', member)}
-                            className="text-destructive"
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {isClient ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog('view', member)}
+                            >
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog('edit', member)}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog('delete', member)}
+                              className="text-destructive"
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <div className="h-10 w-10" />
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -225,7 +234,11 @@ export default function MembersPage() {
       {/* Add/Edit Member Dialog */}
       <Dialog
         open={activeDialog === 'add' || activeDialog === 'edit'}
-        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeDialogs();
+          }
+        }}
       >
         <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleSaveMember}>
@@ -342,7 +355,11 @@ export default function MembersPage() {
       {/* View Details Dialog */}
       <Dialog
         open={activeDialog === 'view'}
-        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeDialogs();
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -405,7 +422,11 @@ export default function MembersPage() {
       {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={activeDialog === 'delete'}
-        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeDialogs();
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
