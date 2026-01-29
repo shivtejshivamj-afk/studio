@@ -32,6 +32,14 @@ export function SignupForm() {
       <CardContent>
         <form onSubmit={handleSignup} className="grid gap-4">
           <div className="grid gap-2">
+            <Label htmlFor="owner-name">Gym Owner Name</Label>
+            <Input id="owner-name" placeholder="John Doe" required />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="gym-name">Gym Name</Label>
+            <Input id="gym-name" placeholder="My Awesome Gym" required />
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
