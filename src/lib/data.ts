@@ -2,6 +2,7 @@ export type Member = {
   id: string;
   name: string;
   email: string;
+  phone: string;
   plan: string;
   status: 'Active' | 'Inactive' | 'Expiring Soon';
   joinDate: string;
@@ -35,12 +36,12 @@ export type Payment = {
 };
 
 export const members: Member[] = [
-  { id: 'm001', name: 'Alicia Keys', email: 'alicia@example.com', plan: 'Annual', status: 'Active', joinDate: '2023-01-15', expiryDate: '2024-01-14', avatar: 'member-1' },
-  { id: 'm002', name: 'Ben Affleck', email: 'ben@example.com', plan: 'Monthly', status: 'Expiring Soon', joinDate: '2023-06-20', expiryDate: '2024-07-19', avatar: 'member-2' },
-  { id: 'm003', name: 'Catherine Zeta', email: 'catherine@example.com', plan: 'Quarterly', status: 'Active', joinDate: '2023-04-10', expiryDate: '2024-07-09', avatar: 'member-3' },
-  { id: 'm004', name: 'Denzel Washington', email: 'denzel@example.com', plan: 'Annual', status: 'Inactive', joinDate: '2022-11-05', expiryDate: '2023-11-04', avatar: 'member-4' },
-  { id: 'm005', name: 'Eva Mendes', email: 'eva@example.com', plan: 'Monthly', status: 'Expiring Soon', joinDate: '2023-06-25', expiryDate: '2024-07-24', avatar: 'member-5' },
-  { id: 'm006', name: 'Frank Grillo', email: 'frank@example.com', plan: 'Quarterly', status: 'Active', joinDate: '2023-05-30', expiryDate: '2024-08-29', avatar: 'member-6' },
+  { id: 'm001', name: 'Alicia Keys', email: 'alicia@example.com', phone: '123-456-7890', plan: 'Annual', status: 'Active', joinDate: '2023-01-15', expiryDate: '2024-01-14', avatar: 'member-1' },
+  { id: 'm002', name: 'Ben Affleck', email: 'ben@example.com', phone: '234-567-8901', plan: 'Monthly', status: 'Expiring Soon', joinDate: '2023-06-20', expiryDate: '2024-07-19', avatar: 'member-2' },
+  { id: 'm003', name: 'Catherine Zeta', email: 'catherine@example.com', phone: '345-678-9012', plan: 'Quarterly', status: 'Active', joinDate: '2023-04-10', expiryDate: '2024-07-09', avatar: 'member-3' },
+  { id: 'm004', name: 'Denzel Washington', email: 'denzel@example.com', phone: '456-789-0123', plan: 'Annual', status: 'Inactive', joinDate: '2022-11-05', expiryDate: '2023-11-04', avatar: 'member-4' },
+  { id: 'm005', name: 'Eva Mendes', email: 'eva@example.com', phone: '567-890-1234', plan: 'Monthly', status: 'Expiring Soon', joinDate: '2023-06-25', expiryDate: '2024-07-24', avatar: 'member-5' },
+  { id: 'm006', name: 'Frank Grillo', email: 'frank@example.com', phone: '678-901-2345', plan: 'Quarterly', status: 'Active', joinDate: '2023-05-30', expiryDate: '2024-08-29', avatar: 'member-6' },
 ];
 
 export const trainers: Trainer[] = [

@@ -84,6 +84,12 @@ export default function MembersPage() {
                   </Label>
                   <Input id="email" type="email" className="col-span-3" />
                 </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="phone" className="text-right">
+                    Phone
+                  </Label>
+                  <Input id="phone" type="tel" className="col-span-3" />
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit">Save Member</Button>
@@ -98,7 +104,9 @@ export default function MembersPage() {
             <TableRow>
               <TableHead>Member</TableHead>
               <TableHead className="hidden md:table-cell">Plan</TableHead>
+              <TableHead className="hidden md:table-cell">Join Date</TableHead>
               <TableHead className="hidden md:table-cell">Expiry Date</TableHead>
+              <TableHead className="hidden lg:table-cell">Phone</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -135,7 +143,9 @@ export default function MembersPage() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{member.plan}</TableCell>
+                  <TableCell className="hidden md:table-cell">{member.joinDate}</TableCell>
                   <TableCell className="hidden md:table-cell">{member.expiryDate}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{member.phone}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[member.status]}>
                       {member.status}
