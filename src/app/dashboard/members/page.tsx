@@ -77,9 +77,7 @@ export default function MembersPage() {
 
   const closeDialogs = () => {
     setActiveDialog(null);
-    setTimeout(() => {
-      setSelectedMember(null);
-    }, 200);
+    setSelectedMember(null);
   };
 
   const handleSaveMember = (e: React.FormEvent) => {
