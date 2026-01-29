@@ -7,6 +7,7 @@ import {
   Clock,
   MoreVertical,
   Building,
+  ClipboardCopy,
 } from 'lucide-react';
 import Image from 'next/image';
 import { dashboardStats, members, gymInfo } from '@/lib/data';
@@ -35,6 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
 
 const statCards = [
   {
@@ -69,6 +71,16 @@ const expiringMembers = members.filter(
 );
 
 export default function DashboardPage() {
+  const { toast } = useToast();
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: 'Copied to clipboard!',
+      description: `The Gym ID "${text}" has been copied.`,
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -79,7 +91,22 @@ export default function DashboardPage() {
               <card.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
+              {card.title === 'Gym ID' ? (
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">{card.value}</div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleCopy(card.value as string)}
+                    className="h-8 w-8"
+                  >
+                    <ClipboardCopy className="h-4 w-4" />
+                    <span className="sr-only">Copy Gym ID</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-2xl font-bold">{card.value}</div>
+              )}
             </CardContent>
           </Card>
         ))}
