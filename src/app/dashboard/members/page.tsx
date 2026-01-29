@@ -66,44 +66,26 @@ const statusVariant = {
 
 export default function MembersPage() {
   const { toast } = useToast();
-  const [isAddEditDialogOpen, setAddEditDialogOpen] = useState(false);
-  const [isViewDialogOpen, setViewDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
+  const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
-  const handleOpenAddDialog = () => {
-    setSelectedMember(null);
-    setAddEditDialogOpen(true);
-  };
-
-  const handleOpenEditDialog = (member: Member) => {
-    setSelectedMember(member);
-    setAddEditDialogOpen(true);
-  };
-
-  const handleOpenViewDialog = (member: Member) => {
-    setSelectedMember(member);
-    setViewDialogOpen(true);
-  };
-
-  const handleOpenDeleteDialog = (member: Member) => {
-    setSelectedMember(member);
-    setDeleteDialogOpen(true);
+  const handleOpenDialog = (dialog: DialogType, member?: Member) => {
+    setSelectedMember(member || null);
+    setActiveDialog(dialog);
   };
 
   const closeDialogs = () => {
-    setAddEditDialogOpen(false);
-    setViewDialogOpen(false);
-    setDeleteDialogOpen(false);
+    setActiveDialog(null);
     setTimeout(() => {
-        setSelectedMember(null);
+      setSelectedMember(null);
     }, 200);
   };
 
   const handleSaveMember = (e: React.FormEvent) => {
     e.preventDefault();
     toast({
-      title: selectedMember ? 'Member Updated' : 'Member Added',
+      title: activeDialog === 'edit' ? 'Member Updated' : 'Member Added',
       description: `The member details have been saved.`,
     });
     closeDialogs();
@@ -114,12 +96,11 @@ export default function MembersPage() {
       toast({
         title: 'Member Deleted',
         description: `${selectedMember.name} has been deleted.`,
-        variant: 'destructive'
+        variant: 'destructive',
       });
       closeDialogs();
     }
   };
-
 
   return (
     <>
@@ -132,7 +113,11 @@ export default function MembersPage() {
                 Manage your gym members and their details.
               </CardDescription>
             </div>
-            <Button size="sm" className="gap-1" onClick={handleOpenAddDialog}>
+            <Button
+              size="sm"
+              className="gap-1"
+              onClick={() => handleOpenDialog('add')}
+            >
               <PlusCircle className="h-4 w-4" />
               Add Member
             </Button>
@@ -144,8 +129,12 @@ export default function MembersPage() {
               <TableRow>
                 <TableHead>Member</TableHead>
                 <TableHead className="hidden md:table-cell">Plan</TableHead>
-                <TableHead className="hidden md:table-cell">Join Date</TableHead>
-                <TableHead className="hidden md:table-cell">Expiry Date</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Join Date
+                </TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Expiry Date
+                </TableHead>
                 <TableHead className="hidden lg:table-cell">Phone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -170,7 +159,9 @@ export default function MembersPage() {
                               data-ai-hint={avatar.imageHint}
                             />
                           )}
-                          <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                          <AvatarFallback>
+                            {member.name.charAt(0)}
+                          </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-medium">{member.name}</div>
@@ -180,10 +171,18 @@ export default function MembersPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{member.plan}</TableCell>
-                    <TableCell className="hidden md:table-cell">{member.joinDate}</TableCell>
-                    <TableCell className="hidden md:table-cell">{member.expiryDate}</TableCell>
-                    <TableCell className="hidden lg:table-cell">{member.phone}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {member.plan}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {member.joinDate}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {member.expiryDate}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {member.phone}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[member.status]}>
                         {member.status}
@@ -199,17 +198,17 @@ export default function MembersPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => handleOpenViewDialog(member)}
+                            onClick={() => handleOpenDialog('view', member)}
                           >
                             View
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleOpenEditDialog(member)}
+                            onClick={() => handleOpenDialog('edit', member)}
                           >
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleOpenDeleteDialog(member)}
+                            onClick={() => handleOpenDialog('delete', member)}
                             className="text-destructive"
                           >
                             Delete
@@ -226,13 +225,20 @@ export default function MembersPage() {
       </Card>
 
       {/* Add/Edit Member Dialog */}
-      <Dialog open={isAddEditDialogOpen} onOpenChange={setAddEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]" onInteractOutside={closeDialogs} onEscapeKeyDown={closeDialogs}>
+      <Dialog
+        open={activeDialog === 'add' || activeDialog === 'edit'}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+      >
+        <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleSaveMember}>
             <DialogHeader>
-              <DialogTitle>{selectedMember ? 'Edit Member' : 'Add New Member'}</DialogTitle>
+              <DialogTitle>
+                {activeDialog === 'edit' ? 'Edit Member' : 'Add New Member'}
+              </DialogTitle>
               <DialogDescription>
-                {selectedMember ? 'Update the details for this member.' : 'Fill in the details to add a new member.'}
+                {activeDialog === 'edit'
+                  ? 'Update the details for this member.'
+                  : 'Fill in the details to add a new member.'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -240,19 +246,33 @@ export default function MembersPage() {
                 <Label htmlFor="name" className="text-right">
                   Name
                 </Label>
-                <Input id="name" defaultValue={selectedMember?.name} className="col-span-3" />
+                <Input
+                  id="name"
+                  defaultValue={selectedMember?.name}
+                  className="col-span-3"
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email" className="text-right">
                   Email
                 </Label>
-                <Input id="email" type="email" defaultValue={selectedMember?.email} className="col-span-3" />
+                <Input
+                  id="email"
+                  type="email"
+                  defaultValue={selectedMember?.email}
+                  className="col-span-3"
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="phone" className="text-right">
                   Phone
                 </Label>
-                <Input id="phone" type="tel" defaultValue={selectedMember?.phone} className="col-span-3" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  defaultValue={selectedMember?.phone}
+                  className="col-span-3"
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="plan" className="text-right">
@@ -275,13 +295,23 @@ export default function MembersPage() {
                 <Label htmlFor="joinDate" className="text-right">
                   Join Date
                 </Label>
-                <Input id="joinDate" type="date" defaultValue={selectedMember?.joinDate} className="col-span-3" />
+                <Input
+                  id="joinDate"
+                  type="date"
+                  defaultValue={selectedMember?.joinDate}
+                  className="col-span-3"
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="expiryDate" className="text-right">
                   Expiry Date
                 </Label>
-                <Input id="expiryDate" type="date" defaultValue={selectedMember?.expiryDate} className="col-span-3" />
+                <Input
+                  id="expiryDate"
+                  type="date"
+                  defaultValue={selectedMember?.expiryDate}
+                  className="col-span-3"
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="status" className="text-right">
@@ -294,46 +324,78 @@ export default function MembersPage() {
                   <SelectContent>
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Inactive">Inactive</SelectItem>
-                    <SelectItem value="Expiring Soon">
-                      Expiring Soon
-                    </SelectItem>
+                    <SelectItem value="Expiring Soon">Expiring Soon</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialogs}>Cancel</Button>
-              <Button type="submit">Save {selectedMember ? 'Changes' : 'Member'}</Button>
+              <Button type="button" variant="outline" onClick={closeDialogs}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Save {activeDialog === 'edit' ? 'Changes' : 'Member'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* View Details Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent onInteractOutside={closeDialogs} onEscapeKeyDown={closeDialogs}>
+      <Dialog
+        open={activeDialog === 'view'}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+      >
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
           </DialogHeader>
           {selectedMember && (
             <div className="grid gap-4 py-4 text-sm">
-                <div className="flex items-center gap-4">
-                    <Avatar className="h-24 w-24">
-                        <AvatarImage src={PlaceHolderImages.find(p => p.id === selectedMember.avatar)?.imageUrl} alt={selectedMember.name} />
-                        <AvatarFallback>{selectedMember.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <h3 className="text-xl font-semibold">{selectedMember.name}</h3>
-                        <p className="text-muted-foreground">{selectedMember.email}</p>
-                        <p className="text-muted-foreground">{selectedMember.phone}</p>
-                    </div>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage
+                    src={
+                      PlaceHolderImages.find(
+                        (p) => p.id === selectedMember.avatar
+                      )?.imageUrl
+                    }
+                    alt={selectedMember.name}
+                  />
+                  <AvatarFallback>{selectedMember.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {selectedMember.name}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {selectedMember.email}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {selectedMember.phone}
+                  </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                    <div><span className="font-semibold">Plan:</span> {selectedMember.plan}</div>
-                    <div><span className="font-semibold">Status:</span> <Badge variant={statusVariant[selectedMember.status]}>{selectedMember.status}</Badge></div>
-                    <div><span className="font-semibold">Join Date:</span> {selectedMember.joinDate}</div>
-                    <div><span className="font-semibold">Expiry Date:</span> {selectedMember.expiryDate}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <div>
+                  <span className="font-semibold">Plan:</span>{' '}
+                  {selectedMember.plan}
                 </div>
+                <div>
+                  <span className="font-semibold">Status:</span>{' '}
+                  <Badge variant={statusVariant[selectedMember.status]}>
+                    {selectedMember.status}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="font-semibold">Join Date:</span>{' '}
+                  {selectedMember.joinDate}
+                </div>
+                <div>
+                  <span className="font-semibold">Expiry Date:</span>{' '}
+                  {selectedMember.expiryDate}
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -341,18 +403,24 @@ export default function MembersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog
+        open={activeDialog === 'delete'}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this member?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Are you sure you want to delete this member?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the member "{selectedMember?.name}".
+              This action cannot be undone. This will permanently delete the
+              member "{selectedMember?.name}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={closeDialogs}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>
               Delete
             </AlertDialogAction>
