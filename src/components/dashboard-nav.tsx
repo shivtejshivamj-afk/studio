@@ -48,7 +48,7 @@ export function DashboardNav() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} legacyBehavior passHref>
+              <Link href={item.href}>
                 <SidebarMenuButton
                   isActive={pathname === item.href}
                   tooltip={{ children: item.label }}
@@ -73,7 +73,7 @@ export function DashboardNav() {
             <span className="text-xs text-muted-foreground">admin@gymtrack.pro</span>
           </div>
         </div>
-        <Link href="/" legacyBehavior passHref>
+        <Link href="/">
           <SidebarMenuButton tooltip={{ children: 'Logout' }}>
             <LogOut />
             <span>Logout</span>
