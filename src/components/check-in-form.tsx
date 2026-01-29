@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/form';
 
 const formSchema = z.object({
-  gymId: z.string().min(1, 'Gym ID is required.'),
+  memberId: z.string().min(1, 'Member ID is required.'),
 });
 
 export function CheckInForm() {
@@ -32,14 +32,14 @@ export function CheckInForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      gymId: '',
+      memberId: '',
     },
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     toast({
       title: 'Check-in Successful!',
-      description: `Welcome back, member ${values.gymId}!`,
+      description: `Welcome back, member ${values.memberId}!`,
     });
     form.reset();
   }
@@ -50,7 +50,7 @@ export function CheckInForm() {
         <Dumbbell className="h-12 w-12 text-primary" />
         <CardTitle className="text-3xl font-bold">Member Check-in</CardTitle>
         <CardDescription>
-          Please enter your Gym ID to check in.
+          Please enter your Member ID to check in.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -58,16 +58,16 @@ export function CheckInForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
             <FormField
               control={form.control}
-              name="gymId"
+              name="memberId"
               render={({ field }) => (
                 <FormItem className="grid gap-2">
-                  <FormLabel htmlFor="gym-id" className="sr-only">
-                    Gym ID
+                  <FormLabel htmlFor="member-id" className="sr-only">
+                    Member ID
                   </FormLabel>
                   <FormControl>
                     <Input
-                      id="gym-id"
-                      placeholder="Enter your Gym ID (e.g., m001)"
+                      id="member-id"
+                      placeholder="Enter your Member ID (e.g., ALIC7890)"
                       className="text-center"
                       {...field}
                     />

@@ -1,5 +1,6 @@
 export type Member = {
   id: string;
+  memberId: string;
   name: string;
   email: string;
   phone: string;
@@ -49,18 +50,18 @@ export const gymInfo = {
 };
 
 export const members: Member[] = [
-  { id: 'm001', name: 'Alicia Keys', email: 'alicia@example.com', phone: '123-456-7890', plan: 'Annual', status: 'Paid', joinDate: '2023-01-15', expiryDate: '2024-01-14', avatar: 'member-1' },
-  { id: 'm002', name: 'Ben Affleck', email: 'ben@example.com', phone: '234-567-8901', plan: 'Monthly', status: 'Overdue', joinDate: '2023-06-20', expiryDate: '2024-07-19', avatar: 'member-2' },
-  { id: 'm003', name: 'Catherine Zeta', email: 'catherine@example.com', phone: '345-678-9012', plan: 'Quarterly', status: 'Paid', joinDate: '2023-04-10', expiryDate: '2024-07-09', avatar: 'member-3' },
-  { id: 'm004', name: 'Denzel Washington', email: 'denzel@example.com', phone: '456-789-0123', plan: 'Annual', status: 'Pending', joinDate: '2022-11-05', expiryDate: '2023-11-04', avatar: 'member-4' },
-  { id: 'm005', name: 'Eva Mendes', email: 'eva@example.com', phone: '567-890-1234', plan: 'Monthly', status: 'Overdue', joinDate: '2023-06-25', expiryDate: '2024-07-24', avatar: 'member-5' },
-  { id: 'm006', name: 'Frank Grillo', email: 'frank@example.com', phone: '678-901-2345', plan: 'Quarterly', status: 'Paid', joinDate: '2023-05-30', expiryDate: '2024-08-29', avatar: 'member-6' },
+  { id: 'm001', memberId: 'ALIC7890', name: 'Alicia Keys', email: 'alicia@example.com', phone: '1234567890', plan: 'Annual', status: 'Paid', joinDate: '2023-01-15', expiryDate: '2024-01-14', avatar: 'member-1' },
+  { id: 'm002', memberId: 'BENA8901', name: 'Ben Affleck', email: 'ben@example.com', phone: '2345678901', plan: 'Monthly', status: 'Overdue', joinDate: '2023-06-20', expiryDate: '2024-07-19', avatar: 'member-2' },
+  { id: 'm003', memberId: 'CATH9012', name: 'Catherine Zeta', email: 'catherine@example.com', phone: '3456789012', plan: 'Quarterly', status: 'Paid', joinDate: '2023-04-10', expiryDate: '2024-07-09', avatar: 'member-3' },
+  { id: 'm004', memberId: 'DENZ0123', name: 'Denzel Washington', email: 'denzel@example.com', phone: '4567890123', plan: 'Annual', status: 'Pending', joinDate: '2022-11-05', expiryDate: '2023-11-04', avatar: 'member-4' },
+  { id: 'm005', memberId: 'EVAM1234', name: 'Eva Mendes', email: 'eva@example.com', phone: '5678901234', plan: 'Monthly', status: 'Overdue', joinDate: '2023-06-25', expiryDate: '2024-07-24', avatar: 'member-5' },
+  { id: 'm006', memberId: 'FRAN2345', name: 'Frank Grillo', email: 'frank@example.com', phone: '6789012345', plan: 'Quarterly', status: 'Paid', joinDate: '2023-05-30', expiryDate: '2024-08-29', avatar: 'member-6' },
 ];
 
 export const trainers: Trainer[] = [
-  { id: 't01', name: 'Jane Fonda', specialization: 'Yoga & Pilates', phone: '123-456-7890', email: 'jane.f@gymtrack.pro', avatar: 'trainer-1' },
-  { id: 't02', name: 'Arnold Schwarzenegger', specialization: 'Bodybuilding', phone: '123-456-7891', email: 'arnold.s@gymtrack.pro', avatar: 'trainer-2' },
-  { id: 't03', name: 'Jillian Michaels', specialization: 'HIIT & Cardio', phone: '123-456-7892', email: 'jillian.m@gymtrack.pro', avatar: 'trainer-3' },
+  { id: 't01', name: 'Jane Fonda', specialization: 'Yoga & Pilates', phone: '1234567890', email: 'jane.f@gymtrack.pro', avatar: 'trainer-1' },
+  { id: 't02', name: 'Arnold Schwarzenegger', specialization: 'Bodybuilding', phone: '1234567891', email: 'arnold.s@gymtrack.pro', avatar: 'trainer-2' },
+  { id: 't03', name: 'Jillian Michaels', specialization: 'HIIT & Cardio', phone: '1234567892', email: 'jillian.m@gymtrack.pro', avatar: 'trainer-3' },
 ];
 
 export const plans: Plan[] = [

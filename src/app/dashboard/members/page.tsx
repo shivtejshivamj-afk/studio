@@ -1,8 +1,8 @@
 'use client';
 
-import { Eye, MoreVertical, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { members, plans, type Member } from '@/lib/data';
+import { members as initialMembers, plans, type Member } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
@@ -62,12 +62,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 const statusVariant = {
   Paid: 'default',
@@ -91,6 +85,7 @@ const memberFormSchema = z.object({
 type MemberFormValues = z.infer<typeof memberFormSchema>;
 
 export default function MembersPage() {
+  const [members, setMembers] = useState<Member[]>(initialMembers);
   const { toast } = useToast();
   type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
@@ -129,15 +124,50 @@ export default function MembersPage() {
   };
 
   const handleSaveMember = (values: MemberFormValues) => {
-    toast({
-      title: activeDialog === 'edit' ? 'Member Updated' : 'Member Added',
-      description: `The member details for ${values.name} have been saved.`,
-    });
+    const generateMemberId = (name: string, phone: string) => {
+      const namePart = name.replace(/ /g, "").substring(0, 4).toUpperCase();
+      const phonePart = phone.slice(-4);
+      return `${namePart}${phonePart}`;
+    };
+
+    if (activeDialog === 'add') {
+      const newMember: Member = {
+        id: `m${Date.now()}`,
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        plan: values.plan,
+        status: values.status,
+        joinDate: values.joinDate,
+        expiryDate: values.expiryDate,
+        avatar: 'member-3',
+        memberId: generateMemberId(values.name, values.phone),
+      };
+      setMembers((prev) => [...prev, newMember]);
+      toast({
+        title: 'Member Added',
+        description: `The member details for ${values.name} have been saved.`,
+      });
+    } else if (activeDialog === 'edit' && selectedMember) {
+      const updatedMember: Member = {
+        ...selectedMember,
+        ...values,
+        memberId: generateMemberId(values.name, values.phone),
+      };
+      setMembers((prev) =>
+        prev.map((m) => (m.id === selectedMember.id ? updatedMember : m))
+      );
+      toast({
+        title: 'Member Updated',
+        description: `The member details for ${values.name} have been saved.`,
+      });
+    }
     closeDialogs();
   };
 
   const handleDeleteConfirm = () => {
     if (selectedMember) {
+      setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
       toast({
         title: 'Member Deleted',
         description: `${selectedMember.name} has been deleted.`,
@@ -173,6 +203,7 @@ export default function MembersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Member</TableHead>
+                <TableHead>Member ID</TableHead>
                 <TableHead className="hidden md:table-cell">Plan</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Join Date
@@ -216,6 +247,7 @@ export default function MembersPage() {
                         </div>
                       </div>
                     </TableCell>
+                    <TableCell>{member.memberId}</TableCell>
                     <TableCell className="hidden md:table-cell">
                       {member.plan}
                     </TableCell>
@@ -234,33 +266,39 @@ export default function MembersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog('view', member)}
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">View</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog('edit', member)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog('delete', member)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </div>
+                      {isClient ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDialog('view', member)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="hidden sm:inline ml-2">View</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDialog('edit', member)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                            <span className="hidden sm:inline ml-2">Edit</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDialog('delete', member)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="hidden sm:inline ml-2">
+                              Delete
+                            </span>
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="h-10 w-20" />
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -416,9 +454,7 @@ export default function MembersPage() {
                           <SelectContent>
                             <SelectItem value="Paid">Paid</SelectItem>
                             <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Overdue">
-                              Overdue
-                            </SelectItem>
+                            <SelectItem value="Overdue">Overdue</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage className="mt-1" />
@@ -482,6 +518,10 @@ export default function MembersPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
+                <div>
+                  <span className="font-semibold">Member ID:</span>{' '}
+                  {selectedMember.memberId}
+                </div>
                 <div>
                   <span className="font-semibold">Plan:</span>{' '}
                   {selectedMember.plan}
