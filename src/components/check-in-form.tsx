@@ -22,6 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { members } from '@/lib/data';
 
 const formSchema = z.object({
   memberId: z.string().min(1, 'Member ID is required.'),
@@ -37,10 +38,22 @@ export function CheckInForm() {
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    toast({
-      title: 'Check-in Successful!',
-      description: `Welcome back, member ${values.memberId}!`,
-    });
+    const member = members.find(
+      (m) => m.memberId.toUpperCase() === values.memberId.toUpperCase()
+    );
+
+    if (member) {
+      toast({
+        title: 'Check-in Successful!',
+        description: `Welcome back, ${member.name}!`,
+      });
+    } else {
+      toast({
+        title: 'Check-in Failed',
+        description: `Member ID "${values.memberId}" not found. Please try again.`,
+        variant: 'destructive',
+      });
+    }
     form.reset();
   }
 

@@ -38,6 +38,7 @@ export type Payment = {
 
 export type Attendance = {
   id: string;
+  memberId: string;
   memberName: string;
   date: string;
   checkInTime: string;
@@ -79,12 +80,12 @@ export const payments: Payment[] = [
 ];
 
 export const attendance: Attendance[] = [
-    { id: 'att01', memberName: 'Alicia Keys', date: '2024-07-28', checkInTime: '08:15 AM', status: 'Checked-in' },
-    { id: 'att02', memberName: 'Ben Affleck', date: '2024-07-28', checkInTime: '09:00 AM', status: 'Checked-in' },
-    { id: 'att03', memberName: 'Catherine Zeta', date: '2024-07-28', checkInTime: 'N/A', status: 'Absent' },
-    { id: 'att04', memberName: 'Denzel Washington', date: '2024-07-27', checkInTime: '07:30 PM', status: 'Checked-in' },
-    { id: 'att05', memberName: 'Eva Mendes', date: '2024-07-27', checkInTime: '06:00 PM', status: 'Checked-in' },
-    { id: 'att06', memberName: 'Frank Grillo', date: '2024-07-27', checkInTime: 'N/A', status: 'Absent' },
+    { id: 'att01', memberId: 'ALIC7890', memberName: 'Alicia Keys', date: '2024-07-28', checkInTime: '08:15 AM', status: 'Checked-in' },
+    { id: 'att02', memberId: 'BENA8901', memberName: 'Ben Affleck', date: '2024-07-28', checkInTime: '09:00 AM', status: 'Checked-in' },
+    { id: 'att03', memberId: 'CATH9012', memberName: 'Catherine Zeta', date: '2024-07-28', checkInTime: 'N/A', status: 'Absent' },
+    { id: 'att04', memberId: 'DENZ0123', memberName: 'Denzel Washington', date: '2024-07-27', checkInTime: '07:30 PM', status: 'Checked-in' },
+    { id: 'att05', memberId: 'EVAM1234', memberName: 'Eva Mendes', date: '2024-07-27', checkInTime: '06:00 PM', status: 'Checked-in' },
+    { id: 'att06', memberId: 'FRAN2345', memberName: 'Frank Grillo', date: '2024-07-27', checkInTime: 'N/A', status: 'Absent' },
 ];
 
 export const dashboardStats = {

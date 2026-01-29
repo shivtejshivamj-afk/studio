@@ -35,6 +35,7 @@ export default function AttendancePage() {
           <TableHeader>
             <TableRow>
               <TableHead>Member</TableHead>
+              <TableHead>Member ID</TableHead>
               <TableHead className="hidden sm:table-cell">Date</TableHead>
               <TableHead className="hidden md:table-cell">Check-in Time</TableHead>
               <TableHead className="text-right">Status</TableHead>
@@ -46,6 +47,7 @@ export default function AttendancePage() {
                 <TableCell>
                   <div className="font-medium">{record.memberName}</div>
                 </TableCell>
+                <TableCell>{record.memberId}</TableCell>
                 <TableCell className="hidden sm:table-cell">{record.date}</TableCell>
                 <TableCell className="hidden md:table-cell">{record.checkInTime}</TableCell>
                 <TableCell className="text-right">
