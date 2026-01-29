@@ -64,9 +64,9 @@ import {
 } from '@/components/ui/form';
 
 const statusVariant = {
-  Active: 'default',
-  Inactive: 'secondary',
-  'Expiring Soon': 'destructive',
+  Paid: 'default',
+  Pending: 'secondary',
+  Overdue: 'destructive',
 } as const;
 
 const memberFormSchema = z.object({
@@ -79,7 +79,7 @@ const memberFormSchema = z.object({
   plan: z.string({ required_error: 'Please select a plan.' }),
   joinDate: z.string().min(1, 'Join date is required.'),
   expiryDate: z.string().min(1, 'Expiry date is required.'),
-  status: z.enum(['Active', 'Inactive', 'Expiring Soon']),
+  status: z.enum(['Paid', 'Pending', 'Overdue']),
 });
 
 type MemberFormValues = z.infer<typeof memberFormSchema>;
@@ -112,7 +112,7 @@ export default function MembersPage() {
         plan: undefined,
         joinDate: '',
         expiryDate: '',
-        status: 'Active',
+        status: 'Paid',
       });
     }
   };
@@ -406,10 +406,10 @@ export default function MembersPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Inactive">Inactive</SelectItem>
-                            <SelectItem value="Expiring Soon">
-                              Expiring Soon
+                            <SelectItem value="Paid">Paid</SelectItem>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Overdue">
+                              Overdue
                             </SelectItem>
                           </SelectContent>
                         </Select>

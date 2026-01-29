@@ -60,7 +60,7 @@ const statCards = [
     icon: Dumbbell,
   },
   {
-    title: 'Expiring Soon',
+    title: 'Overdue',
     value: dashboardStats.expiringSoon,
     icon: Clock,
   },
@@ -76,14 +76,14 @@ const statCards = [
   },
 ];
 
-const expiringMembers = members.filter(
-  (member) => member.status === 'Expiring Soon'
+const overdueMembers = members.filter(
+  (member) => member.status === 'Overdue'
 );
 
 const statusVariant = {
-  Active: 'default',
-  Inactive: 'secondary',
-  'Expiring Soon': 'destructive',
+  Paid: 'default',
+  Pending: 'secondary',
+  Overdue: 'destructive',
 } as const;
 
 export default function DashboardPage() {
@@ -161,9 +161,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Expiring Soon</CardTitle>
+              <CardTitle>Overdue Memberships</CardTitle>
               <CardDescription>
-                Members with memberships expiring soon.
+                Members with an overdue payment.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expiringMembers.map((member) => {
+                  {overdueMembers.map((member) => {
                     const avatar = PlaceHolderImages.find(
                       (img) => img.id === member.avatar
                     );
@@ -206,7 +206,7 @@ export default function DashboardPage() {
                           {member.plan}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="destructive">{member.status}</Badge>
+                          <Badge variant={statusVariant[member.status]}>{member.status}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           {isClient ? (
