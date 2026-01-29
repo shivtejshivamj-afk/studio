@@ -212,20 +212,20 @@ export default function DashboardPage() {
                           {isClient ? (
                             <div className="flex items-center justify-end gap-2">
                               <Button
-                                variant="outline"
-                                size="sm"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => handleSendReminder(member)}
                               >
                                 <Mail className="h-4 w-4" />
-                                <span className="hidden sm:inline ml-2">Send Reminder</span>
+                                <span className="sr-only">Send Reminder</span>
                               </Button>
                               <Button
-                                variant="outline"
-                                size="sm"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => handleOpenDialog('view', member)}
                               >
                                 <Eye className="h-4 w-4" />
-                                <span className="hidden sm:inline ml-2">View</span>
+                                <span className="sr-only">View</span>
                               </Button>
                             </div>
                           ) : (

@@ -284,29 +284,29 @@ export default function MembersPage() {
                       {isClient ? (
                         <div className="flex items-center justify-end gap-2">
                           <Button
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleOpenDialog('view', member)}
                           >
                             <Eye className="h-4 w-4" />
-                            <span className="hidden sm:inline ml-2">View</span>
+                            <span className="sr-only">View</span>
                           </Button>
                           <Button
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleOpenDialog('edit', member)}
                           >
                             <Pencil className="h-4 w-4" />
-                            <span className="hidden sm:inline ml-2">Edit</span>
+                            <span className="sr-only">Edit</span>
                           </Button>
                           <Button
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleOpenDialog('delete', member)}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
-                            <span className="hidden sm:inline ml-2">
+                            <span className="sr-only">
                               Delete
                             </span>
                           </Button>
