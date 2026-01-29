@@ -38,16 +38,6 @@ import {
 
 const statCards = [
   {
-    title: 'Gym ID',
-    value: gymInfo.id,
-    icon: Building,
-  },
-  {
-    title: 'Total Revenue',
-    value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
-    icon: DollarSign,
-  },
-  {
     title: 'Total Members',
     value: dashboardStats.totalMembers,
     icon: Users,
@@ -62,6 +52,16 @@ const statCards = [
     value: dashboardStats.expiringSoon,
     icon: Clock,
   },
+  {
+    title: 'Total Revenue',
+    value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
+    icon: DollarSign,
+  },
+  {
+    title: 'Gym ID',
+    value: gymInfo.id,
+    icon: Building,
+  },
 ];
 
 const expiringMembers = members.filter(
@@ -71,7 +71,7 @@ const expiringMembers = members.filter(
 export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card) => (
           <Card key={card.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
