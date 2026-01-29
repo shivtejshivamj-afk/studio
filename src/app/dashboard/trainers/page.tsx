@@ -2,7 +2,7 @@
 
 import { MoreVertical, PlusCircle } from 'lucide-react';
 import Image from 'next/image';
-import { trainers } from '@/lib/data';
+import { trainers as initialTrainers, type Trainer } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
@@ -46,9 +46,28 @@ import { useToast } from '@/hooks/use-toast';
 export default function TrainersPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
 
-  const handleSaveTrainer = (e: React.FormEvent) => {
+  const handleSaveTrainer = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const phone = formData.get('phone') as string;
+    const specialization = formData.get('specialization') as string;
+
+    const newTrainer: Trainer = {
+      id: `t${Date.now()}`,
+      name,
+      email,
+      phone,
+      specialization,
+      avatar: 'trainer-3', // Default avatar
+    };
+
+    setTrainers((prevTrainers) => [...prevTrainers, newTrainer]);
+
     toast({
       title: 'Trainer Added',
       description: 'The new trainer has been saved.',
@@ -86,7 +105,7 @@ export default function TrainersPage() {
                     <Label htmlFor="name" className="text-right">
                       Name
                     </Label>
-                    <Input id="name" className="col-span-3" required />
+                    <Input id="name" name="name" className="col-span-3" required />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="email" className="text-right">
@@ -94,6 +113,7 @@ export default function TrainersPage() {
                     </Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
                       placeholder="trainer@example.com"
                       className="col-span-3"
@@ -106,6 +126,7 @@ export default function TrainersPage() {
                     </Label>
                     <Input
                       id="phone"
+                      name="phone"
                       type="tel"
                       placeholder="123-456-7890"
                       className="col-span-3"
@@ -118,7 +139,12 @@ export default function TrainersPage() {
                     <Label htmlFor="specialization" className="text-right">
                       Specialization
                     </Label>
-                    <Input id="specialization" className="col-span-3" required />
+                    <Input
+                      id="specialization"
+                      name="specialization"
+                      className="col-span-3"
+                      required
+                    />
                   </div>
                 </div>
                 <DialogFooter>
