@@ -1,3 +1,58 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "member-1",
+      "description": "Portrait of a female member",
+      "imageUrl": "https://images.unsplash.com/photo-1581403341630-a6e0b9d2d257?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHx3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc2OTYzMjI1MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman portrait"
+    },
+    {
+      "id": "member-2",
+      "description": "Portrait of a male member",
+      "imageUrl": "https://images.unsplash.com/photo-1607031542107-f6f46b5d54e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3Njk2MjcxNjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man portrait"
+    },
+    {
+      "id": "member-3",
+      "description": "Portrait of a member",
+      "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3Njk2MzQxMjd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "member-4",
+      "description": "Portrait of a smiling female member",
+      "imageUrl": "https://images.unsplash.com/photo-1563178406-4cdc2923acbc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3b21hbiUyMHNtaWxpbmd8ZW58MHx8fHwxNzY5NTY3MjcwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman smiling"
+    },
+    {
+      "id": "member-5",
+      "description": "Portrait of a smiling male member",
+      "imageUrl": "https://images.unsplash.com/photo-1522556189639-b150ed9c4330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtYW4lMjBzbWlsaW5nfGVufDB8fHx8MTc2OTU5MjcxOHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man smiling"
+    },
+    {
+      "id": "member-6",
+      "description": "Portrait of a member",
+      "imageUrl": "https://images.unsplash.com/photo-1750521281030-964a37f24cb9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxwZXJzb24lMjBneW18ZW58MHx8fHwxNzY5NjgxNzMyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person gym"
+    },
+    {
+      "id": "trainer-1",
+      "description": "Portrait of a female fitness trainer",
+      "imageUrl": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxmaXRuZXNzJTIwdHJhaW5lcnxlbnwwfHx8fDE3Njk2NTgxNzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fitness trainer"
+    },
+    {
+      "id": "trainer-2",
+      "description": "Portrait of a male fitness trainer",
+      "imageUrl": "https://images.unsplash.com/photo-1638408536234-7d2697778dc7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtYWxlJTIwdHJhaW5lcnxlbnwwfHx8fDE3Njk2ODE3MzN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "male trainer"
+    },
+    {
+      "id": "trainer-3",
+      "description": "Portrait of a fitness trainer",
+      "imageUrl": "https://images.unsplash.com/photo-1758522274399-8d3fd26a02f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8dHJhaW5lciUyMHNtaWxpbmd8ZW58MHx8fHwxNzY5NjgxNzMyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "trainer smiling"
+    }
+  ]
 }
