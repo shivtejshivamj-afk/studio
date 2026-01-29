@@ -9,7 +9,6 @@ import {
   ClipboardCopy,
   Eye,
   Mail,
-  MoreVertical,
 } from 'lucide-react';
 import Image from 'next/image';
 import { dashboardStats, members, gymInfo, type Member } from '@/lib/data';
@@ -41,44 +40,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-
-const statCards = [
-  {
-    title: 'Total Members',
-    value: dashboardStats.totalMembers,
-    icon: Users,
-  },
-  {
-    title: 'Active Members',
-    value: dashboardStats.activeMembers,
-    icon: Dumbbell,
-  },
-  {
-    title: 'Overdue',
-    value: dashboardStats.expiringSoon,
-    icon: Clock,
-  },
-  {
-    title: 'Total Revenue',
-    value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
-    icon: DollarSign,
-  },
-  {
-    title: 'Gym ID',
-    value: gymInfo.id,
-    icon: Building,
-  },
-];
-
-const overdueMembers = members.filter(
-  (member) => member.status === 'Overdue'
-);
 
 const statusVariant = {
   Paid: 'default',
@@ -96,6 +57,53 @@ export default function DashboardPage() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const processedMembers = members.map((member) => {
+    const expiryDate = new Date(member.expiryDate);
+    if (expiryDate < today) {
+      return { ...member, status: 'Overdue' as const };
+    }
+    return member;
+  });
+
+  const overdueMembers = processedMembers.filter(
+    (member) => member.status === 'Overdue'
+  );
+
+  const activeMembersCount = processedMembers.filter(
+    (m) => m.status === 'Paid'
+  ).length;
+
+  const statCards = [
+    {
+      title: 'Total Members',
+      value: members.length,
+      icon: Users,
+    },
+    {
+      title: 'Active Members',
+      value: activeMembersCount,
+      icon: Dumbbell,
+    },
+    {
+      title: 'Overdue',
+      value: overdueMembers.length,
+      icon: Clock,
+    },
+    {
+      title: 'Total Revenue',
+      value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
+      icon: DollarSign,
+    },
+    {
+      title: 'Gym ID',
+      value: gymInfo.id,
+      icon: Building,
+    },
+  ];
 
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
     setSelectedMember(member || null);
@@ -206,7 +214,9 @@ export default function DashboardPage() {
                           {member.plan}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={statusVariant[member.status]}>{member.status}</Badge>
+                          <Badge variant={statusVariant[member.status]}>
+                            {member.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           {isClient ? (

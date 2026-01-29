@@ -49,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -101,6 +101,18 @@ export default function MembersPage() {
     resolver: zodResolver(memberFormSchema),
   });
 
+  const processedMembers = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return members.map((member) => {
+      const expiryDate = new Date(member.expiryDate);
+      if (expiryDate < today) {
+        return { ...member, status: 'Overdue' as const };
+      }
+      return member;
+    });
+  }, [members]);
+
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
     setSelectedMember(member || null);
     setActiveDialog(dialog);
@@ -126,7 +138,7 @@ export default function MembersPage() {
 
   const handleSaveMember = (values: MemberFormValues) => {
     const generateMemberId = (name: string, phone: string) => {
-      const namePart = name.replace(/ /g, "").substring(0, 4).toUpperCase();
+      const namePart = name.replace(/ /g, '').substring(0, 4).toUpperCase();
       const phonePart = phone.slice(-4);
       return `${namePart}${phonePart}`;
     };
@@ -177,8 +189,8 @@ export default function MembersPage() {
       closeDialogs();
     }
   };
-  
-  const filteredMembers = members.filter(
+
+  const filteredMembers = processedMembers.filter(
     (member) =>
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
@@ -196,7 +208,7 @@ export default function MembersPage() {
               </CardDescription>
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
-               <Input
+              <Input
                 placeholder="Search by name or ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -306,9 +318,7 @@ export default function MembersPage() {
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">
-                              Delete
-                            </span>
+                            <span className="sr-only">Delete</span>
                           </Button>
                         </div>
                       ) : (
