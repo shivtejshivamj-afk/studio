@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { Eye, MoreVertical, Pencil, PlusCircle, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { members, plans, type Member } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -62,6 +62,12 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const statusVariant = {
   Paid: 'default',
@@ -171,6 +177,9 @@ export default function MembersPage() {
                 <TableHead className="hidden md:table-cell">
                   Join Date
                 </TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Expiry Date
+                </TableHead>
                 <TableHead className="hidden lg:table-cell">Phone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -213,6 +222,9 @@ export default function MembersPage() {
                     <TableCell className="hidden md:table-cell">
                       {member.joinDate}
                     </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {member.expiryDate}
+                    </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       {member.phone}
                     </TableCell>
@@ -222,37 +234,33 @@ export default function MembersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {isClient ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog('view', member)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">View</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog('edit', member)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog('delete', member)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="h-10 w-24" />
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDialog('view', member)}
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDialog('edit', member)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Edit</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDialog('delete', member)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
