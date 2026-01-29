@@ -39,31 +39,54 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+
+const trainerFormSchema = z.object({
+  name: z.string().min(1, { message: 'Name is required.' }),
+  email: z.string().email({ message: 'Please enter a valid email.' }),
+  phone: z
+    .string()
+    .length(10, { message: 'Phone number must be exactly 10 digits.' })
+    .regex(/^[0-9]+$/, { message: 'Phone number must only contain digits.' }),
+  specialization: z
+    .string()
+    .min(1, { message: 'Specialization is required.' }),
+});
+
+type TrainerFormValues = z.infer<typeof trainerFormSchema>;
 
 export default function TrainersPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
 
-  const handleSaveTrainer = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
-    const specialization = formData.get('specialization') as string;
+  const form = useForm<TrainerFormValues>({
+    resolver: zodResolver(trainerFormSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      specialization: '',
+    },
+  });
 
+  function handleSaveTrainer(values: TrainerFormValues) {
     const newTrainer: Trainer = {
       id: `t${Date.now()}`,
-      name,
-      email,
-      phone,
-      specialization,
       avatar: 'trainer-3', // Default avatar
+      ...values,
     };
 
     setTrainers((prevTrainers) => [...prevTrainers, newTrainer]);
@@ -74,6 +97,13 @@ export default function TrainersPage() {
     });
     setIsDialogOpen(false);
     form.reset();
+  }
+
+  const handleOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      form.reset();
+    }
   };
 
   return (
@@ -86,7 +116,7 @@ export default function TrainersPage() {
               Manage your gym's trainers and their profiles.
             </CardDescription>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1">
                 <PlusCircle className="h-4 w-4" />
@@ -94,71 +124,98 @@ export default function TrainersPage() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <form onSubmit={handleSaveTrainer}>
-                <DialogHeader>
-                  <DialogTitle>Add New Trainer</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details for the new trainer.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">
-                      Name
-                    </Label>
-                    <Input id="name" name="name" className="col-span-3" required />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="email" className="text-right">
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSaveTrainer)}>
+                  <DialogHeader>
+                    <DialogTitle>Add New Trainer</DialogTitle>
+                    <DialogDescription>
+                      Fill in the details for the new trainer.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <div className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">Name</FormLabel>
+                          <FormItem className="col-span-3">
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
                       name="email"
-                      type="email"
-                      placeholder="trainer@example.com"
-                      className="col-span-3"
-                      required
+                      render={({ field }) => (
+                        <div className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">Email</FormLabel>
+                          <FormItem className="col-span-3">
+                            <FormControl>
+                              <Input
+                                type="email"
+                                placeholder="trainer@example.com"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                      )}
                     />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="phone" className="text-right">
-                      Phone
-                    </Label>
-                    <Input
-                      id="phone"
+                    <FormField
+                      control={form.control}
                       name="phone"
-                      type="tel"
-                      placeholder="1234567890"
-                      className="col-span-3"
-                      pattern="[0-9]{10}"
-                      title="Phone number must be 10 digits."
-                      required
+                      render={({ field }) => (
+                        <div className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">Phone</FormLabel>
+                          <FormItem className="col-span-3">
+                            <FormControl>
+                              <Input
+                                type="tel"
+                                placeholder="1234567890"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                      )}
                     />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="specialization" className="text-right">
-                      Specialization
-                    </Label>
-                    <Input
-                      id="specialization"
+                    <FormField
+                      control={form.control}
                       name="specialization"
-                      className="col-span-3"
-                      required
+                      render={({ field }) => (
+                        <div className="grid grid-cols-4 items-center gap-x-4">
+                          <FormLabel className="text-right">
+                            Specialization
+                          </FormLabel>
+                          <FormItem className="col-span-3">
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                      )}
                     />
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save Trainer</Button>
-                </DialogFooter>
-              </form>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">Save Trainer</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>
