@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a gym owner or administrator account.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID from Firebase Authentication."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "The name of the gym owner."
+        },
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym."
+        },
+        "gymId": {
+          "type": "string",
+          "description": "A unique ID for the gym."
+        }
+      },
+      "required": ["uid", "email", "ownerName", "gymName", "gymId"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Represents a member of the gym.",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "description": "The unique identifier for the member."
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "plan": {
+          "type": "string",
+          "description": "Name of the Plan"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Paid", "Pending", "Overdue"]
+        },
+        "joinDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "expiryDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "avatar": {
+            "type": "string",
+            "description": "ID for placeholder image"
+        }
+      },
+      "required": ["memberId", "name", "email", "phone", "plan", "status", "joinDate", "expiryDate"]
+    },
+    "Trainer": {
+        "title": "Trainer",
+        "description": "Represents a trainer at the gym.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "specialization": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
+            "avatar": { "type": "string", "description": "ID for placeholder image" }
+        },
+        "required": ["name", "specialization", "phone", "email"]
+    },
+    "Plan": {
+        "title": "Plan",
+        "description": "Represents a membership plan.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "price": { "type": "number" },
+            "duration": { "type": "number", "description": "Duration in days" }
+        },
+        "required": ["name", "price", "duration"]
+    },
+    "Payment": {
+        "title": "Payment",
+        "description": "Represents a payment from a member.",
+        "type": "object",
+        "properties": {
+            "memberName": { "type": "string" },
+            "planName": { "type": "string" },
+            "amount": { "type": "number" },
+            "date": { "type": "string", "format": "date" },
+            "status": { "type": "string", "enum": ["Paid", "Pending", "Failed"] }
+        },
+        "required": ["memberName", "planName", "amount", "date", "status"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Represents a member's check-in record.",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "checkInTime": { "type": "string", "format": "time" },
+        "status": { "type": "string", "enum": ["Checked-in", "Absent"] }
+      },
+      "required": ["memberId", "memberName", "date", "status"]
+    }
+  },
+  "auth": {
+    "providers": ["email_password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores public profile information for each user."
+    },
+    "/gyms/{gymId}/members": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Stores information about gym members for a specific gym."
+    },
+    "/gyms/{gymId}/trainers": {
+        "schema": { "$ref": "#/entities/Trainer" },
+        "description": "Stores information about gym trainers for a specific gym."
+    },
+    "/gyms/{gymId}/plans": {
+        "schema": { "$ref": "#/entities/Plan" },
+        "description": "Stores membership plans for a specific gym."
+    },
+    "/gyms/{gymId}/payments": {
+        "schema": { "$ref": "#/entities/Payment" },
+        "description": "Stores payment records for a specific gym."
+    },
+    "/gyms/{gymId}/attendance": {
+        "schema": { "$ref": "#/entities/Attendance" },
+        "description": "Stores attendance records for a specific gym."
+    }
+  }
+}

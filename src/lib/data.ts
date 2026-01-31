@@ -45,25 +45,9 @@ export type Attendance = {
   status: 'Checked-in' | 'Absent';
 };
 
-export const gymInfo = {
-  name: 'GymTrack Pro',
-  id: 'GYMT4587'
-};
+export const members: Member[] = [];
 
-export const members: Member[] = [
-  { id: 'm001', memberId: 'ALIC7890', name: 'Alicia Keys', email: 'alicia@example.com', phone: '1234567890', plan: 'Annual', status: 'Paid', joinDate: '2023-01-15', expiryDate: '2024-01-14', avatar: 'member-1' },
-  { id: 'm002', memberId: 'BENA8901', name: 'Ben Affleck', email: 'ben@example.com', phone: '2345678901', plan: 'Monthly', status: 'Overdue', joinDate: '2023-06-20', expiryDate: '2024-07-19', avatar: 'member-2' },
-  { id: 'm003', memberId: 'CATH9012', name: 'Catherine Zeta', email: 'catherine@example.com', phone: '3456789012', plan: 'Quarterly', status: 'Paid', joinDate: '2023-04-10', expiryDate: '2024-07-09', avatar: 'member-3' },
-  { id: 'm004', memberId: 'DENZ0123', name: 'Denzel Washington', email: 'denzel@example.com', phone: '4567890123', plan: 'Annual', status: 'Pending', joinDate: '2022-11-05', expiryDate: '2023-11-04', avatar: 'member-4' },
-  { id: 'm005', memberId: 'EVAM1234', name: 'Eva Mendes', email: 'eva@example.com', phone: '5678901234', plan: 'Monthly', status: 'Overdue', joinDate: '2023-06-25', expiryDate: '2024-07-24', avatar: 'member-5' },
-  { id: 'm006', memberId: 'FRAN2345', name: 'Frank Grillo', email: 'frank@example.com', phone: '6789012345', plan: 'Quarterly', status: 'Paid', joinDate: '2023-05-30', expiryDate: '2024-08-29', avatar: 'member-6' },
-];
-
-export const trainers: Trainer[] = [
-  { id: 't01', name: 'Jane Fonda', specialization: 'Yoga & Pilates', phone: '1234567890', email: 'jane.f@gymtrack.pro', avatar: 'trainer-1' },
-  { id: 't02', name: 'Arnold Schwarzenegger', specialization: 'Bodybuilding', phone: '1234567891', email: 'arnold.s@gymtrack.pro', avatar: 'trainer-2' },
-  { id: 't03', name: 'Jillian Michaels', specialization: 'HIIT & Cardio', phone: '1234567892', email: 'jillian.m@gymtrack.pro', avatar: 'trainer-3' },
-];
+export const trainers: Trainer[] = [];
 
 export const plans: Plan[] = [
   { id: 'p01', name: 'Monthly', price: 50, duration: 30 },
@@ -71,26 +55,13 @@ export const plans: Plan[] = [
   { id: 'p03', name: 'Annual', price: 500, duration: 365 },
 ];
 
-export const payments: Payment[] = [
-  { id: 'pay01', memberName: 'Alicia Keys', planName: 'Annual', amount: 500, date: '2023-01-15', status: 'Paid' },
-  { id: 'pay02', memberName: 'Ben Affleck', planName: 'Monthly', amount: 50, date: '2023-06-20', status: 'Paid' },
-  { id: 'pay03', memberName: 'Catherine Zeta', planName: 'Quarterly', amount: 135, date: '2023-04-10', status: 'Paid' },
-  { id: 'pay04', memberName: 'Eva Mendes', planName: 'Monthly', amount: 50, date: '2023-06-25', status: 'Paid' },
-  { id: 'pay05', memberName: 'Frank Grillo', planName: 'Quarterly', amount: 135, date: '2023-05-30', status: 'Paid' },
-];
+export const payments: Payment[] = [];
 
-export const attendance: Attendance[] = [
-    { id: 'att01', memberId: 'ALIC7890', memberName: 'Alicia Keys', date: '2024-07-28', checkInTime: '08:15 AM', status: 'Checked-in' },
-    { id: 'att02', memberId: 'BENA8901', memberName: 'Ben Affleck', date: '2024-07-28', checkInTime: '09:00 AM', status: 'Checked-in' },
-    { id: 'att03', memberId: 'CATH9012', memberName: 'Catherine Zeta', date: '2024-07-28', checkInTime: 'N/A', status: 'Absent' },
-    { id: 'att04', memberId: 'DENZ0123', memberName: 'Denzel Washington', date: '2024-07-27', checkInTime: '07:30 PM', status: 'Checked-in' },
-    { id: 'att05', memberId: 'EVAM1234', memberName: 'Eva Mendes', date: '2024-07-27', checkInTime: '06:00 PM', status: 'Checked-in' },
-    { id: 'att06', memberId: 'FRAN2345', memberName: 'Frank Grillo', date: '2024-07-27', checkInTime: 'N/A', status: 'Absent' },
-];
+export const attendance: Attendance[] = [];
 
 export const dashboardStats = {
-  totalMembers: members.length,
-  activeMembers: members.filter(m => m.status === 'Paid').length,
-  totalRevenue: payments.reduce((acc, p) => acc + p.amount, 0),
-  expiringSoon: members.filter(m => m.status === 'Overdue').length,
+  totalMembers: 0,
+  activeMembers: 0,
+  totalRevenue: 0,
+  expiringSoon: 0,
 };
