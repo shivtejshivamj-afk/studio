@@ -5,13 +5,11 @@ import {
   Dumbbell,
   DollarSign,
   Clock,
-  Building,
-  ClipboardCopy,
   Eye,
   Mail,
 } from 'lucide-react';
 import Image from 'next/image';
-import { dashboardStats, members, gymInfo, type Member } from '@/lib/data';
+import { dashboardStats, members, type Member } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
@@ -98,11 +96,6 @@ export default function DashboardPage() {
       value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
       icon: DollarSign,
     },
-    {
-      title: 'Gym ID',
-      value: gymInfo.id,
-      icon: Building,
-    },
   ];
 
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
@@ -115,14 +108,6 @@ export default function DashboardPage() {
     setSelectedMember(null);
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copied to clipboard!',
-      description: `The Gym ID "${text}" has been copied.`,
-    });
-  };
-
   const handleSendReminder = (member: Member) => {
     toast({
       title: 'Reminder Sent!',
@@ -133,7 +118,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((card) => (
             <Card key={card.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -143,24 +128,7 @@ export default function DashboardPage() {
                 <card.icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                {card.title === 'Gym ID' ? (
-                  <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold">{card.value}</div>
-                    {isClient && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleCopy(card.value as string)}
-                        className="h-8 w-8"
-                      >
-                        <ClipboardCopy className="h-4 w-4" />
-                        <span className="sr-only">Copy Gym ID</span>
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold">{card.value}</div>
-                )}
+                <div className="text-2xl font-bold">{card.value}</div>
               </CardContent>
             </Card>
           ))}
