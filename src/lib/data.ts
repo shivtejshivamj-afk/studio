@@ -27,13 +27,17 @@ export type Plan = {
   duration: number; // in days
 };
 
-export type Payment = {
+export type Invoice = {
   id: string;
+  invoiceId: string;
+  memberId: string;
   memberName: string;
   planName: string;
   amount: number;
-  date: string;
-  status: 'Paid' | 'Pending' | 'Failed';
+  issueDate: string;
+  dueDate: string;
+  paidDate?: string;
+  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
 };
 
 export type Attendance = {
@@ -55,7 +59,7 @@ export const plans: Plan[] = [
   { id: 'p03', name: 'Annual', price: 500, duration: 365 },
 ];
 
-export const payments: Payment[] = [];
+export const invoices: Invoice[] = [];
 
 export const attendance: Attendance[] = [];
 

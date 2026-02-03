@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Users,
   Dumbbell,
-  CreditCard,
+  FileText,
   Calendar,
   LayoutDashboard,
   LogOut,
@@ -32,7 +32,7 @@ const navItems = [
   { href: '/dashboard/members', icon: Users, label: 'Members' },
   { href: '/dashboard/trainers', icon: Dumbbell, label: 'Trainers' },
   { href: '/dashboard/plans', icon: Calendar, label: 'Plans' },
-  { href: '/dashboard/payments', icon: CreditCard, label: 'Payments' },
+  { href: '/dashboard/payments', icon: FileText, label: 'Invoicing' },
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
 ];
 

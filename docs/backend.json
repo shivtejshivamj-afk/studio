@@ -95,18 +95,22 @@
         },
         "required": ["name", "price", "duration"]
     },
-    "Payment": {
-        "title": "Payment",
-        "description": "Represents a payment from a member.",
+    "Invoice": {
+        "title": "Invoice",
+        "description": "Represents a billing invoice for a member.",
         "type": "object",
         "properties": {
+            "invoiceId": { "type": "string", "description": "Unique identifier for the invoice." },
+            "memberId": { "type": "string", "description": "ID of the member being invoiced." },
             "memberName": { "type": "string" },
             "planName": { "type": "string" },
             "amount": { "type": "number" },
-            "date": { "type": "string", "format": "date" },
-            "status": { "type": "string", "enum": ["Paid", "Pending", "Failed"] }
+            "issueDate": { "type": "string", "format": "date" },
+            "dueDate": { "type": "string", "format": "date" },
+            "paidDate": { "type": "string", "format": "date", "description": "The date the invoice was paid."},
+            "status": { "type": "string", "enum": ["Paid", "Pending", "Overdue", "Draft"] }
         },
-        "required": ["memberName", "planName", "amount", "date", "status"]
+        "required": ["invoiceId", "memberId", "memberName", "planName", "amount", "issueDate", "dueDate", "status"]
     },
     "Attendance": {
       "title": "Attendance",
@@ -142,9 +146,9 @@
         "schema": { "$ref": "#/entities/Plan" },
         "description": "Stores membership plans for a specific gym."
     },
-    "/gyms/{gymId}/payments": {
-        "schema": { "$ref": "#/entities/Payment" },
-        "description": "Stores payment records for a specific gym."
+    "/gyms/{gymId}/invoices": {
+        "schema": { "$ref": "#/entities/Invoice" },
+        "description": "Stores invoice records for a specific gym."
     },
     "/gyms/{gymId}/attendance": {
         "schema": { "$ref": "#/entities/Attendance" },
