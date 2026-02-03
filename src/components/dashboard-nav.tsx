@@ -21,6 +21,8 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarSeparator,
+  SidebarTrigger,
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -39,11 +41,15 @@ export function DashboardNav() {
   const userAvatar = PlaceHolderImages.find(img => img.id === 'trainer-1');
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
+      <SidebarRail />
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <Dumbbell className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-semibold">GymTrack Pro</h1>
+        <div className="flex w-full items-center justify-between">
+            <div className="flex items-center gap-2">
+                <Dumbbell className="h-8 w-8 text-primary" />
+                <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">GymTrack Pro</h1>
+            </div>
+          <SidebarTrigger className="hidden md:flex" />
         </div>
       </SidebarHeader>
       <SidebarContent className="p-2">
@@ -56,7 +62,7 @@ export function DashboardNav() {
                   tooltip={{ children: item.label }}
                 >
                   <item.icon />
-                  <span>{item.label}</span>
+                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -65,12 +71,12 @@ export function DashboardNav() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarSeparator />
-        <div className="flex items-center gap-3 p-2">
+        <div className="flex items-center gap-3 p-2 group-data-[collapsible=icon]:justify-center">
            <Avatar className="h-10 w-10">
             {userAvatar && <AvatarImage src={userAvatar.imageUrl} alt="Admin" data-ai-hint={userAvatar.imageHint}/>}
             <AvatarFallback>AD</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="font-semibold text-sm">Admin User</span>
             <span className="text-xs text-muted-foreground">admin@gymtrack.pro</span>
           </div>
@@ -78,7 +84,7 @@ export function DashboardNav() {
         <Link href="/">
           <SidebarMenuButton tooltip={{ children: 'Logout' }}>
             <LogOut />
-            <span>Logout</span>
+            <span className="group-data-[collapsible=icon]:hidden">Logout</span>
           </SidebarMenuButton>
         </Link>
       </SidebarFooter>
