@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -24,20 +25,47 @@ import {
 } from '@/components/ui/form';
 import { members } from '@/lib/data';
 
-const formSchema = z.object({
+const gymIdSchema = z.object({
+  gymId: z.string().min(1, 'Gym ID is required.'),
+});
+
+const memberIdSchema = z.object({
   memberId: z.string().min(1, 'Member ID is required.'),
 });
 
 export function CheckInForm() {
   const { toast } = useToast();
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const [step, setStep] = useState<'gymId' | 'memberId'>('gymId');
+  const [gymId, setGymId] = useState('');
+
+  const gymIdForm = useForm<z.infer<typeof gymIdSchema>>({
+    resolver: zodResolver(gymIdSchema),
+    defaultValues: {
+      gymId: '',
+    },
+  });
+
+  const memberIdForm = useForm<z.infer<typeof memberIdSchema>>({
+    resolver: zodResolver(memberIdSchema),
     defaultValues: {
       memberId: '',
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  function handleGymIdSubmit(values: z.infer<typeof gymIdSchema>) {
+    // In a real app, you'd validate the gymId against a database.
+    // For now, we'll just assume it's valid and move to the next step.
+    setGymId(values.gymId);
+    setStep('memberId');
+    toast({
+      title: 'Gym ID Entered',
+      description: `Checking in to gym: ${values.gymId}`,
+    });
+  }
+
+  function handleMemberIdSubmit(values: z.infer<typeof memberIdSchema>) {
+    // Here we would check the member in the specific gym using `gymId` and `values.memberId`
+    // For now, using mock data.
     const member = members.find(
       (m) => m.memberId.toUpperCase() === values.memberId.toUpperCase()
     );
@@ -50,51 +78,117 @@ export function CheckInForm() {
     } else {
       toast({
         title: 'Check-in Failed',
-        description: `Member ID "${values.memberId}" not found. Please try again.`,
+        description: `Member ID "${values.memberId}" not found in gym "${gymId}". Please try again.`,
         variant: 'destructive',
       });
     }
-    form.reset();
+    memberIdForm.reset();
+    gymIdForm.reset();
+    setStep('gymId'); // Go back to the first step after an attempt
   }
 
-  return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="items-center text-center">
-        <Dumbbell className="h-12 w-12 text-primary" />
-        <CardTitle className="text-3xl font-bold">Member Check-in</CardTitle>
-        <CardDescription>
-          Please enter your Member ID to check in.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
-            <FormField
-              control={form.control}
-              name="memberId"
-              render={({ field }) => (
-                <FormItem className="grid gap-2">
-                  <FormLabel htmlFor="member-id" className="sr-only">
-                    Member ID
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      id="member-id"
-                      placeholder="Enter your Member ID (e.g., ALIC7890)"
-                      className="text-center"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" size="lg">
-              Check In
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  );
+  const handleBack = () => {
+    setStep('gymId');
+    memberIdForm.reset();
+  };
+
+  if (step === 'gymId') {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          <Dumbbell className="h-12 w-12 text-primary" />
+          <CardTitle className="text-3xl font-bold">Gym Check-in</CardTitle>
+          <CardDescription>
+            Please enter your Gym ID to begin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...gymIdForm}>
+            <form
+              onSubmit={gymIdForm.handleSubmit(handleGymIdSubmit)}
+              className="grid gap-4"
+            >
+              <FormField
+                control={gymIdForm.control}
+                name="gymId"
+                render={({ field }) => (
+                  <FormItem className="grid gap-2">
+                    <FormLabel htmlFor="gym-id" className="sr-only">
+                      Gym ID
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        id="gym-id"
+                        placeholder="Enter your Gym ID"
+                        className="text-center"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" size="lg">
+                Continue
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (step === 'memberId') {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          <Dumbbell className="h-12 w-12 text-primary" />
+          <CardTitle className="text-3xl font-bold">Member Check-in</CardTitle>
+          <CardDescription>
+            Checking in to <span className="font-semibold">{gymId}</span>.
+            Please enter your Member ID.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...memberIdForm}>
+            <form
+              onSubmit={memberIdForm.handleSubmit(handleMemberIdSubmit)}
+              className="grid gap-4"
+            >
+              <FormField
+                control={memberIdForm.control}
+                name="memberId"
+                render={({ field }) => (
+                  <FormItem className="grid gap-2">
+                    <FormLabel htmlFor="member-id" className="sr-only">
+                      Member ID
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        id="member-id"
+                        placeholder="Enter your Member ID (e.g., ALIC7890)"
+                        className="text-center"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Button variant="outline" size="lg" onClick={handleBack} type="button">
+                  Back
+                </Button>
+                <Button type="submit" size="lg">
+                  Check In
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return null;
 }
