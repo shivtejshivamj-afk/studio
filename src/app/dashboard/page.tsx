@@ -8,7 +8,7 @@ import {
   Eye,
   Mail,
   Copy,
-  Store,
+  UserCheck,
 } from 'lucide-react';
 import { type Member } from '@/lib/data';
 import {
@@ -46,6 +46,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 const statusVariant = {
   active: 'default',
@@ -128,10 +129,10 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      title: 'Gym Name',
-      value: adminProfile?.gymName ?? '...',
-      icon: Store,
-      loading: isLoadingAdminProfile,
+      title: 'Member Check-in ID',
+      icon: UserCheck,
+      isInfoCard: true,
+      loading: false,
     },
     {
       title: 'Total Members',
@@ -164,7 +165,7 @@ export default function DashboardPage() {
     <>
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {statCards.map((card) => (
+          {statCards.map((card: any) => (
             <Card key={card.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -175,6 +176,17 @@ export default function DashboardPage() {
               <CardContent>
                 {card.loading ? (
                   <Skeleton className="h-8 w-20" />
+                ) : card.isInfoCard ? (
+                  <div className="text-sm text-muted-foreground pt-2">
+                    IDs are unique per member. View and copy them on the{' '}
+                    <Link
+                      href="/dashboard/members"
+                      className="underline text-primary hover:text-primary/80"
+                    >
+                      Members page
+                    </Link>
+                    .
+                  </div>
                 ) : (
                   <div className="text-2xl font-bold">{card.value}</div>
                 )}
