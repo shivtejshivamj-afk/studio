@@ -112,6 +112,7 @@ export function CheckInForm() {
       addDocumentNonBlocking(attendanceRef, {
         memberId: member.id,
         checkInTime: serverTimestamp(),
+        gymName: gymName,
       });
 
       toast({

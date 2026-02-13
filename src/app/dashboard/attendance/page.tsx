@@ -36,6 +36,8 @@ import {
   useFirestore,
   useMemoFirebase,
   addDocumentNonBlocking,
+  useUser,
+  useDoc,
 } from '@/firebase';
 import {
   collection,
@@ -45,6 +47,7 @@ import {
   getDocs,
   serverTimestamp,
   Timestamp,
+  doc,
 } from 'firebase/firestore';
 import { type Attendance, type Member } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -68,18 +71,38 @@ type AttendanceRecord = {
 
 export default function AttendancePage() {
   const { toast } = useToast();
+  const { user } = useUser();
   const firestore = useFirestore();
 
+  const adminProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } =
+    useDoc<{ gymName: string }>(adminProfileRef);
+
   const attendanceQuery = useMemoFirebase(
-    () => (firestore ? collectionGroup(firestore, 'attendance') : null),
-    [firestore]
+    () =>
+      firestore && adminProfile?.gymName
+        ? query(
+            collectionGroup(firestore, 'attendance'),
+            where('gymName', '==', adminProfile.gymName)
+          )
+        : null,
+    [firestore, adminProfile]
   );
   const { data: attendanceData, isLoading: isLoadingAttendance } =
     useCollection<Attendance>(attendanceQuery);
 
   const membersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'members') : null),
-    [firestore]
+    () =>
+      firestore && adminProfile?.gymName
+        ? query(
+            collection(firestore, 'members'),
+            where('gymName', '==', adminProfile.gymName)
+          )
+        : null,
+    [firestore, adminProfile]
   );
   const { data: members, isLoading: isLoadingMembers } =
     useCollection<Member>(membersQuery);
@@ -92,12 +115,20 @@ export default function AttendancePage() {
   });
 
   async function handleCheckIn(values: z.infer<typeof checkInSchema>) {
-    if (!firestore) return;
+    if (!firestore || !adminProfile?.gymName) {
+      toast({
+        title: 'Check-in Error',
+        description: 'Could not determine your gym. Please sign in again.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       const membersRef = collection(firestore, 'members');
       const q = query(
         membersRef,
+        where('gymName', '==', adminProfile.gymName),
         where('gymId', '==', values.memberId.toUpperCase())
       );
       const querySnapshot = await getDocs(q);
@@ -105,7 +136,7 @@ export default function AttendancePage() {
       if (querySnapshot.empty) {
         toast({
           title: 'Check-in Failed',
-          description: `Member ID "${values.memberId}" not found. Please try again.`,
+          description: `Member ID "${values.memberId}" not found in this gym. Please try again.`,
           variant: 'destructive',
         });
         return;
@@ -123,6 +154,7 @@ export default function AttendancePage() {
       addDocumentNonBlocking(attendanceRef, {
         memberId: member.id,
         checkInTime: serverTimestamp(),
+        gymName: adminProfile.gymName,
       });
 
       toast({
@@ -169,7 +201,7 @@ export default function AttendancePage() {
       );
   }, [attendanceData, members]);
 
-  const isLoading = isLoadingAttendance || isLoadingMembers;
+  const isLoading = isLoadingAttendance || isLoadingMembers || isLoadingAdminProfile;
 
   return (
     <Card>
@@ -178,7 +210,7 @@ export default function AttendancePage() {
           <div>
             <CardTitle>Attendance</CardTitle>
             <CardDescription>
-              View and manage member attendance records.
+              View and manage member attendance records for {adminProfile?.gymName || 'your gym'}.
             </CardDescription>
           </div>
           <Form {...form}>
@@ -198,7 +230,7 @@ export default function AttendancePage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit">Check In</Button>
+              <Button type="submit" disabled={isLoading}>Check In</Button>
             </form>
           </Form>
         </div>

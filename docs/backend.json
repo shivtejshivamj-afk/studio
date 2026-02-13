@@ -269,12 +269,17 @@
           "type": "string",
           "description": "The date and time the member checked out (optional).",
           "format": "date-time"
+        },
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym where the check-in occurred."
         }
       },
       "required": [
         "id",
         "memberId",
-        "checkInTime"
+        "checkInTime",
+        "gymName"
       ]
     },
     "Invoice": {
