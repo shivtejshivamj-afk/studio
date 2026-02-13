@@ -101,7 +101,7 @@ export default function MembersPage() {
       () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
       [firestore, user]
   );
-  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string}>(adminProfileRef);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string, ownerName: string}>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
       () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
@@ -149,7 +149,15 @@ export default function MembersPage() {
   };
 
   const handleSaveMember = (values: MemberFormValues) => {
-    if (!firestore || !adminProfile) return;
+    if (!firestore || !adminProfile?.gymName) {
+      toast({
+        title: 'Cannot Add Member',
+        description:
+          "Your gym name couldn't be found. Please ensure you have signed up correctly.",
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (activeDialog === 'add') {
         const newDocRef = doc(collection(firestore, 'members'));
@@ -229,6 +237,7 @@ export default function MembersPage() {
                 size="sm"
                 className="gap-1"
                 onClick={() => handleOpenDialog('add')}
+                disabled={isLoading || !adminProfile?.gymName}
               >
                 <PlusCircle className="h-4 w-4" />
                 Add Member
