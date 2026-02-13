@@ -33,8 +33,8 @@ import {
 } from 'firebase/firestore';
 import type { Member } from '@/lib/data';
 
-const gymIdSchema = z.object({
-  gymId: z.string().min(1, 'Gym ID is required.'),
+const gymNameSchema = z.object({
+  gymName: z.string().min(1, 'Gym Name is required.'),
 });
 
 const memberIdSchema = z.object({
@@ -43,14 +43,14 @@ const memberIdSchema = z.object({
 
 export function CheckInForm() {
   const { toast } = useToast();
-  const [step, setStep] = useState<'gymId' | 'memberId'>('gymId');
-  const [gymId, setGymId] = useState('');
+  const [step, setStep] = useState<'gymName' | 'memberId'>('gymName');
+  const [gymName, setGymName] = useState('');
   const firestore = useFirestore();
 
-  const gymIdForm = useForm<z.infer<typeof gymIdSchema>>({
-    resolver: zodResolver(gymIdSchema),
+  const gymNameForm = useForm<z.infer<typeof gymNameSchema>>({
+    resolver: zodResolver(gymNameSchema),
     defaultValues: {
-      gymId: '',
+      gymName: '',
     },
   });
 
@@ -61,14 +61,12 @@ export function CheckInForm() {
     },
   });
 
-  function handleGymIdSubmit(values: z.infer<typeof gymIdSchema>) {
-    // In a real app, you'd validate the gymId against a database.
-    // For now, we'll just assume it's valid and move to the next step.
-    setGymId(values.gymId);
+  function handleGymNameSubmit(values: z.infer<typeof gymNameSchema>) {
+    setGymName(values.gymName);
     setStep('memberId');
     toast({
-      title: 'Gym ID Entered',
-      description: `Checking in to gym: ${values.gymId}`,
+      title: 'Gym Name Entered',
+      description: `Checking in to gym: ${values.gymName}`,
     });
   }
 
@@ -79,6 +77,7 @@ export function CheckInForm() {
       const membersRef = collection(firestore, 'members');
       const q = query(
         membersRef,
+        where('gymName', '==', gymName),
         where('gymId', '==', values.memberId.toUpperCase())
       );
       const querySnapshot = await getDocs(q);
@@ -86,7 +85,7 @@ export function CheckInForm() {
       if (querySnapshot.empty) {
         toast({
           title: 'Check-in Failed',
-          description: `Member ID "${values.memberId}" not found in gym "${gymId}". Please try again.`,
+          description: `Member ID "${values.memberId}" not found in gym "${gymName}". Please try again.`,
           variant: 'destructive',
         });
         return;
@@ -128,44 +127,44 @@ export function CheckInForm() {
       });
     } finally {
       memberIdForm.reset();
-      gymIdForm.reset();
-      setStep('gymId'); // Go back to the first step after an attempt
+      gymNameForm.reset();
+      setStep('gymName'); // Go back to the first step after an attempt
     }
   }
 
   const handleBack = () => {
-    setStep('gymId');
+    setStep('gymName');
     memberIdForm.reset();
   };
 
-  if (step === 'gymId') {
+  if (step === 'gymName') {
     return (
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
           <Dumbbell className="h-12 w-12 text-primary" />
           <CardTitle className="text-3xl font-bold">Gym Check-in</CardTitle>
           <CardDescription>
-            Please enter your Gym ID to begin.
+            Please enter your Gym Name to begin.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...gymIdForm}>
+          <Form {...gymNameForm}>
             <form
-              onSubmit={gymIdForm.handleSubmit(handleGymIdSubmit)}
+              onSubmit={gymNameForm.handleSubmit(handleGymNameSubmit)}
               className="grid gap-4"
             >
               <FormField
-                control={gymIdForm.control}
-                name="gymId"
+                control={gymNameForm.control}
+                name="gymName"
                 render={({ field }) => (
                   <FormItem className="grid gap-2">
-                    <FormLabel htmlFor="gym-id" className="sr-only">
-                      Gym ID
+                    <FormLabel htmlFor="gym-name" className="sr-only">
+                      Gym Name
                     </FormLabel>
                     <FormControl>
                       <Input
-                        id="gym-id"
-                        placeholder="Enter your Gym ID"
+                        id="gym-name"
+                        placeholder="Enter your Gym Name"
                         className="text-center"
                         {...field}
                       />
@@ -191,7 +190,7 @@ export function CheckInForm() {
           <Dumbbell className="h-12 w-12 text-primary" />
           <CardTitle className="text-3xl font-bold">Member Check-in</CardTitle>
           <CardDescription>
-            Checking in to <span className="font-semibold">{gymId}</span>.
+            Checking in to <span className="font-semibold">{gymName}</span>.
             Please enter your Member ID.
           </CardDescription>
         </CardHeader>

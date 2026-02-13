@@ -66,7 +66,10 @@ export function SignupForm() {
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
         // CRITICAL: Await the creation of the admin role document to prevent a race condition.
         // This ensures the role exists before the user is redirected and attempts to fetch data.
-        await setDoc(adminRoleRef, {});
+        await setDoc(adminRoleRef, {
+          gymName: values.gymName,
+          ownerName: values.ownerName,
+        });
       }
       
       toast({

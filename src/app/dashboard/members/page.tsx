@@ -60,8 +60,10 @@ import {
   setDocumentNonBlocking,
   updateDocumentNonBlocking,
   deleteDocumentNonBlocking,
+  useUser,
+  useDoc,
 } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
@@ -91,12 +93,22 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
 
+  const { user } = useUser();
   const firestore = useFirestore();
-  const membersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'members') : null),
-    [firestore]
+
+  const adminProfileRef = useMemoFirebase(
+      () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
+      [firestore, user]
   );
-  const { data: members, isLoading } = useCollection<Member>(membersQuery);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string}>(adminProfileRef);
+
+  const membersQuery = useMemoFirebase(
+      () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
+      [firestore, adminProfile]
+  );
+  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
+  
+  const isLoading = isLoadingAdminProfile || isLoadingMembers;
 
   useEffect(() => {
     setIsClient(true);
@@ -136,7 +148,7 @@ export default function MembersPage() {
   };
 
   const handleSaveMember = (values: MemberFormValues) => {
-    if (!firestore) return;
+    if (!firestore || !adminProfile) return;
 
     const generateMemberId = (firstName: string, lastName: string, phone: string) => {
       const namePart = `${firstName.substring(0,2)}${lastName.substring(0,2)}`.toUpperCase();
@@ -150,6 +162,7 @@ export default function MembersPage() {
         ...values,
         id: newDocRef.id,
         gymId: generateMemberId(values.firstName, values.lastName, values.phone),
+        gymName: adminProfile.gymName,
       };
       setDocumentNonBlocking(newDocRef, newMember, { merge: true });
       toast({
@@ -161,6 +174,7 @@ export default function MembersPage() {
       const updatedMember = {
         ...values,
         gymId: generateMemberId(values.firstName, values.lastName, values.phone),
+        gymName: adminProfile.gymName,
       };
       updateDocumentNonBlocking(docRef, updatedMember);
       toast({
@@ -492,6 +506,10 @@ export default function MembersPage() {
                 <div>
                   <span className="font-semibold">Join Date:</span>{' '}
                   {selectedMember.joinDate}
+                </div>
+                 <div>
+                  <span className="font-semibold">Gym:</span>{' '}
+                  {selectedMember.gymName}
                 </div>
               </div>
             </div>

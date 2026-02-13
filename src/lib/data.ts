@@ -7,6 +7,7 @@ export type Member = {
   joinDate: string;
   isActive: boolean;
   gymId: string;
+  gymName: string;
 };
 
 export type Plan = {
@@ -29,10 +30,9 @@ export type Trainer = {
 };
 
 export type Attendance = {
-  id: string; // Firestore document ID
-  memberId: string; // Member document ID
-  checkInTime: any; // Firestore Timestamp
-  checkOutTime?: any; // Firestore Timestamp
+  id:string;
+  memberId: string;
+  checkInTime: any;
 };
 
 export type Invoice = {

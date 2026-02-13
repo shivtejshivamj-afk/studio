@@ -1,5 +1,22 @@
 {
   "entities": {
+    "AdminProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Admin Profile",
+      "type": "object",
+      "description": "Stores profile information for an administrative user, including the gym they manage.",
+      "properties": {
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym managed by this administrator."
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "The name of the gym owner."
+        }
+      },
+      "required": ["gymName", "ownerName"]
+    },
     "Member": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Member",
@@ -56,6 +73,10 @@
         "gymId": {
           "type": "string",
           "description": "A unique identifier assigned to the member for public check-in purposes."
+        },
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym the member belongs to."
         }
       },
       "required": [
@@ -66,7 +87,8 @@
         "phone",
         "joinDate",
         "isActive",
-        "gymId"
+        "gymId",
+        "gymName"
       ]
     },
     "MembershipPlan": {
@@ -369,11 +391,11 @@
       {
         "path": "/roles_admin/{adminId}",
         "definition": {
-          "entityName": "user",
+          "entityName": "AdminProfile",
           "schema": {
-            "$ref": "#/backend/entities/user"
+            "$ref": "#/backend/entities/AdminProfile"
           },
-          "description": "Collection for storing UIDs of users who have administrative privileges. Used for Database Access Control (DBAC) based on 'existence over content'. Only document IDs matter; document content can be minimal or empty.",
+          "description": "Collection for storing profile data and administrative privileges for users. The document ID is the user's UID. The existence of a document grants admin rights.",
           "params": [
             {
               "name": "adminId",
