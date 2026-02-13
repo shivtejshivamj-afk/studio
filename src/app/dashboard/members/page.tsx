@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -247,7 +248,6 @@ export default function MembersPage() {
                 size="sm"
                 className="gap-1"
                 onClick={() => handleOpenDialog('add')}
-                disabled={isLoading}
               >
                 <PlusCircle className="h-4 w-4" />
                 Add Member
