@@ -1,22 +1,211 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict, administrator-only security model.
+ * All data access and modification are restricted to authenticated users who are explicitly
+ * designated as administrators in the `/roles_admin` collection. There is no concept of
+ * member self-service or public write access; all operations are mediated by a trusted admin user.
+ *
+ * Data Structure: The data is organized into top-level collections for major entities like
+ * `members`, `membership_plans`, and `trainers`. Member-specific data, such as `memberships`,
+ * `invoices`, and `attendance`, is nested in subcollections under `/members/{memberId}` to
+ * logically group a member's data and leverage path-based security. A special `/roles_admin`
+ * collection is used for authorization checks.
+ *
+ * Key Security Decisions:
+ * - Admin-Only System: Access to the entire database is granted only to users whose UID exists as
+ *   a document ID in the `/roles_admin` collection. This provides a single, centralized point for
+ *   managing permissions.
+ * - No Client-Side Role Management: The `/roles_admin` collection is read-only for admins and
+ *   denies all client-side writes. Admin roles must be managed securely through the Firebase
+ *   Console or a trusted server-side process.
+ * - Server-Mediated Public Actions: Features like public member check-in are explicitly designed
+ *   to be handled by a secure Cloud Function. The rules do not grant public write access to the
+ *   `attendance` collection, ensuring that all check-ins are validated and created by a trusted
+ *   server environment, not directly by unauthenticated clients.
+ * - Default Deny Posture: Any path not explicitly matched is denied by default.
+ *
+ * Denormalization for Authorization:
+ * - Admin roles are managed via "existence over content" in `/roles_admin/{adminId}`. This
+ *   allows for a fast, simple `exists()` check in the rules without reading any document data.
+ * - Subcollection documents (e.g., invoices, payments) contain a denormalized `memberId`.
+ *   This is used to enforce relational integrity, ensuring that a document created under a
+ *   specific member's path also contains the correct member ID internally.
+ *
+ * Structural Segregation:
+ * - The database uses clear structural separation. All collections (`members`, `trainers`, etc.)
+ *   have a homogenous security posture (admin-only). There are no collections that mix public
+ *   and private data, which dramatically simplifies rule logic and prevents unintended data exposure.
+ */
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Function to check if the requesting user is the owner of the gym
-    function isGymOwner(gymId) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == gymId;
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Users can read and write to their own user profile
-    match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+    /**
+     * Checks if the authenticated user has administrative privileges by verifying
+     * their UID exists as a document in the `/roles_admin` collection.
+     * This is the primary authorization check for the entire database.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // All data for a specific gym is nested under /gyms/{gymId}
-    // Only the owner of the gym can read or write this data.
-    match /gyms/{gymId}/{documents=**} {
-      allow read, write: if request.auth != null && isGymOwner(gymId);
+    /**
+     * Ensures the incoming 'memberId' field matches the parent document's ID in the path.
+     * This enforces relational integrity when creating a new document in a subcollection.
+     */
+    function hasCorrectMemberIdOnCreate(memberId) {
+      return request.resource.data.memberId == memberId;
+    }
+
+    /**
+     * Ensures the 'memberId' field is immutable on updates. This prevents an existing
+     * subcollection document from being reassigned to a different member.
+     */
+    function isMemberIdImmutable() {
+      return request.resource.data.memberId == resource.data.memberId;
+    }
+
+    // ------------------------------------------------------------------------
+    // Rule Definitions
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Protects the admin roles collection. Admins can see who other admins are,
+     *              but cannot add or remove roles from the client to prevent privilege escalation.
+     *              Role management must be done server-side or via the Firebase console.
+     * @path        /roles_admin/{adminId}
+     * @allow       (get) An authenticated admin (`auth.uid: 'admin_user_abc'`) reading an admin doc.
+     * @deny        (create) Any user, including an admin, trying to create a new admin document.
+     * @principle   Restricts sensitive administrative tasks (privilege management) to a trusted environment.
+     */
+    match /roles_admin/{adminId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Secures the main collection of gym member profiles. Only authenticated
+     *              administrators are allowed to read or write member data.
+     * @path        /members/{memberId}
+     * @allow       (create) An authenticated admin creating a new member profile.
+     * @deny        (get) A non-admin user trying to read a member profile.
+     * @principle   Enforces role-based access control (RBAC) where all data is private to admins.
+     */
+    match /members/{memberId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Secures the membership subscriptions for a specific member.
+     *              Only admins can manage a member's subscriptions.
+     * @path        /members/{memberId}/memberships/{membershipId}
+     * @allow       (create) An admin creating a new membership for member 'user_123' with `memberId: 'user_123'` in the data.
+     * @deny        (create) An admin creating a membership under member 'user_123' but with `memberId: 'user_456'` in the data.
+     * @principle   Ensures data integrity by validating that subcollection data correctly references its parent.
+     */
+    match /members/{memberId}/memberships/{membershipId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
+      allow update: if isAdmin() && resource != null && isMemberIdImmutable();
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Secures the financial invoices for a specific member.
+     *              Only admins can manage a member's invoices.
+     * @path        /members/{memberId}/invoices/{invoiceId}
+     * @allow       (list) An admin listing all invoices for member 'user_123'.
+     * @deny        (update) A non-admin user trying to update an invoice.
+     * @principle   Ensures data integrity by validating that subcollection data correctly references its parent.
+     */
+    match /members/{memberId}/invoices/{invoiceId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
+      allow update: if isAdmin() && resource != null && isMemberIdImmutable();
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Secures the payment records for a specific member.
+     *              Only admins can manage a member's payments.
+     * @path        /members/{memberId}/payments/{paymentId}
+     * @allow       (delete) An admin deleting a payment record for an existing member.
+     * @deny        (update) An admin trying to change the `memberId` field of an existing payment.
+     * @principle   Ensures data integrity by validating that subcollection data correctly references its parent.
+     */
+    match /members/{memberId}/payments/{paymentId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
+      allow update: if isAdmin() && resource != null && isMemberIdImmutable();
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Secures the attendance (check-in) records for a specific member. Direct
+     *              client writes are restricted to admins, as public check-ins are mediated by a secure Cloud Function.
+     * @path        /members/{memberId}/attendance/{attendanceId}
+     * @allow       (create) An admin manually creating an attendance record for a member.
+     * @deny        (create) Any non-admin or unauthenticated user trying to create a check-in record.
+     * @principle   Delegates complex or public-facing write logic to a trusted server environment (Cloud Function).
+     */
+    match /members/{memberId}/attendance/{attendanceId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
+      allow update: if isAdmin() && resource != null && isMemberIdImmutable();
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Secures the collection of available membership plans.
+     *              Only admins are allowed to define and manage these plans.
+     * @path        /membership_plans/{planId}
+     * @allow       (get) An authenticated admin reading a membership plan's details.
+     * @deny        (list) A non-admin user trying to list all available plans.
+     * @principle   Enforces role-based access control (RBAC) for global configuration data.
+     */
+    match /membership_plans/{planId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Secures the collection of gym trainer profiles. Only admins
+     *              are allowed to manage trainer information.
+     * @path        /trainers/{trainerId}
+     * @allow       (update) An authenticated admin updating an existing trainer's profile.
+     * @deny        (delete) A non-admin user trying to delete a trainer profile.
+     * @principle   Enforces role-based access control (RBAC) for global staff data.
+     */
+    match /trainers/{trainerId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
   }
 }

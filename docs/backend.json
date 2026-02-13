@@ -1,154 +1,516 @@
 {
   "entities": {
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Represents a gym owner or administrator account.",
-      "type": "object",
-      "properties": {
-        "uid": {
-          "type": "string",
-          "description": "The user's unique ID from Firebase Authentication."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The user's email address."
-        },
-        "ownerName": {
-          "type": "string",
-          "description": "The name of the gym owner."
-        },
-        "gymName": {
-          "type": "string",
-          "description": "The name of the gym."
-        },
-        "gymId": {
-          "type": "string",
-          "description": "A unique ID for the gym."
-        }
-      },
-      "required": ["uid", "email", "ownerName", "gymName", "gymId"]
-    },
     "Member": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Member",
-      "description": "Represents a member of the gym.",
       "type": "object",
+      "description": "Represents a gym member, storing their personal details and contact information.",
       "properties": {
-        "memberId": {
+        "id": {
           "type": "string",
-          "description": "The unique identifier for the member."
+          "description": "Unique identifier for the Member entity."
         },
-        "name": {
-          "type": "string"
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the member."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the member."
         },
         "email": {
           "type": "string",
+          "description": "The email address of the member.",
           "format": "email"
         },
         "phone": {
-          "type": "string"
-        },
-        "plan": {
           "type": "string",
-          "description": "Name of the Plan"
+          "description": "The primary phone number of the member."
         },
-        "status": {
+        "dateOfBirth": {
           "type": "string",
-          "enum": ["Paid", "Pending", "Overdue"]
+          "description": "The birth date of the member.",
+          "format": "date"
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the member."
+        },
+        "emergencyContactName": {
+          "type": "string",
+          "description": "The name of the member's emergency contact."
+        },
+        "emergencyContactPhone": {
+          "type": "string",
+          "description": "The phone number of the member's emergency contact."
         },
         "joinDate": {
           "type": "string",
+          "description": "The date when the member joined the gym.",
           "format": "date"
         },
-        "expiryDate": {
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the member currently has an active membership."
+        },
+        "gymId": {
           "type": "string",
-          "format": "date"
+          "description": "A unique identifier assigned to the member for public check-in purposes."
         }
       },
-      "required": ["memberId", "name", "email", "phone", "plan", "status", "joinDate", "expiryDate"]
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "joinDate",
+        "isActive",
+        "gymId"
+      ]
+    },
+    "MembershipPlan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MembershipPlan",
+      "type": "object",
+      "description": "Defines the different types of membership plans offered by the gym.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MembershipPlan entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the membership plan (e.g., 'Monthly Basic', 'Annual Premium')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the membership plan and its features."
+        },
+        "price": {
+          "type": "number",
+          "description": "The monetary cost of the membership plan."
+        },
+        "durationInDays": {
+          "type": "number",
+          "description": "The duration of the membership plan in days."
+        },
+        "benefits": {
+          "type": "array",
+          "description": "A list of benefits included with this membership plan.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isAvailable": {
+          "type": "boolean",
+          "description": "Indicates if the membership plan is currently available for purchase."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "price",
+        "durationInDays",
+        "isAvailable"
+      ]
+    },
+    "Membership": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Membership",
+      "type": "object",
+      "description": "Represents an active or past subscription of a member to a specific membership plan.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Membership entity."
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Reference to the Member who owns this membership. (Relationship: Member 1:N Membership)"
+        },
+        "planId": {
+          "type": "string",
+          "description": "Reference to the MembershipPlan for this membership. (Relationship: MembershipPlan 1:N Membership)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The date when the membership became active.",
+          "format": "date"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The date when the membership is set to expire.",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the membership (e.g., 'active', 'pending', 'expired', 'cancelled')."
+        },
+        "priceAtPurchase": {
+          "type": "number",
+          "description": "The price of the membership plan at the time of purchase."
+        },
+        "autoRenew": {
+          "type": "boolean",
+          "description": "Indicates if the membership is set to automatically renew."
+        }
+      },
+      "required": [
+        "id",
+        "memberId",
+        "planId",
+        "startDate",
+        "endDate",
+        "status",
+        "priceAtPurchase",
+        "autoRenew"
+      ]
     },
     "Trainer": {
-        "title": "Trainer",
-        "description": "Represents a trainer at the gym.",
-        "type": "object",
-        "properties": {
-            "name": { "type": "string" },
-            "specialization": { "type": "string" },
-            "phone": { "type": "string" },
-            "email": { "type": "string", "format": "email" },
-            "joiningDate": { "type": "string", "format": "date" }
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Trainer",
+      "type": "object",
+      "description": "Stores information about the gym's trainers and their specialties.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Trainer entity."
         },
-        "required": ["name", "specialization", "phone", "email", "joiningDate"]
-    },
-    "Plan": {
-        "title": "Plan",
-        "description": "Represents a membership plan.",
-        "type": "object",
-        "properties": {
-            "name": { "type": "string" },
-            "price": { "type": "number" },
-            "duration": { "type": "number", "description": "Duration in days" }
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the trainer."
         },
-        "required": ["name", "price", "duration"]
-    },
-    "Invoice": {
-        "title": "Invoice",
-        "description": "Represents a billing invoice for a member.",
-        "type": "object",
-        "properties": {
-            "invoiceId": { "type": "string", "description": "Unique identifier for the invoice." },
-            "memberId": { "type": "string", "description": "ID of the member being invoiced." },
-            "memberName": { "type": "string" },
-            "planName": { "type": "string" },
-            "amount": { "type": "number" },
-            "issueDate": { "type": "string", "format": "date" },
-            "dueDate": { "type": "string", "format": "date" },
-            "paidDate": { "type": "string", "format": "date", "description": "The date the invoice was paid."},
-            "status": { "type": "string", "enum": ["Paid", "Pending", "Overdue", "Draft"] }
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the trainer."
         },
-        "required": ["invoiceId", "memberId", "memberName", "planName", "amount", "issueDate", "dueDate", "status"]
+        "email": {
+          "type": "string",
+          "description": "The email address of the trainer.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "The primary phone number of the trainer."
+        },
+        "specialization": {
+          "type": "string",
+          "description": "The area of fitness specialization for the trainer (e.g., 'Weightlifting', 'Cardio', 'Yoga')."
+        },
+        "hireDate": {
+          "type": "string",
+          "description": "The date when the trainer was hired.",
+          "format": "date"
+        },
+        "bio": {
+          "type": "string",
+          "description": "A short biography or description of the trainer's experience."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the trainer is currently employed and active."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "specialization",
+        "hireDate",
+        "isActive"
+      ]
     },
     "Attendance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Attendance",
-      "description": "Represents a member's check-in record.",
       "type": "object",
+      "description": "Records when a member checks into the gym.",
       "properties": {
-        "memberId": { "type": "string" },
-        "memberName": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "checkInTime": { "type": "string", "format": "time" },
-        "status": { "type": "string", "enum": ["Checked-in", "Absent"] }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Attendance record."
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Reference to the Member who checked in. (Relationship: Member 1:N Attendance)"
+        },
+        "checkInTime": {
+          "type": "string",
+          "description": "The date and time the member checked in.",
+          "format": "date-time"
+        },
+        "checkOutTime": {
+          "type": "string",
+          "description": "The date and time the member checked out (optional).",
+          "format": "date-time"
+        }
       },
-      "required": ["memberId", "memberName", "date", "status"]
+      "required": [
+        "id",
+        "memberId",
+        "checkInTime"
+      ]
+    },
+    "Invoice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Invoice",
+      "type": "object",
+      "description": "Represents a financial invoice generated for a member's membership or other services.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Invoice entity."
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Reference to the Member associated with this invoice. (Relationship: Member 1:N Invoice)"
+        },
+        "membershipId": {
+          "type": "string",
+          "description": "Reference to the Membership instance for which this invoice was generated. (Relationship: Membership 1:N Invoice)"
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "description": "A unique, human-readable invoice number."
+        },
+        "issueDate": {
+          "type": "string",
+          "description": "The date when the invoice was issued.",
+          "format": "date"
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "The date by which the invoice payment is due.",
+          "format": "date"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total monetary amount of the invoice."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the invoice (e.g., 'Issued', 'Paid', 'Overdue', 'Cancelled')."
+        }
+      },
+      "required": [
+        "id",
+        "memberId",
+        "membershipId",
+        "invoiceNumber",
+        "issueDate",
+        "dueDate",
+        "totalAmount",
+        "status"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Records individual payments made by members, typically against an invoice.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "invoiceId": {
+          "type": "string",
+          "description": "Reference to the Invoice this payment is for. (Relationship: Invoice 1:N Payment)"
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Reference to the Member who made the payment. (Relationship: Member 1:N Payment)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the payment."
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "The date when the payment was made.",
+          "format": "date-time"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "The method used for the payment (e.g., 'Credit Card', 'Bank Transfer', 'Cash')."
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "An optional external transaction ID from a payment gateway."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the payment (e.g., 'Paid', 'Pending', 'Failed', 'Refunded')."
+        }
+      },
+      "required": [
+        "id",
+        "invoiceId",
+        "memberId",
+        "amount",
+        "paymentDate",
+        "paymentMethod",
+        "status"
+      ]
     }
   },
   "auth": {
-    "providers": ["email_password"]
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Stores public profile information for each user."
-    },
-    "/gyms/{gymId}/members": {
-      "schema": { "$ref": "#/entities/Member" },
-      "description": "Stores information about gym members for a specific gym."
-    },
-    "/gyms/{gymId}/trainers": {
-        "schema": { "$ref": "#/entities/Trainer" },
-        "description": "Stores information about gym trainers for a specific gym."
-    },
-    "/gyms/{gymId}/plans": {
-        "schema": { "$ref": "#/entities/Plan" },
-        "description": "Stores membership plans for a specific gym."
-    },
-    "/gyms/{gymId}/invoices": {
-        "schema": { "$ref": "#/entities/Invoice" },
-        "description": "Stores invoice records for a specific gym."
-    },
-    "/gyms/{gymId}/attendance": {
-        "schema": { "$ref": "#/entities/Attendance" },
-        "description": "Stores attendance records for a specific gym."
-    }
+    "structure": [
+      {
+        "path": "/roles_admin/{adminId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/user"
+          },
+          "description": "Collection for storing UIDs of users who have administrative privileges. Used for Database Access Control (DBAC) based on 'existence over content'. Only document IDs matter; document content can be minimal or empty.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "The Firebase Authentication UID of an administrator."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/members/{memberId}",
+        "definition": {
+          "entityName": "Member",
+          "schema": {
+            "$ref": "#/backend/entities/Member"
+          },
+          "description": "Main collection for storing gym member profiles. Access is restricted to authenticated administrators. 'gymId' field is used by a Cloud Function for public check-ins.",
+          "params": [
+            {
+              "name": "memberId",
+              "description": "Unique identifier for a gym member."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/members/{memberId}/memberships/{membershipId}",
+        "definition": {
+          "entityName": "Membership",
+          "schema": {
+            "$ref": "#/backend/entities/Membership"
+          },
+          "description": "Subcollection storing individual membership subscriptions for each gym member. Includes denormalized 'memberId' for authorization independence. Access is restricted to authenticated administrators.",
+          "params": [
+            {
+              "name": "memberId",
+              "description": "The unique identifier of the parent member."
+            },
+            {
+              "name": "membershipId",
+              "description": "Unique identifier for a specific membership instance."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/members/{memberId}/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Subcollection storing financial invoices generated for each member. Includes denormalized 'memberId' and 'membershipId' for authorization independence. Access is restricted to authenticated administrators.",
+          "params": [
+            {
+              "name": "memberId",
+              "description": "The unique identifier of the parent member."
+            },
+            {
+              "name": "invoiceId",
+              "description": "Unique identifier for a specific invoice."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/members/{memberId}/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Subcollection storing records of payments made by each member. Includes denormalized 'memberId' and 'invoiceId' for authorization independence. Access is restricted to authenticated administrators.",
+          "params": [
+            {
+              "name": "memberId",
+              "description": "The unique identifier of the parent member."
+            },
+            {
+              "name": "paymentId",
+              "description": "Unique identifier for a specific payment record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/members/{memberId}/attendance/{attendanceId}",
+        "definition": {
+          "entityName": "Attendance",
+          "schema": {
+            "$ref": "#/backend/entities/Attendance"
+          },
+          "description": "Subcollection storing check-in records for each member. Includes denormalized 'memberId' for authorization independence. Writes for public check-in are mediated by a Cloud Function; direct writes are restricted to authenticated administrators.",
+          "params": [
+            {
+              "name": "memberId",
+              "description": "The unique identifier of the parent member."
+            },
+            {
+              "name": "attendanceId",
+              "description": "Unique identifier for a specific attendance record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/membership_plans/{planId}",
+        "definition": {
+          "entityName": "MembershipPlan",
+          "schema": {
+            "$ref": "#/backend/entities/MembershipPlan"
+          },
+          "description": "Collection for defining and managing different gym membership plans. Access is restricted to authenticated administrators.",
+          "params": [
+            {
+              "name": "planId",
+              "description": "Unique identifier for a membership plan."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/trainers/{trainerId}",
+        "definition": {
+          "entityName": "Trainer",
+          "schema": {
+            "$ref": "#/backend/entities/Trainer"
+          },
+          "description": "Collection for storing information about gym trainers. Access is restricted to authenticated administrators.",
+          "params": [
+            {
+              "name": "trainerId",
+              "description": "Unique identifier for a gym trainer."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure for GymTrack Pro is designed around a clear separation of administrative and member-specific data, prioritizing security, scalability, and debuggability. The core principle of Authorization Independence is met by ensuring that all authorization contexts are either directly available in the request (e.g., `request.auth.uid` for admin roles) or explicitly denormalized within the document itself, eliminating the need for `get()` operations in security rules.\n\n**Authorization Independence & Denormalization:**\n*   **Admin Roles:** A dedicated top-level collection `/roles_admin/{adminId}` is used for Database Access Control (DBAC). Admin authorization relies solely on `request.auth.uid` existing as a document ID in this collection. This is 'existence over content' and perfectly independent.\n*   **Member-Specific Data:** Entities like `Membership`, `Invoice`, `Payment`, and `Attendance` are modeled as subcollections under `/members/{memberId}`. This design choice inherently denormalizes the `memberId` into the document path, making it directly accessible to security rules (`memberId` in `request.path`) without needing to fetch the parent `Member` document. Each subcollection document also explicitly includes `memberId` as a field, further reinforcing this for data integrity and query efficiency. This structure allows atomic writes (e.g., creating a membership, invoice, or attendance record) without cross-document `get()` checks for authorization, making rules simple and robust.\n\n**QAPs (Rules Are Not Filters):**\n*   **Admin Data:** All primary administrative collections (`/members`, `/membership_plans`, `/trainers`, and their subcollections) are protected by rules that check `request.auth.uid` against the `/roles_admin` collection. This ensures that any `list` or `query` operation performed by an authenticated admin will return only data they are authorized to see, without the need for security rules to filter results after a broad read. This strictly adheres to the 'Rules Are Not Filters' principle.\n*   **Public Member Check-in:** The 'Public Member Check-in' feature presents a unique challenge for Authorization Independence and QAPs. To strictly avoid `get()` calls in Firestore rules for this public write and maintain QAPs, the check-in process will be mediated by a **Cloud Function**. A public-facing page will call this Cloud Function, passing the `gymId` and check-in time. The Cloud Function will then securely look up the corresponding `memberId` (using a query on the `gymId` field in the `/members` collection, which requires an index) and create the `Attendance` record in `/members/{memberId}/attendance/{attendanceId}`. This offloads the validation logic to the server, keeping Firestore security rules simple (e.g., only allow writes by admin UIDs, which the Cloud Function would be running as), and ensuring the public client never directly performs writes that require complex server-side validation through Firestore rules.\n\n**Structural Segregation:**\n*   All management data (`Members`, `MembershipPlans`, `Trainers`, `Memberships`, `Invoices`, `Payments`, `Attendance` for viewing) resides in collections with a homogeneous security posture: private to gym administrators.\n*   There are no mixed-security-posture documents within a single collection, simplifying rule logic significantly. The public check-in is handled separately via a Cloud Function, further segregating concerns."
   }
 }
