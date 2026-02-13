@@ -82,16 +82,16 @@ service cloud.firestore {
     /**
      * @description Protects the admin roles collection. Admins can see who other admins are,
      *              but cannot add or remove roles from the client to prevent privilege escalation.
-     *              Role management must be done server-side or via the Firebase console.
+     *              The one exception is that a user can create their own admin role document.
      * @path        /roles_admin/{adminId}
-     * @allow       (get) An authenticated admin (`auth.uid: 'admin_user_abc'`) reading an admin doc.
-     * @deny        (create) Any user, including an admin, trying to create a new admin document.
-     * @principle   Restricts sensitive administrative tasks (privilege management) to a trusted environment.
+     * @allow       (create) An authenticated user creating their own admin role document during signup.
+     * @deny        (create) Any user trying to create an admin document for someone else.
+     * @principle   Restricts sensitive administrative tasks while allowing for initial admin creation.
      */
     match /roles_admin/{adminId} {
       allow get: if isAdmin();
       allow list: if isAdmin();
-      allow create: if false;
+      allow create: if request.auth.uid == adminId;
       allow update: if false;
       allow delete: if false;
     }
