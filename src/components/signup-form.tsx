@@ -64,11 +64,20 @@ export function SignupForm() {
 
       if (user && firestore) {
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+        
+        const generateGymIdentifier = (gymName: string) => {
+            const namePart = gymName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 8).toUpperCase();
+            const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+            return `${namePart}-${randomPart}`;
+        };
+        const gymIdentifier = generateGymIdentifier(values.gymName);
+        
         // CRITICAL: Await the creation of the admin role document to prevent a race condition.
         // This ensures the role exists before the user is redirected and attempts to fetch data.
         await setDoc(adminRoleRef, {
           gymName: values.gymName,
           ownerName: values.ownerName,
+          gymIdentifier: gymIdentifier,
         });
       }
       

@@ -43,6 +43,7 @@ import {
   useMemoFirebase,
   useUser,
   useDoc,
+  updateDocumentNonBlocking,
 } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,7 +68,7 @@ export default function DashboardPage() {
     [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } =
-    useDoc<{ gymName: string }>(adminProfileRef);
+    useDoc<{ gymName: string; gymIdentifier?: string }>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
     () =>
@@ -87,6 +88,23 @@ export default function DashboardPage() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (firestore && user?.uid && adminProfile && !adminProfile.gymIdentifier && adminProfile.gymName) {
+      const generateGymIdentifier = (gymName: string) => {
+        const namePart = gymName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 8).toUpperCase();
+        const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+        return `${namePart}-${randomPart}`;
+      };
+      const gymIdentifier = generateGymIdentifier(adminProfile.gymName);
+      const docRef = doc(firestore, 'roles_admin', user.uid);
+      updateDocumentNonBlocking(docRef, { gymIdentifier });
+      toast({
+        title: "Gym Identifier Generated",
+        description: `A unique identifier for your gym has been created.`
+      });
+    }
+  }, [firestore, user, adminProfile, toast]);
 
   const inactiveMembers = useMemo(
     () => members?.filter((member) => !member.isActive) || [],
@@ -159,16 +177,33 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Gym Name</CardTitle>
+              <CardTitle className="text-sm font-medium">Gym Identifier</CardTitle>
               <Building className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {isLoadingAdminProfile ? (
-                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-8 w-32" />
               ) : (
-                <div className="text-2xl font-bold">
-                  {adminProfile?.gymName}
-                </div>
+                 adminProfile?.gymIdentifier ? (
+                  <div className="flex items-center gap-2">
+                    <div className="text-2xl font-bold">
+                      {adminProfile.gymIdentifier}
+                    </div>
+                    {isClient && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleCopy(adminProfile.gymIdentifier!)}
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span className="sr-only">Copy Gym Identifier</span>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                    <Skeleton className="h-8 w-32" />
+                )
               )}
             </CardContent>
           </Card>
