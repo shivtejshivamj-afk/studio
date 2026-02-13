@@ -1,7 +1,7 @@
 'use client';
 
-import { MoreVertical, PlusCircle } from 'lucide-react';
-import { trainers as initialTrainers, type Trainer } from '@/lib/data';
+import { Eye, MoreVertical, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { type Trainer } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -22,8 +22,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -33,10 +31,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import { useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,263 +54,494 @@ import * as z from 'zod';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  setDocumentNonBlocking,
+  updateDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const trainerFormSchema = z.object({
-  name: z.string().min(1, { message: 'Name is required.' }),
-  email: z.string().email({ message: 'Please enter a valid email.' }),
+  firstName: z.string().min(1, 'First name is required.'),
+  lastName: z.string().min(1, 'Last name is required.'),
+  email: z.string().email('Please enter a valid email.'),
   phone: z
     .string()
-    .length(10, { message: 'Phone number must be exactly 10 digits.' })
-    .regex(/^[0-9]+$/, { message: 'Phone number must only contain digits.' }),
-  specialization: z
-    .string()
-    .min(1, { message: 'Specialization is required.' }),
-  joiningDate: z.string().min(1, { message: 'Joining date is required.' }),
+    .min(10, 'Phone number must be at least 10 digits.')
+    .regex(/^\d+$/, 'Phone number must only contain digits.'),
+  specialization: z.string().min(1, 'Specialization is required.'),
+  hireDate: z.string().min(1, 'Hire date is required.'),
+  bio: z.string().optional(),
+  isActive: z.boolean().default(true),
 });
 
 type TrainerFormValues = z.infer<typeof trainerFormSchema>;
 
+const statusVariant = {
+  active: 'default',
+  inactive: 'secondary',
+} as const;
+
 export default function TrainersPage() {
   const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [trainers, setTrainers] = useState<Trainer[]>(initialTrainers);
+  type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
+  const [activeDialog, setActiveDialog] = useState<DialogType>(null);
+  const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isClient, setIsClient] = useState(false);
+
+  const firestore = useFirestore();
+  const trainersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'trainers') : null),
+    [firestore]
+  );
+  const { data: trainers, isLoading } = useCollection<Trainer>(trainersQuery);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const form = useForm<TrainerFormValues>({
     resolver: zodResolver(trainerFormSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      phone: '',
-      specialization: '',
-      joiningDate: '',
-    },
   });
 
-  function handleSaveTrainer(values: TrainerFormValues) {
-    const newTrainer: Trainer = {
-      id: `t${Date.now()}`,
-      ...values,
-    };
-
-    setTrainers((prevTrainers) => [...prevTrainers, newTrainer]);
-
-    toast({
-      title: 'Trainer Added',
-      description: 'The new trainer has been saved.',
-    });
-    setIsDialogOpen(false);
-    form.reset();
-  }
-
-  const handleOpenChange = (open: boolean) => {
-    setIsDialogOpen(open);
-    if (!open) {
-      form.reset();
+  const handleOpenDialog = (dialog: DialogType, trainer?: Trainer) => {
+    setSelectedTrainer(trainer || null);
+    setActiveDialog(dialog);
+    if ((dialog === 'add' || dialog === 'edit') && trainer) {
+      form.reset({
+        firstName: trainer.firstName,
+        lastName: trainer.lastName,
+        email: trainer.email,
+        phone: trainer.phone,
+        specialization: trainer.specialization,
+        hireDate: trainer.hireDate,
+        bio: trainer.bio || '',
+        isActive: trainer.isActive,
+      });
+    } else if (dialog === 'add') {
+      form.reset({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        specialization: '',
+        hireDate: new Date().toISOString().split('T')[0],
+        bio: '',
+        isActive: true,
+      });
     }
   };
 
-  const filteredTrainers = trainers.filter(
-    (trainer) =>
-      trainer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      trainer.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const closeDialogs = () => {
+    setActiveDialog(null);
+    setSelectedTrainer(null);
+  };
+
+  const handleSaveTrainer = (values: TrainerFormValues) => {
+    if (!firestore) return;
+
+    if (activeDialog === 'add') {
+      const newDocRef = doc(collection(firestore, 'trainers'));
+      const newTrainer = {
+        ...values,
+        id: newDocRef.id,
+      };
+      setDocumentNonBlocking(newDocRef, newTrainer, { merge: true });
+      toast({
+        title: 'Trainer Added',
+        description: `The details for ${values.firstName} ${values.lastName} have been saved.`,
+      });
+    } else if (activeDialog === 'edit' && selectedTrainer) {
+      const docRef = doc(firestore, 'trainers', selectedTrainer.id);
+      updateDocumentNonBlocking(docRef, values);
+      toast({
+        title: 'Trainer Updated',
+        description: `The details for ${values.firstName} ${values.lastName} have been updated.`,
+      });
+    }
+    closeDialogs();
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedTrainer && firestore) {
+      const docRef = doc(firestore, 'trainers', selectedTrainer.id);
+      deleteDocumentNonBlocking(docRef);
+      toast({
+        title: 'Trainer Deleted',
+        description: `${selectedTrainer.firstName} ${selectedTrainer.lastName} has been deleted.`,
+        variant: 'destructive',
+      });
+      closeDialogs();
+    }
+  };
+
+  const filteredTrainers =
+    trainers?.filter(
+      (trainer) =>
+        `${trainer.firstName} ${trainer.lastName}`
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        trainer.email.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Trainers</CardTitle>
-            <CardDescription>
-              Manage your gym's trainers and their profiles.
-            </CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Trainers</CardTitle>
+              <CardDescription>
+                Manage your gym's trainers and their profiles.
+              </CardDescription>
+            </div>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <Input
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:max-w-xs"
+              />
+              <Button
+                size="sm"
+                className="gap-1"
+                onClick={() => handleOpenDialog('add')}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Add Trainer
+              </Button>
+            </div>
           </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Input
-              placeholder="Search by name or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full sm:max-w-xs"
-            />
-            <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1">
-                  <PlusCircle className="h-4 w-4" />
-                  Add Trainer
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(handleSaveTrainer)}>
-                    <DialogHeader>
-                      <DialogTitle>Add New Trainer</DialogTitle>
-                      <DialogDescription>
-                        Fill in the details for the new trainer.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <div className="grid grid-cols-4 items-center gap-x-4">
-                            <FormLabel className="text-right">Name</FormLabel>
-                            <FormItem className="col-span-3">
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          </div>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <div className="grid grid-cols-4 items-center gap-x-4">
-                            <FormLabel className="text-right">Email</FormLabel>
-                            <FormItem className="col-span-3">
-                              <FormControl>
-                                <Input
-                                  type="email"
-                                  placeholder="trainer@example.com"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          </div>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <div className="grid grid-cols-4 items-center gap-x-4">
-                            <FormLabel className="text-right">Phone</FormLabel>
-                            <FormItem className="col-span-3">
-                              <FormControl>
-                                <Input
-                                  type="tel"
-                                  placeholder="1234567890"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          </div>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="specialization"
-                        render={({ field }) => (
-                          <div className="grid grid-cols-4 items-center gap-x-4">
-                            <FormLabel className="text-right">
-                              Specialization
-                            </FormLabel>
-                            <FormItem className="col-span-3">
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          </div>
-                        )}
-                      />
-                       <FormField
-                        control={form.control}
-                        name="joiningDate"
-                        render={({ field }) => (
-                          <div className="grid grid-cols-4 items-center gap-x-4">
-                            <FormLabel className="text-right">Joining Date</FormLabel>
-                            <FormItem className="col-span-3">
-                              <FormControl>
-                                <Input type="date" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          </div>
-                        )}
-                      />
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleOpenChange(false)}
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Trainer</TableHead>
+                <TableHead>Specialization</TableHead>
+                <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Hire Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-20" />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="h-8 w-8" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                filteredTrainers.map((trainer) => (
+                  <TableRow key={trainer.id}>
+                    <TableCell>
+                      <div className="font-medium">{`${trainer.firstName} ${trainer.lastName}`}</div>
+                      <div className="text-sm text-muted-foreground hidden sm:block">
+                        {trainer.email}
+                      </div>
+                    </TableCell>
+                    <TableCell>{trainer.specialization}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {trainer.phone}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {trainer.hireDate}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          statusVariant[trainer.isActive ? 'active' : 'inactive']
+                        }
                       >
-                        Cancel
-                      </Button>
-                      <Button type="submit">Save Trainer</Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Trainer</TableHead>
-              <TableHead className="hidden md:table-cell">
-                Specialization
-              </TableHead>
-              <TableHead className="hidden lg:table-cell">Email</TableHead>
-              <TableHead className="hidden sm:table-cell">Phone</TableHead>
-              <TableHead className="hidden md:table-cell">Joining Date</TableHead>
-              <TableHead className="text-right">
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredTrainers.map((trainer) => {
-              return (
-                <TableRow key={trainer.id}>
-                  <TableCell>
-                    <div className="font-medium">{trainer.name}</div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {trainer.specialization}
-                  </TableCell>
-                   <TableCell className="hidden lg:table-cell">{trainer.email}</TableCell>
-                   <TableCell className="hidden sm:table-cell">{trainer.phone}</TableCell>
-                   <TableCell className="hidden md:table-cell">{trainer.joiningDate}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="ghost">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                        {trainer.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isClient && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog('view', trainer)}
+                            >
+                              <Eye className="mr-2 h-4 w-4" /> View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog('edit', trainer)}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog('delete', trainer)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      <Dialog
+        open={activeDialog === 'add' || activeDialog === 'edit'}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSaveTrainer)}>
+              <DialogHeader>
+                <DialogTitle>
+                  {activeDialog === 'edit' ? 'Edit Trainer' : 'Add New Trainer'}
+                </DialogTitle>
+                <DialogDescription>
+                  {activeDialog === 'edit'
+                    ? 'Update the details for this trainer.'
+                    : 'Fill in the details to add a new trainer.'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input type="tel" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="specialization"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Specialization</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="hireDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Hire Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                 <FormField
+                    control={form.control}
+                    name="bio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bio</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="A short bio for the trainer..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Active Trainer</FormLabel>
+                        <FormDescription>
+                          Indicates if the trainer is currently active.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeDialogs}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Save {activeDialog === 'edit' ? 'Changes' : 'Trainer'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* View Details Dialog */}
+      <Dialog open={activeDialog === 'view'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Trainer Details</DialogTitle>
+          </DialogHeader>
+          {selectedTrainer && (
+             <div className="grid gap-4 py-4 text-sm">
+              <div className="flex items-center gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {selectedTrainer.firstName} {selectedTrainer.lastName}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {selectedTrainer.email}
+                  </p>
+                   <p className="text-muted-foreground">
+                    {selectedTrainer.phone}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                 <div>
+                  <span className="font-semibold">Specialization:</span>{' '}
+                  {selectedTrainer.specialization}
+                </div>
+                <div>
+                  <span className="font-semibold">Status:</span>{' '}
+                  <Badge
+                    variant={statusVariant[selectedTrainer.isActive ? 'active' : 'inactive']}
+                  >
+                    {selectedTrainer.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="font-semibold">Hire Date:</span>{' '}
+                  {selectedTrainer.hireDate}
+                </div>
+              </div>
+               {selectedTrainer.bio && (
+                <div className="mt-4">
+                  <h4 className="font-semibold">Bio</h4>
+                  <p className="text-muted-foreground mt-1">{selectedTrainer.bio}</p>
+                </div>
+              )}
+            </div>
+          )}
+           <DialogFooter>
+            <Button onClick={closeDialogs}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={activeDialog === 'delete'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              trainer "{selectedTrainer?.firstName} {selectedTrainer?.lastName}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
