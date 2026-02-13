@@ -48,6 +48,7 @@ import * as z from 'zod';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -150,28 +151,28 @@ export default function MembersPage() {
   const handleSaveMember = (values: MemberFormValues) => {
     if (!firestore || !adminProfile) return;
 
-    const generateMemberId = (gymName: string) => {
-      const gymPart = gymName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase().padEnd(4, 'X');
-      const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-      return `${gymPart}${randomPart}`;
-    };
-
     if (activeDialog === 'add') {
-      const newDocRef = doc(collection(firestore, 'members'));
-      const newMember: Member = {
-        ...values,
-        id: newDocRef.id,
-        gymId: generateMemberId(adminProfile.gymName),
-        gymName: adminProfile.gymName,
-      };
-      setDocumentNonBlocking(newDocRef, newMember, { merge: true });
-      toast({
-        title: 'Member Added',
-        description: `The member details for ${values.firstName} ${values.lastName} have been saved.`,
-      });
+        const newDocRef = doc(collection(firestore, 'members'));
+        const generateMemberId = (gymName: string) => {
+            const gymPart = gymName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase().padEnd(4, 'X');
+            const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+            return `${gymPart}${randomPart}`;
+        };
+        const newMember: Member = {
+            ...values,
+            id: newDocRef.id,
+            gymId: generateMemberId(adminProfile.gymName),
+            gymName: adminProfile.gymName,
+        };
+        setDocumentNonBlocking(newDocRef, newMember, { merge: true });
+        toast({
+            title: 'Member Added',
+            description: `The member details for ${values.firstName} ${values.lastName} have been saved.`,
+        });
     } else if (activeDialog === 'edit' && selectedMember) {
       const docRef = doc(firestore, 'members', selectedMember.id);
       const updatedMember = {
+        ...selectedMember, // Keep existing values like gymId
         ...values,
       };
       updateDocumentNonBlocking(docRef, updatedMember);
