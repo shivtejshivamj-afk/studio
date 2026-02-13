@@ -84,8 +84,10 @@ import {
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
+  useUser,
+  useDoc,
 } from '@/firebase';
-import { collection, collectionGroup, doc } from 'firebase/firestore';
+import { collection, collectionGroup, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
@@ -116,21 +118,28 @@ export default function InvoicingPage() {
     setIsClient(true);
   }, []);
 
+  const { user } = useUser();
   const firestore = useFirestore();
 
+  const adminProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{ gymName: string }>(adminProfileRef);
+
   const membersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'members') : null),
-    [firestore]
+    () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
+    [firestore, adminProfile]
   );
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
 
   const invoicesQuery = useMemoFirebase(
-    () => (firestore ? collectionGroup(firestore, 'invoices') : null),
-    [firestore]
+    () => (firestore && adminProfile?.gymName ? query(collectionGroup(firestore, 'invoices'), where('gymName', '==', adminProfile.gymName)) : null),
+    [firestore, adminProfile]
   );
   const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
   
-  const isLoading = isLoadingMembers || isLoadingInvoices;
+  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices;
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -168,7 +177,14 @@ export default function InvoicingPage() {
   };
 
   const handleSaveInvoice = (values: InvoiceFormValues) => {
-    if (!firestore || !members) return;
+    if (!firestore || !members || !adminProfile?.gymName) {
+        toast({
+            title: 'Cannot Create Invoice',
+            description: "Could not determine your gym. Please ensure you have signed up correctly.",
+            variant: 'destructive',
+        });
+        return;
+    }
     
     const member = members.find((m) => m.id === values.memberId);
     const plan = plans.find((p) => p.id === values.planId);
@@ -190,6 +206,7 @@ export default function InvoicingPage() {
       issueDate: format(new Date(), 'yyyy-MM-dd'),
       dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
       status: values.status,
+      gymName: adminProfile.gymName,
     };
     
     const invoicesCollectionRef = collection(firestore, 'members', member.id, 'invoices');
@@ -274,7 +291,7 @@ export default function InvoicingPage() {
             <div>
               <CardTitle>Invoicing</CardTitle>
               <CardDescription>
-                Manage your member invoices and billing.
+                Manage your member invoices and billing for {adminProfile?.gymName || 'your gym'}.
               </CardDescription>
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -516,7 +533,7 @@ export default function InvoicingPage() {
                     <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
                   </div>
                   <div className="text-right">
-                    <h2 className="text-2xl font-semibold text-gray-800">GymTrack Pro</h2>
+                    <h2 className="text-2xl font-semibold text-gray-800">{selectedInvoice.gymName}</h2>
                     <p className="text-gray-500">123 Fitness Ave, Gymtown, USA</p>
                   </div>
                 </div>

@@ -27,6 +27,7 @@ export type Trainer = {
   hireDate: string;
   bio?: string;
   isActive: boolean;
+  gymName: string;
 };
 
 export type Attendance = {
@@ -44,6 +45,7 @@ export type Invoice = {
   dueDate: string;
   totalAmount: number;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
+  gymName: string;
   
   // These are for UI display and will be added after fetching
   memberName?: string;

@@ -67,8 +67,10 @@ import {
   setDocumentNonBlocking,
   updateDocumentNonBlocking,
   deleteDocumentNonBlocking,
+  useUser,
+  useDoc,
 } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const trainerFormSchema = z.object({
@@ -100,12 +102,22 @@ export default function TrainersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isClient, setIsClient] = useState(false);
 
+  const { user } = useUser();
   const firestore = useFirestore();
-  const trainersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'trainers') : null),
-    [firestore]
+
+  const adminProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
+    [firestore, user]
   );
-  const { data: trainers, isLoading } = useCollection<Trainer>(trainersQuery);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{ gymName: string }>(adminProfileRef);
+
+  const trainersQuery = useMemoFirebase(
+    () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'trainers'), where('gymName', '==', adminProfile.gymName)) : null),
+    [firestore, adminProfile]
+  );
+  const { data: trainers, isLoading: isLoadingTrainers } = useCollection<Trainer>(trainersQuery);
+  
+  const isLoading = isLoadingAdminProfile || isLoadingTrainers;
 
   useEffect(() => {
     setIsClient(true);
@@ -149,13 +161,22 @@ export default function TrainersPage() {
   };
 
   const handleSaveTrainer = (values: TrainerFormValues) => {
-    if (!firestore) return;
+    if (!firestore || !adminProfile?.gymName) {
+      toast({
+        title: 'Cannot Add Trainer',
+        description:
+          "Your gym name couldn't be found. Please ensure you have signed up correctly.",
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'trainers'));
       const newTrainer = {
         ...values,
         id: newDocRef.id,
+        gymName: adminProfile.gymName,
       };
       setDocumentNonBlocking(newDocRef, newTrainer, { merge: true });
       toast({
@@ -164,7 +185,11 @@ export default function TrainersPage() {
       });
     } else if (activeDialog === 'edit' && selectedTrainer) {
       const docRef = doc(firestore, 'trainers', selectedTrainer.id);
-      updateDocumentNonBlocking(docRef, values);
+      const updatedData = {
+        ...values,
+        gymName: adminProfile.gymName,
+      };
+      updateDocumentNonBlocking(docRef, updatedData);
       toast({
         title: 'Trainer Updated',
         description: `The details for ${values.firstName} ${values.lastName} have been updated.`,
@@ -203,7 +228,7 @@ export default function TrainersPage() {
             <div>
               <CardTitle>Trainers</CardTitle>
               <CardDescription>
-                Manage your gym's trainers and their profiles.
+                Manage your gym's trainers and their profiles for {adminProfile?.gymName || 'your gym'}.
               </CardDescription>
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -217,6 +242,7 @@ export default function TrainersPage() {
                 size="sm"
                 className="gap-1"
                 onClick={() => handleOpenDialog('add')}
+                disabled={isLoading}
               >
                 <PlusCircle className="h-4 w-4" />
                 Add Trainer

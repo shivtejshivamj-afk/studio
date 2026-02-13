@@ -233,6 +233,10 @@
         "isActive": {
           "type": "boolean",
           "description": "Indicates if the trainer is currently employed and active."
+        },
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym the trainer belongs to."
         }
       },
       "required": [
@@ -243,7 +247,8 @@
         "phone",
         "specialization",
         "hireDate",
-        "isActive"
+        "isActive",
+        "gymName"
       ]
     },
     "Attendance": {
@@ -321,6 +326,10 @@
         "status": {
           "type": "string",
           "description": "The current status of the invoice (e.g., 'Issued', 'Paid', 'Overdue', 'Cancelled')."
+        },
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym where the invoice was issued."
         }
       },
       "required": [
@@ -331,7 +340,8 @@
         "issueDate",
         "dueDate",
         "totalAmount",
-        "status"
+        "status",
+        "gymName"
       ]
     },
     "Payment": {
