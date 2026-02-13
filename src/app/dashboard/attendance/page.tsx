@@ -1,11 +1,6 @@
 'use client';
 
 import {
-  attendance as initialAttendance,
-  members,
-  type Attendance,
-} from '@/lib/data';
-import {
   Card,
   CardContent,
   CardDescription,
@@ -34,22 +29,60 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  addDocumentNonBlocking,
+} from '@/firebase';
+import {
+  collection,
+  collectionGroup,
+  query,
+  where,
+  getDocs,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore';
+import { type Attendance, type Member } from '@/lib/data';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
   'Checked-in': 'default',
-  Absent: 'secondary',
 } as const;
 
 const checkInSchema = z.object({
   memberId: z.string().min(1, 'Member ID is required.'),
 });
 
+type AttendanceRecord = {
+  id: string;
+  memberId: string;
+  memberName: string;
+  date: string;
+  checkInTime: string;
+  status: 'Checked-in';
+};
+
 export default function AttendancePage() {
-  const [attendanceRecords, setAttendanceRecords] =
-    useState<Attendance[]>(initialAttendance);
   const { toast } = useToast();
+  const firestore = useFirestore();
+
+  const attendanceQuery = useMemoFirebase(
+    () => (firestore ? collectionGroup(firestore, 'attendance') : null),
+    [firestore]
+  );
+  const { data: attendanceData, isLoading: isLoadingAttendance } =
+    useCollection<Attendance>(attendanceQuery);
+
+  const membersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'members') : null),
+    [firestore]
+  );
+  const { data: members, isLoading: isLoadingMembers } =
+    useCollection<Member>(membersQuery);
 
   const form = useForm<z.infer<typeof checkInSchema>>({
     resolver: zodResolver(checkInSchema),
@@ -58,35 +91,85 @@ export default function AttendancePage() {
     },
   });
 
-  function handleCheckIn(values: z.infer<typeof checkInSchema>) {
-    const member = members.find(
-      (m) => m.memberId.toUpperCase() === values.memberId.toUpperCase()
-    );
+  async function handleCheckIn(values: z.infer<typeof checkInSchema>) {
+    if (!firestore) return;
 
-    if (member) {
-      const now = new Date();
-      const newRecord: Attendance = {
-        id: `att${Date.now()}`,
-        memberId: member.memberId,
-        memberName: member.name,
-        date: format(now, 'yyyy-MM-dd'),
-        checkInTime: format(now, 'hh:mm a'),
-        status: 'Checked-in',
-      };
-      setAttendanceRecords((prev) => [newRecord, ...prev]);
+    try {
+      const membersRef = collection(firestore, 'members');
+      const q = query(
+        membersRef,
+        where('gymId', '==', values.memberId.toUpperCase())
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        toast({
+          title: 'Check-in Failed',
+          description: `Member ID "${values.memberId}" not found. Please try again.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const memberDoc = querySnapshot.docs[0];
+      const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
+
+      const attendanceRef = collection(
+        firestore,
+        'members',
+        member.id,
+        'attendance'
+      );
+      addDocumentNonBlocking(attendanceRef, {
+        memberId: member.id,
+        checkInTime: serverTimestamp(),
+      });
+
       toast({
         title: 'Check-in Successful!',
-        description: `Welcome back, ${member.name}!`,
+        description: `Welcome back, ${member.firstName} ${member.lastName}!`,
       });
-    } else {
+    } catch (error) {
+      console.error('Error checking in:', error);
       toast({
-        title: 'Check-in Failed',
-        description: `Member ID "${values.memberId}" not found. Please try again.`,
+        title: 'Check-in Error',
+        description:
+          'An error occurred while checking in the member. Please try again.',
         variant: 'destructive',
       });
     }
+
     form.reset();
   }
+
+  const attendanceRecords: AttendanceRecord[] = useMemo(() => {
+    if (!attendanceData || !members) return [];
+    return attendanceData
+      .map((att) => {
+        const member = members.find((m) => m.id === att.memberId);
+        if (!member) return null;
+
+        const checkInDate = (att.checkInTime as Timestamp)?.toDate();
+        if (!checkInDate) return null;
+
+        return {
+          id: att.id,
+          memberId: member.gymId,
+          memberName: `${member.firstName} ${member.lastName}`,
+          date: format(checkInDate, 'yyyy-MM-dd'),
+          checkInTime: format(checkInDate, 'hh:mm a'),
+          status: 'Checked-in',
+        };
+      })
+      .filter((rec): rec is AttendanceRecord => rec !== null)
+      .sort(
+        (a, b) =>
+          new Date(b.date + ' ' + b.checkInTime).getTime() -
+          new Date(a.date + ' ' + a.checkInTime).getTime()
+      );
+  }, [attendanceData, members]);
+
+  const isLoading = isLoadingAttendance || isLoadingMembers;
 
   return (
     <Card>
@@ -134,25 +217,53 @@ export default function AttendancePage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {attendanceRecords.map((record) => (
-              <TableRow key={record.id}>
-                <TableCell>
-                  <div className="font-medium">{record.memberName}</div>
-                </TableCell>
-                <TableCell>{record.memberId}</TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  {record.date}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {record.checkInTime}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Badge variant={statusVariant[record.status]}>
-                    {record.status}
-                  </Badge>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell>
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-20" />
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-5 w-24" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : attendanceRecords.length > 0 ? (
+              attendanceRecords.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>
+                    <div className="font-medium">{record.memberName}</div>
+                  </TableCell>
+                  <TableCell>{record.memberId}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    {record.date}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {record.checkInTime}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={statusVariant[record.status]}>
+                      {record.status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center">
+                  No attendance records found.
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </CardContent>

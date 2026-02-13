@@ -23,7 +23,15 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { members } from '@/lib/data';
+import { useFirestore, addDocumentNonBlocking } from '@/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  serverTimestamp,
+} from 'firebase/firestore';
+import type { Member } from '@/lib/data';
 
 const gymIdSchema = z.object({
   gymId: z.string().min(1, 'Gym ID is required.'),
@@ -37,6 +45,7 @@ export function CheckInForm() {
   const { toast } = useToast();
   const [step, setStep] = useState<'gymId' | 'memberId'>('gymId');
   const [gymId, setGymId] = useState('');
+  const firestore = useFirestore();
 
   const gymIdForm = useForm<z.infer<typeof gymIdSchema>>({
     resolver: zodResolver(gymIdSchema),
@@ -63,28 +72,65 @@ export function CheckInForm() {
     });
   }
 
-  function handleMemberIdSubmit(values: z.infer<typeof memberIdSchema>) {
-    // Here we would check the member in the specific gym using `gymId` and `values.memberId`
-    // For now, using mock data.
-    const member = members.find(
-      (m) => m.memberId.toUpperCase() === values.memberId.toUpperCase()
-    );
+  async function handleMemberIdSubmit(values: z.infer<typeof memberIdSchema>) {
+    if (!firestore) return;
 
-    if (member) {
+    try {
+      const membersRef = collection(firestore, 'members');
+      const q = query(
+        membersRef,
+        where('gymId', '==', values.memberId.toUpperCase())
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        toast({
+          title: 'Check-in Failed',
+          description: `Member ID "${values.memberId}" not found in gym "${gymId}". Please try again.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const memberDoc = querySnapshot.docs[0];
+      const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
+
+      if (!member.isActive) {
+        toast({
+          title: 'Check-in Failed',
+          description: `Member ${member.firstName} ${member.lastName} has an inactive membership.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const attendanceRef = collection(
+        firestore,
+        'members',
+        member.id,
+        'attendance'
+      );
+      addDocumentNonBlocking(attendanceRef, {
+        memberId: member.id,
+        checkInTime: serverTimestamp(),
+      });
+
       toast({
         title: 'Check-in Successful!',
-        description: `Welcome back, ${member.name}!`,
+        description: `Welcome back, ${member.firstName} ${member.lastName}!`,
       });
-    } else {
+    } catch (error) {
+      console.error('Check-in error', error);
       toast({
         title: 'Check-in Failed',
-        description: `Member ID "${values.memberId}" not found in gym "${gymId}". Please try again.`,
+        description: `An error occurred. Please try again.`,
         variant: 'destructive',
       });
+    } finally {
+      memberIdForm.reset();
+      gymIdForm.reset();
+      setStep('gymId'); // Go back to the first step after an attempt
     }
-    memberIdForm.reset();
-    gymIdForm.reset();
-    setStep('gymId'); // Go back to the first step after an attempt
   }
 
   const handleBack = () => {
@@ -176,7 +222,12 @@ export function CheckInForm() {
                 )}
               />
               <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" size="lg" onClick={handleBack} type="button">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleBack}
+                  type="button"
+                >
                   Back
                 </Button>
                 <Button type="submit" size="lg">
