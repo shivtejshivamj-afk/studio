@@ -33,7 +33,8 @@ export interface InternalQuery extends Query<DocumentData> {
     path: {
       canonicalString(): string;
       toString(): string;
-    }
+    },
+    collectionGroup: string | null;
   }
 }
 
@@ -86,10 +87,21 @@ export function useCollection<T = any>(
       },
       (error: FirestoreError) => {
         // This logic extracts the path from either a ref or a query
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+        let path = '';
+        if (memoizedTargetRefOrQuery.type === 'collection') {
+          path = (memoizedTargetRefOrQuery as CollectionReference).path;
+        } else {
+          // It's a query, which could be on a collection or a collection group.
+          const q = memoizedTargetRefOrQuery as unknown as InternalQuery;
+          if (q._query.collectionGroup) {
+            // This is a collection group query. The path is the collection group ID.
+            // We represent it in a way that's understandable in error messages.
+            path = `**/${q._query.collectionGroup}`;
+          } else {
+            // This is a standard query on a single collection.
+            path = q._query.path.canonicalString();
+          }
+        }
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
