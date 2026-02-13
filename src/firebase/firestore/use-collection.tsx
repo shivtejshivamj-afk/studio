@@ -86,34 +86,46 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // This logic extracts the path from either a ref or a query
-        let path = '';
-        if (memoizedTargetRefOrQuery.type === 'collection') {
-          path = (memoizedTargetRefOrQuery as CollectionReference).path;
+        // IMPORTANT: Differentiate between permission errors and other errors like missing indexes.
+        if (error.code === 'permission-denied') {
+            // This logic extracts the path from either a ref or a query
+            let path = '';
+            if (memoizedTargetRefOrQuery.type === 'collection') {
+              path = (memoizedTargetRefOrQuery as CollectionReference).path;
+            } else {
+              // It's a query, which could be on a collection or a collection group.
+              const q = memoizedTargetRefOrQuery as unknown as InternalQuery;
+              if (q._query.collectionGroup) {
+                // This is a collection group query. The path is the collection group ID.
+                // We represent it in a way that's understandable in error messages.
+                path = `**/${q._query.collectionGroup}`;
+              } else {
+                // This is a standard query on a single collection.
+                path = q._query.path.canonicalString();
+              }
+            }
+    
+            const contextualError = new FirestorePermissionError({
+              operation: 'list',
+              path,
+            })
+    
+            setError(contextualError);
+            // trigger global error propagation for permission errors
+            errorEmitter.emit('permission-error', contextualError);
         } else {
-          // It's a query, which could be on a collection or a collection group.
-          const q = memoizedTargetRefOrQuery as unknown as InternalQuery;
-          if (q._query.collectionGroup) {
-            // This is a collection group query. The path is the collection group ID.
-            // We represent it in a way that's understandable in error messages.
-            path = `**/${q._query.collectionGroup}`;
-          } else {
-            // This is a standard query on a single collection.
-            path = q._query.path.canonicalString();
-          }
+            // For all other errors (e.g., 'failed-precondition' for missing index),
+            // set the original error. This allows the UI to see the real error message
+            // from Firebase, which might include a link to create a missing index.
+            console.error("useCollection Firestore Error:", error);
+            setError(error);
+            // We do not emit this on the global error emitter, as it's not a permission error
+            // and will be handled by the component's local error state.
+            // Next.js will still show this in the dev overlay.
         }
 
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        })
-
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
-
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
+        setData(null);
+        setIsLoading(false);
       }
     );
 
