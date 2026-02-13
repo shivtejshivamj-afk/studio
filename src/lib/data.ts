@@ -33,20 +33,22 @@ export type Attendance = {
   memberId: string; // Member document ID
   checkInTime: any; // Firestore Timestamp
   checkOutTime?: any; // Firestore Timestamp
-  // Not in schema, but for UI
-  memberName?: string;
 };
 
 export type Invoice = {
-  id: string;
-  invoiceId: string;
-  memberId: string; // This is the gymId
-  memberName: string;
-  planName: string;
-  amount: number;
+  id: string; // Firestore document ID
+  memberId: string; // Member document ID
+  membershipId: string;
+  invoiceNumber: string;
   issueDate: string;
   dueDate: string;
+  totalAmount: number;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
+  
+  // These are for UI display and will be added after fetching
+  memberName?: string;
+  memberEmail?: string;
+  planName?: string;
 };
 
 

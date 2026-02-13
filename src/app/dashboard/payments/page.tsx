@@ -7,12 +7,7 @@ import {
   Trash2,
   Eye,
 } from 'lucide-react';
-import {
-  invoices as initialInvoices,
-  members,
-  plans,
-  type Invoice,
-} from '@/lib/data';
+import { type Member, type Invoice, plans } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -75,9 +70,18 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  addDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from '@/firebase';
+import { collection, collectionGroup, doc } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
   Paid: 'default',
@@ -88,14 +92,13 @@ const statusVariant = {
 
 const invoiceSchema = z.object({
   memberId: z.string().min(1, { message: 'Please select a member.' }),
-  planName: z.string().min(1, { message: 'Please select a plan.' }),
+  planId: z.string().min(1, { message: 'Please select a plan.' }),
   status: z.enum(['Paid', 'Pending', 'Overdue', 'Draft']),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
 export default function InvoicingPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   type DialogType = 'add' | 'view' | 'delete' | null;
@@ -103,9 +106,39 @@ export default function InvoicingPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const invoiceContentRef = useRef<HTMLDivElement>(null);
 
+  const firestore = useFirestore();
+
+  const membersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'members') : null),
+    [firestore]
+  );
+  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
+
+  const invoicesQuery = useMemoFirebase(
+    () => (firestore ? collectionGroup(firestore, 'invoices') : null),
+    [firestore]
+  );
+  const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
+  
+  const isLoading = isLoadingMembers || isLoadingInvoices;
+
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
   });
+
+  const processedInvoices = useMemo(() => {
+    if (!invoicesData || !members) return [];
+    return invoicesData.map(inv => {
+      const member = members.find(m => m.id === inv.memberId);
+      const plan = plans.find(p => p.id === inv.membershipId);
+      return {
+        ...inv,
+        memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
+        memberEmail: member?.email,
+        planName: plan?.name || 'Unknown Plan',
+      };
+    }).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+  }, [invoicesData, members]);
 
   const handleOpenDialog = (dialog: DialogType, invoice?: Invoice) => {
     setSelectedInvoice(invoice || null);
@@ -113,7 +146,7 @@ export default function InvoicingPage() {
     if (dialog === 'add') {
       form.reset({
         memberId: undefined,
-        planName: undefined,
+        planId: undefined,
         status: 'Draft',
       });
     }
@@ -125,8 +158,10 @@ export default function InvoicingPage() {
   };
 
   const handleSaveInvoice = (values: InvoiceFormValues) => {
+    if (!firestore || !members) return;
+    
     const member = members.find((m) => m.id === values.memberId);
-    const plan = plans.find((p) => p.name === values.planName);
+    const plan = plans.find((p) => p.id === values.planId);
 
     if (!member || !plan) {
       toast({
@@ -137,31 +172,34 @@ export default function InvoicingPage() {
       return;
     }
 
-    const newInvoice: Invoice = {
-      id: `inv${Date.now()}`,
-      invoiceId: `INV-${String(invoices.length + 1).padStart(3, '0')}`,
-      memberId: member.memberId,
-      memberName: member.name,
-      planName: plan.name,
-      amount: plan.price,
+    const newInvoiceData = {
+      invoiceNumber: `INV-${String((invoicesData?.length || 0) + 1).padStart(3, '0')}`,
+      memberId: member.id,
+      membershipId: plan.id,
+      totalAmount: plan.price,
       issueDate: format(new Date(), 'yyyy-MM-dd'),
       dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
       status: values.status,
     };
-    setInvoices((prev) => [newInvoice, ...prev]);
+    
+    const invoicesCollectionRef = collection(firestore, 'members', member.id, 'invoices');
+    addDocumentNonBlocking(invoicesCollectionRef, newInvoiceData);
+    
     toast({
       title: 'Invoice Created',
-      description: `New invoice for ${member.name} has been created.`,
+      description: `New invoice for ${member.firstName} ${member.lastName} has been created.`,
     });
     closeDialogs();
   };
 
   const handleDeleteConfirm = () => {
-    if (selectedInvoice) {
-      setInvoices((prev) => prev.filter((i) => i.id !== selectedInvoice.id));
+    if (selectedInvoice && firestore) {
+      const docRef = doc(firestore, 'members', selectedInvoice.memberId, 'invoices', selectedInvoice.id);
+      deleteDocumentNonBlocking(docRef);
+
       toast({
         title: 'Invoice Deleted',
-        description: `Invoice ${selectedInvoice.invoiceId} has been deleted.`,
+        description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,
         variant: 'destructive',
       });
       closeDialogs();
@@ -171,7 +209,6 @@ export default function InvoicingPage() {
   const handleDownloadPdf = () => {
     if (!selectedInvoice || !invoiceContentRef.current) return;
     
-    // Temporarily make all text black for PDF output
     const originalColors = new Map();
     const elements = invoiceContentRef.current.querySelectorAll('*');
     elements.forEach(el => {
@@ -189,8 +226,7 @@ export default function InvoicingPage() {
         });
         doc.html(invoiceContentRef.current, {
             callback: function (doc) {
-                doc.save(`invoice-${selectedInvoice.invoiceId}.pdf`);
-                 // Restore original colors
+                doc.save(`invoice-${selectedInvoice.invoiceNumber}.pdf`);
                 elements.forEach(el => {
                     (el as HTMLElement).style.color = originalColors.get(el);
                 });
@@ -204,10 +240,10 @@ export default function InvoicingPage() {
     }
   };
 
-  const filteredInvoices = invoices.filter(
+  const filteredInvoices = processedInvoices.filter(
     (invoice) =>
-      invoice.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.invoiceId.toLowerCase().includes(searchQuery.toLowerCase())
+      invoice.memberName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -253,13 +289,26 @@ export default function InvoicingPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.map((invoice) => (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredInvoices.length > 0 ? (
+                filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoiceId}</TableCell>
+                  <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.memberName}</TableCell>
                   <TableCell>{invoice.issueDate}</TableCell>
                   <TableCell>{invoice.dueDate}</TableCell>
-                  <TableCell>${invoice.amount.toFixed(2)}</TableCell>
+                  <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[invoice.status]}>
                       {invoice.status}
@@ -289,13 +338,19 @@ export default function InvoicingPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center">
+                    No invoices found.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Add Invoice Dialog */}
       <Dialog
         open={activeDialog === 'add'}
         onOpenChange={(isOpen) => !isOpen && closeDialogs()}
@@ -323,9 +378,9 @@ export default function InvoicingPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {members.map((member) => (
+                          {members?.map((member) => (
                             <SelectItem key={member.id} value={member.id}>
-                              {member.name} ({member.memberId})
+                              {member.firstName} {member.lastName} ({member.gymId})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -336,7 +391,7 @@ export default function InvoicingPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="planName"
+                  name="planId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Plan</FormLabel>
@@ -348,7 +403,7 @@ export default function InvoicingPage() {
                         </FormControl>
                         <SelectContent>
                           {plans.map((plan) => (
-                            <SelectItem key={plan.id} value={plan.name}>
+                            <SelectItem key={plan.id} value={plan.id}>
                               {plan.name} - ${plan.price}
                             </SelectItem>
                           ))}
@@ -389,7 +444,6 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
       
-      {/* View Invoice Dialog */}
       <Dialog
         open={activeDialog === 'view'}
         onOpenChange={(isOpen) => !isOpen && closeDialogs()}
@@ -407,7 +461,7 @@ export default function InvoicingPage() {
                 <div className="flex justify-between items-start mb-8">
                   <div>
                     <h1 className="text-3xl font-bold text-gray-800">INVOICE</h1>
-                    <p className="text-gray-500">{selectedInvoice.invoiceId}</p>
+                    <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
                   </div>
                   <div className="text-right">
                     <h2 className="text-2xl font-semibold text-gray-800">GymTrack Pro</h2>
@@ -419,7 +473,7 @@ export default function InvoicingPage() {
                   <div>
                     <h3 className="font-semibold text-gray-600 mb-2">BILL TO</h3>
                     <p className="font-bold text-gray-800">{selectedInvoice.memberName}</p>
-                    <p className="text-gray-600">{members.find(m => m.memberId === selectedInvoice.memberId)?.email}</p>
+                    <p className="text-gray-600">{selectedInvoice.memberEmail}</p>
                   </div>
                   <div className="text-right">
                     <div className="grid grid-cols-2">
@@ -448,7 +502,7 @@ export default function InvoicingPage() {
                   <TableBody>
                     <TableRow>
                       <TableCell className="font-medium text-gray-700">{selectedInvoice.planName} Membership</TableCell>
-                      <TableCell className="text-right text-gray-700">${selectedInvoice.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-gray-700">${selectedInvoice.totalAmount.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -456,7 +510,7 @@ export default function InvoicingPage() {
                     <div className="w-64">
                         <div className="flex justify-between text-gray-700">
                             <p>Subtotal</p>
-                            <p>${selectedInvoice.amount.toFixed(2)}</p>
+                            <p>${selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
                          <div className="flex justify-between text-gray-700">
                             <p>Tax (0%)</p>
@@ -465,7 +519,7 @@ export default function InvoicingPage() {
                         <Separator className="my-2"/>
                          <div className="flex justify-between font-bold text-gray-800 text-lg">
                             <p>Total</p>
-                            <p>${selectedInvoice.amount.toFixed(2)}</p>
+                            <p>${selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
@@ -485,7 +539,6 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={activeDialog === 'delete'}
         onOpenChange={(isOpen) => !isOpen && closeDialogs()}
@@ -495,7 +548,7 @@ export default function InvoicingPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete invoice{' '}
-              <strong>{selectedInvoice?.invoiceId}</strong>. This action
+              <strong>{selectedInvoice?.invoiceNumber}</strong>. This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
