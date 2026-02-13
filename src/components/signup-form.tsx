@@ -24,9 +24,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { doc } from 'firebase/firestore';
 
 const formSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
@@ -38,6 +39,7 @@ const formSchema = z.object({
 export function SignupForm() {
   const router = useRouter();
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -53,7 +55,20 @@ export function SignupForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
+      const user = userCredential.user;
+
+      if (user && firestore) {
+        const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+        // Create an empty document to grant admin role.
+        // The content is irrelevant; only its existence matters for the security rule.
+        setDocumentNonBlocking(adminRoleRef, {}, {});
+      }
+
       router.push('/dashboard');
     } catch (error: any) {
       toast({
