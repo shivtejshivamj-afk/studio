@@ -24,10 +24,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuth, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { doc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
@@ -64,12 +64,17 @@ export function SignupForm() {
 
       if (user && firestore) {
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-        // Create an empty document to grant admin role.
-        // The content is irrelevant; only its existence matters for the security rule.
-        setDocumentNonBlocking(adminRoleRef, {}, {});
+        // CRITICAL: Await the creation of the admin role document to prevent a race condition.
+        // This ensures the role exists before the user is redirected and attempts to fetch data.
+        await setDoc(adminRoleRef, {});
       }
-
+      
+      toast({
+        title: "Account Created!",
+        description: "You have been successfully signed up and granted admin privileges."
+      });
       router.push('/dashboard');
+
     } catch (error: any) {
       toast({
         variant: 'destructive',
