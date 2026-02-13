@@ -41,7 +41,6 @@ import {
 } from '@/firebase';
 import {
   collection,
-  collectionGroup,
   query,
   where,
   getDocs,
@@ -85,7 +84,7 @@ export default function AttendancePage() {
     () =>
       firestore && adminProfile?.gymName
         ? query(
-            collectionGroup(firestore, 'attendance'),
+            collection(firestore, 'attendance'),
             where('gymName', '==', adminProfile.gymName)
           )
         : null,
@@ -147,8 +146,6 @@ export default function AttendancePage() {
 
       const attendanceRef = collection(
         firestore,
-        'members',
-        member.id,
         'attendance'
       );
       addDocumentNonBlocking(attendanceRef, {
@@ -302,3 +299,5 @@ export default function AttendancePage() {
     </Card>
   );
 }
+
+    

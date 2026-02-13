@@ -88,16 +88,12 @@ export function CheckInForm() {
         return;
       }
 
-      const attendanceRef = collection(
-        firestore,
-        'members',
-        member.id,
-        'attendance'
-      );
+      // Write to the top-level 'attendance' collection
+      const attendanceRef = collection(firestore, 'attendance');
       addDocumentNonBlocking(attendanceRef, {
         memberId: member.id,
         checkInTime: serverTimestamp(),
-        gymName: member.gymName, // Use gymName from the member's record
+        gymName: member.gymName,
       });
 
       toast({
@@ -159,3 +155,5 @@ export function CheckInForm() {
     </Card>
   );
 }
+
+    

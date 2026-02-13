@@ -31,9 +31,10 @@ export type Trainer = {
 };
 
 export type Attendance = {
-  id:string;
+  id: string;
   memberId: string;
   checkInTime: any;
+  gymName: string;
 };
 
 export type Invoice = {
@@ -46,7 +47,7 @@ export type Invoice = {
   totalAmount: number;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
   gymName: string;
-  
+
   // These are for UI display and will be added after fetching
   memberName?: string;
   memberEmail?: string;
@@ -60,3 +61,5 @@ export const plans: Plan[] = [
   { id: 'p02', name: 'Quarterly', price: 135, duration: 90 },
   { id: 'p03', name: 'Annual', price: 500, duration: 365 },
 ];
+
+    
