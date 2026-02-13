@@ -1,7 +1,7 @@
 'use client';
 
 import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
-import { members as initialMembers, plans, type Member } from '@/lib/data';
+import { type Member } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -39,14 +39,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useState, useEffect, useMemo } from 'react';
+import { Switch } from '@/components/ui/switch';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,36 +53,50 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  setDocumentNonBlocking,
+  updateDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
-  Paid: 'default',
-  Pending: 'secondary',
-  Overdue: 'destructive',
+  active: 'default',
+  inactive: 'secondary',
 } as const;
 
 const memberFormSchema = z.object({
-  name: z.string().min(1, 'Name is required.'),
+  firstName: z.string().min(1, 'First name is required.'),
+  lastName: z.string().min(1, 'Last name is required.'),
   email: z.string().email('Please enter a valid email.'),
   phone: z
     .string()
-    .length(10, 'Phone number must be 10 digits.')
+    .min(10, 'Phone number must be at least 10 digits.')
     .regex(/^\d+$/, 'Phone number must only contain digits.'),
-  plan: z.string({ required_error: 'Please select a plan.' }),
   joinDate: z.string().min(1, 'Join date is required.'),
-  expiryDate: z.string().min(1, 'Expiry date is required.'),
-  status: z.enum(['Paid', 'Pending', 'Overdue']),
+  isActive: z.boolean().default(true),
 });
 
 type MemberFormValues = z.infer<typeof memberFormSchema>;
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>(initialMembers);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
+
+  const firestore = useFirestore();
+  const membersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'members') : null),
+    [firestore]
+  );
+  const { data: members, isLoading } = useCollection<Member>(membersQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -98,32 +106,26 @@ export default function MembersPage() {
     resolver: zodResolver(memberFormSchema),
   });
 
-  const processedMembers = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return members.map((member) => {
-      const expiryDate = new Date(member.expiryDate);
-      if (expiryDate < today) {
-        return { ...member, status: 'Overdue' as const };
-      }
-      return member;
-    });
-  }, [members]);
-
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
     setSelectedMember(member || null);
     setActiveDialog(dialog);
-    if (dialog === 'edit' && member) {
-      form.reset(member);
+    if ((dialog === 'add' || dialog === 'edit') && member) {
+      form.reset({
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.email,
+        phone: member.phone,
+        joinDate: member.joinDate,
+        isActive: member.isActive,
+      });
     } else if (dialog === 'add') {
       form.reset({
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         phone: '',
-        plan: undefined,
-        joinDate: '',
-        expiryDate: '',
-        status: 'Paid',
+        joinDate: new Date().toISOString().split('T')[0],
+        isActive: true,
       });
     }
   };
@@ -134,63 +136,63 @@ export default function MembersPage() {
   };
 
   const handleSaveMember = (values: MemberFormValues) => {
-    const generateMemberId = (name: string, phone: string) => {
-      const namePart = name.replace(/ /g, '').substring(0, 4).toUpperCase();
+    if (!firestore) return;
+
+    const generateMemberId = (firstName: string, lastName: string, phone: string) => {
+      const namePart = `${firstName.substring(0,2)}${lastName.substring(0,2)}`.toUpperCase();
       const phonePart = phone.slice(-4);
       return `${namePart}${phonePart}`;
     };
 
     if (activeDialog === 'add') {
+      const newDocRef = doc(collection(firestore, 'members'));
       const newMember: Member = {
-        id: `m${Date.now()}`,
-        name: values.name,
-        email: values.email,
-        phone: values.phone,
-        plan: values.plan,
-        status: values.status,
-        joinDate: values.joinDate,
-        expiryDate: values.expiryDate,
-        memberId: generateMemberId(values.name, values.phone),
+        ...values,
+        id: newDocRef.id,
+        gymId: generateMemberId(values.firstName, values.lastName, values.phone),
       };
-      setMembers((prev) => [...prev, newMember]);
+      setDocumentNonBlocking(newDocRef, newMember, { merge: true });
       toast({
         title: 'Member Added',
-        description: `The member details for ${values.name} have been saved.`,
+        description: `The member details for ${values.firstName} ${values.lastName} have been saved.`,
       });
     } else if (activeDialog === 'edit' && selectedMember) {
-      const updatedMember: Member = {
-        ...selectedMember,
+      const docRef = doc(firestore, 'members', selectedMember.id);
+      const updatedMember = {
         ...values,
-        memberId: generateMemberId(values.name, values.phone),
+        gymId: generateMemberId(values.firstName, values.lastName, values.phone),
       };
-      setMembers((prev) =>
-        prev.map((m) => (m.id === selectedMember.id ? updatedMember : m))
-      );
+      updateDocumentNonBlocking(docRef, updatedMember);
       toast({
         title: 'Member Updated',
-        description: `The member details for ${values.name} have been saved.`,
+        description: `The member details for ${values.firstName} ${values.lastName} have been saved.`,
       });
     }
     closeDialogs();
   };
 
   const handleDeleteConfirm = () => {
-    if (selectedMember) {
-      setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
+    if (selectedMember && firestore) {
+      const docRef = doc(firestore, 'members', selectedMember.id);
+      deleteDocumentNonBlocking(docRef);
       toast({
         title: 'Member Deleted',
-        description: `${selectedMember.name} has been deleted.`,
+        description: `${selectedMember.firstName} ${selectedMember.lastName} has been deleted.`,
         variant: 'destructive',
       });
       closeDialogs();
     }
   };
 
-  const filteredMembers = processedMembers.filter(
-    (member) =>
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMembers =
+    members?.filter(
+      (member) =>
+        `${member.firstName} ${member.lastName}`
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member.gymId.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
 
   return (
     <>
@@ -205,7 +207,7 @@ export default function MembersPage() {
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
               <Input
-                placeholder="Search by name or ID..."
+                placeholder="Search by name, email, or ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full sm:max-w-xs"
@@ -227,84 +229,96 @@ export default function MembersPage() {
               <TableRow>
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
-                <TableHead className="hidden md:table-cell">Plan</TableHead>
+                <TableHead className="hidden md:table-cell">Phone</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Join Date
                 </TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Expiry Date
-                </TableHead>
-                <TableHead className="hidden lg:table-cell">Phone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMembers.map((member) => {
-                return (
-                  <TableRow key={member.id}>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{member.name}</div>
-                        <div className="text-sm text-muted-foreground hidden sm:block">
-                          {member.email}
-                        </div>
-                      </div>
+                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-4 w-32 mt-1" />
                     </TableCell>
-                    <TableCell>{member.memberId}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {member.plan}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {member.joinDate}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {member.expiryDate}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {member.phone}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant[member.status]}>
-                        {member.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isClient ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog('view', member)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">View</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog('edit', member)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog('delete', member)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="h-10 w-20" />
-                      )}
-                    </TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
                   </TableRow>
-                );
-              })}
+                ))
+              ) : (
+                filteredMembers.map((member) => {
+                  return (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{`${member.firstName} ${member.lastName}`}</div>
+                          <div className="text-sm text-muted-foreground hidden sm:block">
+                            {member.email}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{member.gymId}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {member.phone}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {member.joinDate}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            statusVariant[member.isActive ? 'active' : 'inactive']
+                          }
+                        >
+                          {member.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isClient ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDialog('view', member)}
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">View</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDialog('edit', member)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleOpenDialog('delete', member)
+                              }
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="h-10 w-20" />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -319,7 +333,7 @@ export default function MembersPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-md">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSaveMember)}>
               <DialogHeader>
@@ -333,33 +347,44 @@ export default function MembersPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Name</FormLabel>
-                      <div className="col-span-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
-                        <FormMessage className="mt-1" />
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Email</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input type="email" {...field} />
-                        </FormControl>
-                        <FormMessage className="mt-1" />
-                      </div>
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -367,43 +392,12 @@ export default function MembersPage() {
                   control={form.control}
                   name="phone"
                   render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Phone</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input type="tel" {...field} />
-                        </FormControl>
-                        <FormMessage className="mt-1" />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="plan"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Plan</FormLabel>
-                      <div className="col-span-3">
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a plan" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {plans.map((plan) => (
-                              <SelectItem key={plan.id} value={plan.name}>
-                                {plan.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage className="mt-1" />
-                      </div>
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input type="tel" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -411,56 +405,32 @@ export default function MembersPage() {
                   control={form.control}
                   name="joinDate"
                   render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Join Date</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage className="mt-1" />
-                      </div>
+                    <FormItem>
+                      <FormLabel>Join Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
-                  name="expiryDate"
+                  name="isActive"
                   render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Expiry Date</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage className="mt-1" />
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Active Membership</FormLabel>
+                        <FormDescription>
+                          Indicates if the member has an active subscription.
+                        </FormDescription>
                       </div>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Status</FormLabel>
-                      <div className="col-span-3">
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Paid">Paid</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Overdue">Overdue</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage className="mt-1" />
-                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -496,7 +466,7 @@ export default function MembersPage() {
               <div className="flex items-center gap-4">
                 <div>
                   <h3 className="text-xl font-semibold">
-                    {selectedMember.name}
+                    {selectedMember.firstName} {selectedMember.lastName}
                   </h3>
                   <p className="text-muted-foreground">
                     {selectedMember.email}
@@ -509,25 +479,19 @@ export default function MembersPage() {
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <div>
                   <span className="font-semibold">Member ID:</span>{' '}
-                  {selectedMember.memberId}
-                </div>
-                <div>
-                  <span className="font-semibold">Plan:</span>{' '}
-                  {selectedMember.plan}
+                  {selectedMember.gymId}
                 </div>
                 <div>
                   <span className="font-semibold">Status:</span>{' '}
-                  <Badge variant={statusVariant[selectedMember.status]}>
-                    {selectedMember.status}
+                  <Badge
+                    variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}
+                  >
+                    {selectedMember.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 <div>
                   <span className="font-semibold">Join Date:</span>{' '}
                   {selectedMember.joinDate}
-                </div>
-                <div>
-                  <span className="font-semibold">Expiry Date:</span>{' '}
-                  {selectedMember.expiryDate}
                 </div>
               </div>
             </div>
@@ -554,7 +518,7 @@ export default function MembersPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the
-              member "{selectedMember?.name}".
+              member "{selectedMember?.firstName} {selectedMember?.lastName}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

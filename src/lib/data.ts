@@ -1,13 +1,12 @@
 export type Member = {
   id: string;
-  memberId: string;
-  name: string;
+  gymId: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
-  plan: string;
-  status: 'Paid' | 'Pending' | 'Overdue';
   joinDate: string;
-  expiryDate: string;
+  isActive: boolean;
 };
 
 export type Trainer = {
@@ -48,23 +47,9 @@ export type Attendance = {
   status: 'Checked-in' | 'Absent';
 };
 
-export const members: Member[] = [];
-
-export const trainers: Trainer[] = [];
-
+// Mock data is removed as we are now using Firestore
 export const plans: Plan[] = [
   { id: 'p01', name: 'Monthly', price: 50, duration: 30 },
   { id: 'p02', name: 'Quarterly', price: 135, duration: 90 },
   { id: 'p03', name: 'Annual', price: 500, duration: 365 },
 ];
-
-export const invoices: Invoice[] = [];
-
-export const attendance: Attendance[] = [];
-
-export const dashboardStats = {
-  totalMembers: 0,
-  activeMembers: 0,
-  totalRevenue: 0,
-  expiringSoon: 0,
-};

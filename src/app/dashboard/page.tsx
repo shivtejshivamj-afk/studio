@@ -7,8 +7,9 @@ import {
   Clock,
   Eye,
   Mail,
+  UserX,
 } from 'lucide-react';
-import { dashboardStats, members, type Member } from '@/lib/data';
+import { type Member } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -27,7 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -35,11 +36,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
-  Paid: 'default',
-  Pending: 'secondary',
-  Overdue: 'destructive',
+  active: 'default',
+  inactive: 'secondary',
 } as const;
 
 export default function DashboardPage() {
@@ -49,51 +52,27 @@ export default function DashboardPage() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
 
+  const firestore = useFirestore();
+  const membersQuery = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'members') : null),
+    [firestore]
+  );
+  const { data: members, isLoading: isLoadingMembers } =
+    useCollection<Member>(membersQuery);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const processedMembers = members.map((member) => {
-    const expiryDate = new Date(member.expiryDate);
-    if (expiryDate < today) {
-      return { ...member, status: 'Overdue' as const };
-    }
-    return member;
-  });
-
-  const overdueMembers = processedMembers.filter(
-    (member) => member.status === 'Overdue'
+  const inactiveMembers = useMemo(
+    () => members?.filter((member) => !member.isActive) || [],
+    [members]
   );
 
-  const activeMembersCount = processedMembers.filter(
-    (m) => m.status === 'Paid'
-  ).length;
-
-  const statCards = [
-    {
-      title: 'Total Members',
-      value: members.length,
-      icon: Users,
-    },
-    {
-      title: 'Active Members',
-      value: activeMembersCount,
-      icon: Dumbbell,
-    },
-    {
-      title: 'Overdue',
-      value: overdueMembers.length,
-      icon: Clock,
-    },
-    {
-      title: 'Total Revenue',
-      value: `$${dashboardStats.totalRevenue.toLocaleString()}`,
-      icon: DollarSign,
-    },
-  ];
+  const activeMembersCount = useMemo(
+    () => members?.filter((m) => m.isActive).length || 0,
+    [members]
+  );
 
   const handleOpenDialog = (dialog: DialogType, member?: Member) => {
     setSelectedMember(member || null);
@@ -108,9 +87,37 @@ export default function DashboardPage() {
   const handleSendReminder = (member: Member) => {
     toast({
       title: 'Reminder Sent!',
-      description: `A renewal reminder has been sent to ${member.name}.`,
+      description: `An activation reminder has been sent to ${member.firstName} ${member.lastName}.`,
     });
   };
+
+  const statCards = [
+    {
+      title: 'Total Members',
+      value: members?.length ?? 0,
+      icon: Users,
+      loading: isLoadingMembers,
+    },
+    {
+      title: 'Active Members',
+      value: activeMembersCount,
+      icon: Dumbbell,
+      loading: isLoadingMembers,
+    },
+    {
+      title: 'Inactive Members',
+      value: inactiveMembers.length,
+      icon: UserX,
+      loading: isLoadingMembers,
+    },
+    {
+      title: 'Total Revenue',
+      value: `$0`, // This would be calculated from invoice data
+      icon: DollarSign,
+      loading: true, // Replace with invoice loading state
+    },
+  ];
+
 
   return (
     <>
@@ -125,7 +132,11 @@ export default function DashboardPage() {
                 <card.icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{card.value}</div>
+                {card.loading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <div className="text-2xl font-bold">{card.value}</div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -134,9 +145,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Overdue Memberships</CardTitle>
+              <CardTitle>Inactive Memberships</CardTitle>
               <CardDescription>
-                Members with an overdue payment.
+                Members whose accounts are currently inactive.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -144,53 +155,67 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead className="hidden sm:table-cell">Plan</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {overdueMembers.map((member) => {
-                    return (
-                      <TableRow key={member.id}>
-                        <TableCell>
-                          <div className="font-medium">{member.name}</div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          {member.plan}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusVariant[member.status]}>
-                            {member.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isClient ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleSendReminder(member)}
-                              >
-                                <Mail className="h-4 w-4" />
-                                <span className="sr-only">Send Reminder</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenDialog('view', member)}
-                              >
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">View</span>
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="h-10 w-20" />
-                          )}
-                        </TableCell>
+                  {isLoadingMembers ? (
+                     Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                       </TableRow>
-                    );
-                  })}
+                    ))
+                  ) : inactiveMembers.length > 0 ? (
+                    inactiveMembers.map((member) => {
+                      return (
+                        <TableRow key={member.id}>
+                          <TableCell>
+                            <div className="font-medium">{`${member.firstName} ${member.lastName}`}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusVariant[member.isActive ? 'active' : 'inactive']}>
+                              {member.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isClient ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleSendReminder(member)}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                  <span className="sr-only">
+                                    Send Reminder
+                                  </span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleOpenDialog('view', member)
+                                  }
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span className="sr-only">View</span>
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="h-10 w-20" />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center">No inactive members found.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -215,7 +240,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-4">
                 <div>
                   <h3 className="text-xl font-semibold">
-                    {selectedMember.name}
+                    {selectedMember.firstName} {selectedMember.lastName}
                   </h3>
                   <p className="text-muted-foreground">
                     {selectedMember.email}
@@ -227,22 +252,14 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <div>
-                  <span className="font-semibold">Plan:</span>{' '}
-                  {selectedMember.plan}
-                </div>
-                <div>
                   <span className="font-semibold">Status:</span>{' '}
-                  <Badge variant={statusVariant[selectedMember.status]}>
-                    {selectedMember.status}
+                  <Badge variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>
+                    {selectedMember.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 <div>
                   <span className="font-semibold">Join Date:</span>{' '}
                   {selectedMember.joinDate}
-                </div>
-                <div>
-                  <span className="font-semibold">Expiry Date:</span>{' '}
-                  {selectedMember.expiryDate}
                 </div>
               </div>
             </div>
