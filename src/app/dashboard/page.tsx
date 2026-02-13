@@ -7,6 +7,7 @@ import {
   UserX,
   Eye,
   Mail,
+  Copy,
 } from 'lucide-react';
 import { type Member } from '@/lib/data';
 import {
@@ -113,6 +114,17 @@ export default function DashboardPage() {
     });
   };
 
+  const handleCopy = (text: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: 'Copied to clipboard!',
+          description: `ID: ${text}`,
+        });
+      });
+    }
+  };
+
   const statCards = [
     {
       title: 'Total Members',
@@ -199,7 +211,22 @@ export default function DashboardPage() {
                           <TableCell>
                             <div className="font-medium">{`${member.firstName} ${member.lastName}`}</div>
                           </TableCell>
-                          <TableCell>{member.gymId}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {member.gymId}
+                              {isClient && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => handleCopy(member.gymId)}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                  <span className="sr-only">Copy Member ID</span>
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={statusVariant[member.isActive ? 'active' : 'inactive']}>
                               {member.isActive ? 'Active' : 'Inactive'}
@@ -277,8 +304,21 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <div>
-                  <span className="font-semibold">Member ID:</span>{' '}
-                  {selectedMember.gymId}
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold">Member ID:</span>
+                    {selectedMember.gymId}
+                    {isClient && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleCopy(selectedMember.gymId)}
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span className="sr-only">Copy Member ID</span>
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <span className="font-semibold">Status:</span>{' '}
