@@ -75,18 +75,22 @@ service cloud.firestore {
     /**
      * @description Protects the admin roles collection. A user can create their own
      *              admin role document. Any signed-in user can read an admin profile (for gymName context),
-     *              but only existing admins can list all other admins. Client-side updates and
-     *              deletes are forbidden to prevent privilege escalation.
+     *              but only existing admins can list all other admins. An admin can update their own
+     *              document, but cannot change their gym or owner name to prevent data access issues.
+     *              Deletes are forbidden.
      * @path        /roles_admin/{adminId}
      * @allow       (get) Any signed-in user reading an admin document to retrieve context (e.g., gymName).
      * @allow       (create) An authenticated user creating their own admin role document during signup.
+     * @allow       (update) The admin updating their own profile, but critical fields are immutable.
      * @principle   Allows the isAdmin() function to work by letting any signed-in user `get` a role document.
      */
     match /roles_admin/{adminId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
-      allow update: if false;
+      allow update: if request.auth.uid == adminId &&
+                      request.resource.data.gymName == resource.data.gymName &&
+                      request.resource.data.ownerName == resource.data.ownerName;
       allow delete: if false;
     }
 

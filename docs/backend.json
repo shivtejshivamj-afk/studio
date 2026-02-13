@@ -19,7 +19,7 @@
           "description": "A unique, human-readable identifier for the gym."
         }
       },
-      "required": ["gymName", "ownerName", "gymIdentifier"]
+      "required": ["gymName", "ownerName"]
     },
     "Member": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -456,3 +456,5 @@
     }
   }
 }
+
+    
