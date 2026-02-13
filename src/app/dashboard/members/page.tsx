@@ -263,7 +263,7 @@ export default function MembersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Member</TableHead>
-                <TableHead>Member ID</TableHead>
+                <TableHead>Gym ID</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Join Date
