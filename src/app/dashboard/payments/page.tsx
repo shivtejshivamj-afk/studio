@@ -584,10 +584,6 @@ export default function InvoicingPage() {
                             <p>Subtotal</p>
                             <p>${selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
-                         <div className="flex justify-between text-gray-700">
-                            <p>Tax (0%)</p>
-                            <p>$0.00</p>
-                        </div>
                         <Separator className="my-2"/>
                          <div className="flex justify-between font-bold text-gray-800 text-lg">
                             <p>Total</p>
@@ -635,5 +631,3 @@ export default function InvoicingPage() {
     </>
   );
 }
-
-    
