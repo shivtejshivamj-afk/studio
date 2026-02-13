@@ -150,10 +150,10 @@ export default function MembersPage() {
   const handleSaveMember = (values: MemberFormValues) => {
     if (!firestore || !adminProfile) return;
 
-    const generateMemberId = (firstName: string, lastName: string, phone: string) => {
-      const namePart = `${firstName.substring(0,2)}${lastName.substring(0,2)}`.toUpperCase();
-      const phonePart = phone.slice(-4);
-      return `${namePart}${phonePart}`;
+    const generateMemberId = (gymName: string) => {
+      const gymPart = gymName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase().padEnd(4, 'X');
+      const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+      return `${gymPart}${randomPart}`;
     };
 
     if (activeDialog === 'add') {
@@ -161,7 +161,7 @@ export default function MembersPage() {
       const newMember: Member = {
         ...values,
         id: newDocRef.id,
-        gymId: generateMemberId(values.firstName, values.lastName, values.phone),
+        gymId: generateMemberId(adminProfile.gymName),
         gymName: adminProfile.gymName,
       };
       setDocumentNonBlocking(newDocRef, newMember, { merge: true });
@@ -173,8 +173,6 @@ export default function MembersPage() {
       const docRef = doc(firestore, 'members', selectedMember.id);
       const updatedMember = {
         ...values,
-        gymId: generateMemberId(values.firstName, values.lastName, values.phone),
-        gymName: adminProfile.gymName,
       };
       updateDocumentNonBlocking(docRef, updatedMember);
       toast({
