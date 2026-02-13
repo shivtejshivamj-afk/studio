@@ -6,6 +6,9 @@ import {
   PlusCircle,
   Trash2,
   Eye,
+  CheckCircle,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { type Member, type Invoice, plans } from '@/lib/data';
 import {
@@ -29,6 +32,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -79,6 +83,7 @@ import {
   useMemoFirebase,
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
+  updateDocumentNonBlocking,
 } from '@/firebase';
 import { collection, collectionGroup, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -205,6 +210,16 @@ export default function InvoicingPage() {
       closeDialogs();
     }
   };
+  
+  const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft') => {
+    if (!firestore) return;
+    const docRef = doc(firestore, 'members', invoice.memberId, 'invoices', invoice.id);
+    updateDocumentNonBlocking(docRef, { status });
+    toast({
+      title: 'Invoice Status Updated',
+      description: `Invoice ${invoice.invoiceNumber} has been marked as ${status}.`,
+    });
+  };
 
   const handleDownloadPdf = () => {
     if (!selectedInvoice || !invoiceContentRef.current) return;
@@ -328,8 +343,29 @@ export default function InvoicingPage() {
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateStatus(invoice, 'Paid')}
+                        >
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                           Mark as Paid
+                        </DropdownMenuItem>
+                         <DropdownMenuItem
+                          onClick={() => handleUpdateStatus(invoice, 'Pending')}
+                        >
+                          <Clock className="mr-2 h-4 w-4" />
+                           Mark as Pending
+                        </DropdownMenuItem>
+                         <DropdownMenuItem
+                          onClick={() => handleUpdateStatus(invoice, 'Overdue')}
+                        >
+                          <AlertCircle className="mr-2 h-4 w-4" />
+                           Mark as Overdue
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => handleOpenDialog('delete', invoice)}
+                          className="text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
