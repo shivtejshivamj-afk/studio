@@ -25,7 +25,7 @@
  *
  * Denormalization for Authorization:
  * - Admin roles are managed via "existence over content" in `/roles_admin/{adminId}`. This
- *   allows for a fast, simple `exists()` check in the rules without reading any document data.
+ *   allows for a fast, simple check in the rules without reading any document data.
  * - Subcollection documents (e.g., invoices, payments) contain a denormalized `memberId`.
  *   This is used to enforce relational integrity, ensuring that a document created under a
  *   specific member's path also contains the correct member ID internally.
@@ -56,7 +56,7 @@ service cloud.firestore {
      * This is the primary authorization check for the entire database.
      */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) != null;
     }
 
     /**
