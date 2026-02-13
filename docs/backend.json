@@ -456,26 +456,6 @@
         }
       },
       {
-        "path": "/members/{memberId}/invoices/{invoiceId}",
-        "definition": {
-          "entityName": "Invoice",
-          "schema": {
-            "$ref": "#/backend/entities/Invoice"
-          },
-          "description": "Subcollection storing financial invoices generated for each member. Includes denormalized 'memberId' and 'membershipId' for authorization independence. Access is restricted to authenticated administrators.",
-          "params": [
-            {
-              "name": "memberId",
-              "description": "The unique identifier of the parent member."
-            },
-            {
-              "name": "invoiceId",
-              "description": "Unique identifier for a specific invoice."
-            }
-          ]
-        }
-      },
-      {
         "path": "/members/{memberId}/payments/{paymentId}",
         "definition": {
           "entityName": "Payment",
@@ -507,6 +487,22 @@
             {
               "name": "attendanceId",
               "description": "Unique identifier for a specific attendance record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Top-level collection for storing all invoices. Access is restricted per-document based on gymName. This flat structure avoids the need for collection group queries and manual index creation.",
+          "params": [
+            {
+              "name": "invoiceId",
+              "description": "Unique identifier for a specific invoice."
             }
           ]
         }
@@ -544,7 +540,7 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure for GymTrack Pro is designed around a clear separation of administrative and member-specific data, prioritizing security, scalability, and debuggability. The core principle of Authorization Independence is met by ensuring that all authorization contexts are either directly available in the request (e.g., `request.auth.uid` for admin roles) or explicitly denormalized within the document itself, eliminating the need for `get()` operations in security rules.\n\n**Data Model Simplification (Attendance):**\n*   The `attendance` collection has been moved to the top level (`/attendance/{attendanceId}`). This is a critical change to avoid collection group queries, which require manual index creation in the Firebase Console. By using a top-level collection, administrators can query for their gym's attendance records using a simple `where('gymName', '==', adminGymName)` clause. This query only requires a single-field index on `gymName`, which Firestore can create automatically, thus removing the manual setup step that was causing persistent errors.\n\n**Authorization Independence & Denormalization:**\n*   **Admin Roles:** A dedicated top-level collection `/roles_admin/{adminId}` is used for Database Access Control (DBAC). Admin authorization relies solely on `request.auth.uid` existing as a document ID in this collection. This is 'existence over content' and perfectly independent.\n*   **Member-Specific Data:** Entities like `Membership`, `Invoice`, and `Payment` remain as subcollections under `/members/{memberId}`. This design choice inherently denormalizes the `memberId` into the document path, making it directly accessible to security rules (`memberId` in `request.path`) without needing to fetch the parent `Member` document.\n\n**QAPs (Rules Are Not Filters):**\n*   **Admin Data:** All primary administrative collections are protected by rules that check `request.auth.uid` against the `/roles_admin` collection. Client-side queries are constructed with `where()` clauses that match the security rules (e.g., filtering by `gymName`), ensuring that `list` operations do not attempt to fetch unauthorized data.\n\n**Structural Segregation:**\n*   All management data resides in collections with a homogeneous security posture: private to gym administrators. There are no mixed-security-posture documents within a single collection, simplifying rule logic significantly."
+    "reasoning": "The Firestore structure for GymTrack Pro is designed around a clear separation of administrative and member-specific data, prioritizing security, scalability, and debuggability. A core principle of this design is the elimination of manual index creation by avoiding collection group queries where possible. \n\n**Data Model Simplification (Top-Level Collections):**\n*   The `attendance` and `invoices` collections have been designed as top-level collections (`/attendance/{attendanceId}` and `/invoices/{invoiceId}`). This is a critical change to avoid collection group queries, which require manual index creation in the Firebase Console. By using a top-level collection, administrators can query for their gym's records using a simple `where('gymName', '==', adminGymName)` clause. These queries only require a single-field index on `gymName`, which Firestore can create automatically, thus removing the manual setup step that was causing persistent errors.\n\n**Authorization Independence & Denormalization:**\n*   **Admin Roles:** A dedicated top-level collection `/roles_admin/{adminId}` is used for Database Access Control (DBAC). Admin authorization relies solely on `request.auth.uid` existing as a document ID in this collection. This is 'existence over content' and perfectly independent.\n*   **Member-Specific Data:** Entities that do not need to be queried across all members, like `Membership` and `Payment`, remain as subcollections under `/members/{memberId}`. This design choice inherently denormalizes the `memberId` into the document path, making it directly accessible to security rules (`memberId` in `request.path`) without needing to fetch the parent `Member` document.\n\n**QAPs (Rules Are Not Filters):**\n*   **Admin Data:** All primary administrative collections are protected by rules that check `request.auth.uid` against the `/roles_admin` collection. Client-side queries are constructed with `where()` clauses that match the security rules (e.g., filtering by `gymName`), ensuring that `list` operations do not attempt to fetch unauthorized data.\n\n**Structural Segregation:**\n*   All management data resides in collections with a homogeneous security posture: private to gym administrators. There are no mixed-security-posture documents within a single collection, simplifying rule logic significantly."
   }
 }
 

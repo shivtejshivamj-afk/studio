@@ -5,9 +5,9 @@
  * member self-service or public write access; all operations are mediated by a trusted admin user.
  *
  * Data Structure: The data is organized into top-level collections for major entities like
- * `members`, `membership_plans`, `trainers`, and `attendance`. This flat structure is intentional
+ * `members`, `membership_plans`, `trainers`, `attendance`, and `invoices`. This flat structure is intentional
  * to support simple queries that do not require manual index creation. Member-specific data that is
- * not queried across all members (e.g., `memberships`, `invoices`) is nested in subcollections.
+ * not queried across all members (e.g., `memberships`, `payments`) is nested in subcollections.
  *
  * Key Security Decisions:
  * - Admin-Only System: Access to the entire database is granted only to users whose UID exists as
@@ -115,18 +115,6 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures the financial invoices for a specific member.
-     *              Only admins can manage a member's invoices.
-     * @path        /members/{memberId}/invoices/{invoiceId}
-     * @principle   Ensures data integrity by validating that subcollection data correctly references its parent.
-     */
-    match /members/{memberId}/invoices/{invoiceId} {
-      allow get, list, delete: if isAdmin();
-      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
-      allow update: if isAdmin() && isMemberIdImmutable();
-    }
-
-    /**
      * @description Secures the payment records for a specific member.
      *              Only admins can manage a member's payments.
      * @path        /members/{memberId}/payments/{paymentId}
@@ -145,6 +133,16 @@ service cloud.firestore {
      * @principle   Uses a flat data structure to avoid collection group queries and manual indexes.
      */
     match /attendance/{attendanceId} {
+        allow read, write: if isAdmin();
+    }
+    
+    /**
+     * @description Secures the top-level invoices collection. Only admins can read/write.
+     *              Client-side queries must filter by gymName.
+     * @path        /invoices/{invoiceId}
+     * @principle   Uses a flat data structure to avoid collection group queries and manual indexes.
+     */
+    match /invoices/{invoiceId} {
         allow read, write: if isAdmin();
     }
 
@@ -168,21 +166,6 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // ------------------------------------------------------------------------
-    // Collection Group Rules
-    // ------------------------------------------------------------------------
-
-    /**
-     * @description Secures the 'invoices' collection group. Allows an admin
-     *              to list invoices across ALL members. This is required
-     *              for the invoicing page which uses a collectionGroup query.
-     * @path        /{path=**}/invoices/{invoiceId}
-     * @allow       (list) An admin listing all invoices.
-     * @principle   Supports collection group queries for system-wide reporting.
-     */
-    match /{path=**}/invoices/{invoiceId} {
-      allow list: if isAdmin();
-    }
   }
 }
 

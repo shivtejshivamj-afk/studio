@@ -86,8 +86,9 @@ import {
   updateDocumentNonBlocking,
   useUser,
   useDoc,
+  setDocumentNonBlocking,
 } from '@/firebase';
-import { collection, collectionGroup, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
@@ -134,7 +135,7 @@ export default function InvoicingPage() {
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
 
   const invoicesQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymName ? query(collectionGroup(firestore, 'invoices'), where('gymName', '==', adminProfile.gymName)) : null),
+    () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'invoices'), where('gymName', '==', adminProfile.gymName)) : null),
     [firestore, adminProfile]
   );
   const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
@@ -197,8 +198,11 @@ export default function InvoicingPage() {
       });
       return;
     }
+    
+    const newDocRef = doc(collection(firestore, 'invoices'));
 
     const newInvoiceData = {
+      id: newDocRef.id,
       invoiceNumber: `INV-${String((invoicesData?.length || 0) + 1).padStart(3, '0')}`,
       memberId: member.id,
       membershipId: plan.id,
@@ -209,8 +213,7 @@ export default function InvoicingPage() {
       gymName: adminProfile.gymName,
     };
     
-    const invoicesCollectionRef = collection(firestore, 'members', member.id, 'invoices');
-    addDocumentNonBlocking(invoicesCollectionRef, newInvoiceData);
+    setDocumentNonBlocking(newDocRef, newInvoiceData, {});
     
     toast({
       title: 'Invoice Created',
@@ -221,7 +224,7 @@ export default function InvoicingPage() {
 
   const handleDeleteConfirm = () => {
     if (selectedInvoice && firestore) {
-      const docRef = doc(firestore, 'members', selectedInvoice.memberId, 'invoices', selectedInvoice.id);
+      const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       deleteDocumentNonBlocking(docRef);
 
       toast({
@@ -235,7 +238,7 @@ export default function InvoicingPage() {
   
   const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft') => {
     if (!firestore) return;
-    const docRef = doc(firestore, 'members', invoice.memberId, 'invoices', invoice.id);
+    const docRef = doc(firestore, 'invoices', invoice.id);
     updateDocumentNonBlocking(docRef, { status });
     toast({
       title: 'Invoice Status Updated',
@@ -632,3 +635,5 @@ export default function InvoicingPage() {
     </>
   );
 }
+
+    
