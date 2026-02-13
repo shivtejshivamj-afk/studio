@@ -80,16 +80,17 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
 
     /**
-     * @description Protects the admin roles collection. A user can create and read their own
-     *              admin role document, which is necessary for the app to function. Only existing
-     *              admins can list all other admins. Client-side updates and deletes are forbidden.
+     * @description Protects the admin roles collection. A user can create their own
+     *              admin role document. Any signed-in user can read an admin profile (for gymName context),
+     *              but only existing admins can list all other admins. Client-side updates and
+     *              deletes are forbidden to prevent privilege escalation.
      * @path        /roles_admin/{adminId}
-     * @allow       (get) A user reading their own admin document to retrieve their profile (e.g., gymName).
+     * @allow       (get) Any signed-in user reading an admin document to retrieve context (e.g., gymName).
      * @allow       (create) An authenticated user creating their own admin role document during signup.
-     * @principle   Allowing self-read of a role is essential for the app to determine user-specific context.
+     * @principle   Breaking the circular dependency where checking for admin status required admin status.
      */
     match /roles_admin/{adminId} {
-      allow get: if request.auth.uid == adminId;
+      allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
       allow update: if false;
