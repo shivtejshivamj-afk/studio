@@ -8,6 +8,7 @@ import {
   Eye,
   Mail,
   Copy,
+  Store,
 } from 'lucide-react';
 import { type Member } from '@/lib/data';
 import {
@@ -127,6 +128,12 @@ export default function DashboardPage() {
 
   const statCards = [
     {
+      title: 'Gym Name',
+      value: adminProfile?.gymName ?? '...',
+      icon: Store,
+      loading: isLoadingAdminProfile,
+    },
+    {
       title: 'Total Members',
       value: members?.length ?? 0,
       icon: Users,
@@ -156,7 +163,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {statCards.map((card) => (
             <Card key={card.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
