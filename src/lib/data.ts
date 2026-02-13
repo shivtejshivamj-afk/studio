@@ -8,7 +8,6 @@ export type Member = {
   status: 'Paid' | 'Pending' | 'Overdue';
   joinDate: string;
   expiryDate: string;
-  avatar: string;
 };
 
 export type Trainer = {
@@ -17,7 +16,6 @@ export type Trainer = {
   specialization: string;
   phone: string;
   email: string;
-  avatar: string;
   joiningDate: string;
 };
 

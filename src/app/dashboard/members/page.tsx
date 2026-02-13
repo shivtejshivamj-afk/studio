@@ -1,9 +1,7 @@
 'use client';
 
 import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
-import Image from 'next/image';
 import { members as initialMembers, plans, type Member } from '@/lib/data';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
   CardContent,
@@ -19,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -153,7 +150,6 @@ export default function MembersPage() {
         status: values.status,
         joinDate: values.joinDate,
         expiryDate: values.expiryDate,
-        avatar: 'member-3',
         memberId: generateMemberId(values.name, values.phone),
       };
       setMembers((prev) => [...prev, newMember]);
@@ -245,32 +241,13 @@ export default function MembersPage() {
             </TableHeader>
             <TableBody>
               {filteredMembers.map((member) => {
-                const avatar = PlaceHolderImages.find(
-                  (img) => img.id === member.avatar
-                );
                 return (
                   <TableRow key={member.id}>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          {avatar && (
-                            <AvatarImage
-                              src={avatar.imageUrl}
-                              alt={member.name}
-                              width={40}
-                              height={40}
-                              data-ai-hint={avatar.imageHint}
-                            />
-                          )}
-                          <AvatarFallback>
-                            {member.name.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{member.name}</div>
-                          <div className="text-sm text-muted-foreground hidden sm:block">
-                            {member.email}
-                          </div>
+                      <div>
+                        <div className="font-medium">{member.name}</div>
+                        <div className="text-sm text-muted-foreground hidden sm:block">
+                          {member.email}
                         </div>
                       </div>
                     </TableCell>
@@ -517,19 +494,6 @@ export default function MembersPage() {
           {selectedMember && (
             <div className="grid gap-4 py-4 text-sm">
               <div className="flex items-center gap-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage
-                    src={
-                      PlaceHolderImages.find(
-                        (p) => p.id === selectedMember.avatar
-                      )?.imageUrl
-                    }
-                    alt={selectedMember.name}
-                  />
-                  <AvatarFallback>
-                    {selectedMember.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
                 <div>
                   <h3 className="text-xl font-semibold">
                     {selectedMember.name}

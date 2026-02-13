@@ -1,9 +1,7 @@
 'use client';
 
 import { MoreVertical, PlusCircle } from 'lucide-react';
-import Image from 'next/image';
 import { trainers as initialTrainers, type Trainer } from '@/lib/data';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
   CardContent,
@@ -19,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -88,7 +85,6 @@ export default function TrainersPage() {
   function handleSaveTrainer(values: TrainerFormValues) {
     const newTrainer: Trainer = {
       id: `t${Date.now()}`,
-      avatar: 'trainer-3', // Default avatar
       ...values,
     };
 
@@ -270,29 +266,10 @@ export default function TrainersPage() {
           </TableHeader>
           <TableBody>
             {filteredTrainers.map((trainer) => {
-              const avatar = PlaceHolderImages.find(
-                (img) => img.id === trainer.avatar
-              );
               return (
                 <TableRow key={trainer.id}>
                   <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        {avatar && (
-                          <AvatarImage
-                            src={avatar.imageUrl}
-                            alt={trainer.name}
-                            width={40}
-                            height={40}
-                            data-ai-hint={avatar.imageHint}
-                          />
-                        )}
-                        <AvatarFallback>
-                          {trainer.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{trainer.name}</div>
-                    </div>
+                    <div className="font-medium">{trainer.name}</div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     {trainer.specialization}

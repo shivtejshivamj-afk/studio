@@ -63,10 +63,6 @@
         "expiryDate": {
           "type": "string",
           "format": "date"
-        },
-        "avatar": {
-            "type": "string",
-            "description": "ID for placeholder image"
         }
       },
       "required": ["memberId", "name", "email", "phone", "plan", "status", "joinDate", "expiryDate"]
@@ -80,7 +76,6 @@
             "specialization": { "type": "string" },
             "phone": { "type": "string" },
             "email": { "type": "string", "format": "email" },
-            "avatar": { "type": "string", "description": "ID for placeholder image" },
             "joiningDate": { "type": "string", "format": "date" }
         },
         "required": ["name", "specialization", "phone", "email", "joiningDate"]

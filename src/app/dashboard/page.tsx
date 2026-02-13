@@ -8,9 +8,7 @@ import {
   Eye,
   Mail,
 } from 'lucide-react';
-import Image from 'next/image';
 import { dashboardStats, members, type Member } from '@/lib/data';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
   CardContent,
@@ -26,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -154,29 +151,10 @@ export default function DashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {overdueMembers.map((member) => {
-                    const avatar = PlaceHolderImages.find(
-                      (img) => img.id === member.avatar
-                    );
                     return (
                       <TableRow key={member.id}>
                         <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              {avatar && (
-                                <AvatarImage
-                                  src={avatar.imageUrl}
-                                  alt={member.name}
-                                  width={40}
-                                  height={40}
-                                  data-ai-hint={avatar.imageHint}
-                                />
-                              )}
-                              <AvatarFallback>
-                                {member.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="font-medium">{member.name}</div>
-                          </div>
+                          <div className="font-medium">{member.name}</div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           {member.plan}
@@ -235,19 +213,6 @@ export default function DashboardPage() {
           {selectedMember && (
             <div className="grid gap-4 py-4 text-sm">
               <div className="flex items-center gap-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage
-                    src={
-                      PlaceHolderImages.find(
-                        (p) => p.id === selectedMember.avatar
-                      )?.imageUrl
-                    }
-                    alt={selectedMember.name}
-                  />
-                  <AvatarFallback>
-                    {selectedMember.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
                 <div>
                   <h3 className="text-xl font-semibold">
                     {selectedMember.name}
