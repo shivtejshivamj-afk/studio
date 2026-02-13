@@ -74,7 +74,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import {
@@ -109,7 +109,12 @@ export default function InvoicingPage() {
   type DialogType = 'add' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isClient, setIsClient] = useState(false);
   const invoiceContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const firestore = useFirestore();
 
@@ -330,48 +335,57 @@ export default function InvoicingPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
+                    {isClient ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleOpenDialog('view', invoice)}
                         >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleUpdateStatus(invoice, 'Paid')}
-                        >
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                           Mark as Paid
-                        </DropdownMenuItem>
-                         <DropdownMenuItem
-                          onClick={() => handleUpdateStatus(invoice, 'Pending')}
-                        >
-                          <Clock className="mr-2 h-4 w-4" />
-                           Mark as Pending
-                        </DropdownMenuItem>
-                         <DropdownMenuItem
-                          onClick={() => handleUpdateStatus(invoice, 'Overdue')}
-                        >
-                          <AlertCircle className="mr-2 h-4 w-4" />
-                           Mark as Overdue
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View Details</span>
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Update Status</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(invoice, 'Paid')}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Mark as Paid
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(invoice, 'Pending')}
+                            >
+                              <Clock className="mr-2 h-4 w-4" />
+                              Mark as Pending
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(invoice, 'Overdue')}
+                            >
+                              <AlertCircle className="mr-2 h-4 w-4" />
+                              Mark as Overdue
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleOpenDialog('delete', invoice)}
-                          className="text-destructive"
+                          className="text-destructive hover:text-destructive"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="h-10 w-28" />
+                    )}
                   </TableCell>
                 </TableRow>
               ))
