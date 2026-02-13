@@ -207,5 +207,33 @@ service cloud.firestore {
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
+
+    // ------------------------------------------------------------------------
+    // Collection Group Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Secures the 'attendance' collection group. Allows an admin
+     *              to list attendance records across ALL members. This is required
+     *              for the main attendance page which uses a collectionGroup query.
+     * @path        /{path=**}/attendance/{attendanceId}
+     * @allow       (list) An admin listing all attendance records.
+     * @principle   Supports collection group queries for system-wide reporting.
+     */
+    match /{path=**}/attendance/{attendanceId} {
+      allow list: if isAdmin();
+    }
+
+    /**
+     * @description Secures the 'invoices' collection group. Allows an admin
+     *              to list invoices across ALL members. This is required
+     *              for the invoicing page which uses a collectionGroup query.
+     * @path        /{path=**}/invoices/{invoiceId}
+     * @allow       (list) An admin listing all invoices.
+     * @principle   Supports collection group queries for system-wide reporting.
+     */
+    match /{path=**}/invoices/{invoiceId} {
+      allow list: if isAdmin();
+    }
   }
 }
