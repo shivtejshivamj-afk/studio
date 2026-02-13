@@ -428,6 +428,8 @@ export default function InvoicingPage() {
                         <SelectContent>
                           <SelectItem value="Draft">Draft</SelectItem>
                           <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="Paid">Paid</SelectItem>
+                          <SelectItem value="Overdue">Overdue</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
