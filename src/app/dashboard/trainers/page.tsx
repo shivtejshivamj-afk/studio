@@ -63,6 +63,7 @@ const trainerFormSchema = z.object({
   specialization: z
     .string()
     .min(1, { message: 'Specialization is required.' }),
+  joiningDate: z.string().min(1, { message: 'Joining date is required.' }),
 });
 
 type TrainerFormValues = z.infer<typeof trainerFormSchema>;
@@ -80,6 +81,7 @@ export default function TrainersPage() {
       email: '',
       phone: '',
       specialization: '',
+      joiningDate: '',
     },
   });
 
@@ -217,6 +219,21 @@ export default function TrainersPage() {
                           </div>
                         )}
                       />
+                       <FormField
+                        control={form.control}
+                        name="joiningDate"
+                        render={({ field }) => (
+                          <div className="grid grid-cols-4 items-center gap-x-4">
+                            <FormLabel className="text-right">Joining Date</FormLabel>
+                            <FormItem className="col-span-3">
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          </div>
+                        )}
+                      />
                     </div>
                     <DialogFooter>
                       <Button
@@ -243,8 +260,10 @@ export default function TrainersPage() {
               <TableHead className="hidden md:table-cell">
                 Specialization
               </TableHead>
-              <TableHead className="hidden sm:table-cell">Contact</TableHead>
-              <TableHead>
+              <TableHead className="hidden lg:table-cell">Email</TableHead>
+              <TableHead className="hidden sm:table-cell">Phone</TableHead>
+              <TableHead className="hidden md:table-cell">Joining Date</TableHead>
+              <TableHead className="text-right">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
@@ -278,12 +297,9 @@ export default function TrainersPage() {
                   <TableCell className="hidden md:table-cell">
                     {trainer.specialization}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <div>{trainer.email}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {trainer.phone}
-                    </div>
-                  </TableCell>
+                   <TableCell className="hidden lg:table-cell">{trainer.email}</TableCell>
+                   <TableCell className="hidden sm:table-cell">{trainer.phone}</TableCell>
+                   <TableCell className="hidden md:table-cell">{trainer.joiningDate}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

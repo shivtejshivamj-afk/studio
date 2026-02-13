@@ -18,6 +18,7 @@ export type Trainer = {
   phone: string;
   email: string;
   avatar: string;
+  joiningDate: string;
 };
 
 export type Plan = {
