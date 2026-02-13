@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Users,
@@ -9,7 +9,6 @@ import {
   Calendar,
   LayoutDashboard,
   LogOut,
-  UserCircle,
   CalendarCheck,
 } from 'lucide-react';
 import {
@@ -24,8 +23,10 @@ import {
   SidebarTrigger,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -38,17 +39,43 @@ const navItems = [
 
 export function DashboardNav() {
   const pathname = usePathname();
-  const userAvatar = PlaceHolderImages.find(img => img.id === 'trainer-1');
+  const router = useRouter();
+  const auth = useAuth();
+  const { user } = useUser();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+      toast({
+        title: 'Logged Out',
+        description: 'You have been successfully logged out.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Logout Failed',
+        description: 'An error occurred while logging out.',
+      });
+    }
+  };
+
+  const getInitials = (email: string | null | undefined) => {
+    if (!email) return 'AD';
+    const parts = email.split('@');
+    return parts[0].substring(0, 2).toUpperCase();
+  };
 
   return (
     <Sidebar collapsible="icon">
       <SidebarRail />
       <SidebarHeader>
         <div className="flex w-full items-center justify-between">
-            <div className="flex items-center gap-2">
+            <Link href="/dashboard" className="flex items-center gap-2">
                 <Dumbbell className="h-8 w-8 text-primary" />
                 <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">GymTrack Pro</h1>
-            </div>
+            </Link>
           <SidebarTrigger className="hidden md:flex" />
         </div>
       </SidebarHeader>
@@ -73,20 +100,19 @@ export function DashboardNav() {
         <SidebarSeparator />
         <div className="flex items-center gap-3 p-2 group-data-[collapsible=icon]:justify-center">
            <Avatar className="h-10 w-10">
-            {userAvatar && <AvatarImage src={userAvatar.imageUrl} alt="Admin" data-ai-hint={userAvatar.imageHint}/>}
-            <AvatarFallback>AD</AvatarFallback>
+            <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-sm">Admin User</span>
-            <span className="text-xs text-muted-foreground">admin@gymtrack.pro</span>
+            <span className="font-semibold text-sm truncate">{user?.email || 'Admin User'}</span>
+            <span className="text-xs text-muted-foreground">Administrator</span>
           </div>
         </div>
-        <Link href="/">
-          <SidebarMenuButton tooltip={{ children: 'Logout' }}>
+        
+          <SidebarMenuButton tooltip={{ children: 'Logout' }} onClick={handleLogout}>
             <LogOut />
             <span className="group-data-[collapsible=icon]:hidden">Logout</span>
           </SidebarMenuButton>
-        </Link>
+        
       </SidebarFooter>
     </Sidebar>
   );
