@@ -4,10 +4,9 @@ import {
   Users,
   Dumbbell,
   DollarSign,
-  Clock,
+  UserX,
   Eye,
   Mail,
-  UserX,
 } from 'lucide-react';
 import { type Member } from '@/lib/data';
 import {
@@ -36,8 +35,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  useUser,
+  useDoc,
+} from '@/firebase';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
@@ -52,13 +57,30 @@ export default function DashboardPage() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
 
+  const { user } = useUser();
   const firestore = useFirestore();
+
+  const adminProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } =
+    useDoc<{ gymName: string }>(adminProfileRef);
+
   const membersQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'members') : null),
-    [firestore]
+    () =>
+      firestore && adminProfile?.gymName
+        ? query(
+            collection(firestore, 'members'),
+            where('gymName', '==', adminProfile.gymName)
+          )
+        : null,
+    [firestore, adminProfile]
   );
   const { data: members, isLoading: isLoadingMembers } =
     useCollection<Member>(membersQuery);
+
+  const isLoading = isLoadingAdminProfile || isLoadingMembers;
 
   useEffect(() => {
     setIsClient(true);
@@ -96,19 +118,19 @@ export default function DashboardPage() {
       title: 'Total Members',
       value: members?.length ?? 0,
       icon: Users,
-      loading: isLoadingMembers,
+      loading: isLoading,
     },
     {
       title: 'Active Members',
       value: activeMembersCount,
       icon: Dumbbell,
-      loading: isLoadingMembers,
+      loading: isLoading,
     },
     {
       title: 'Inactive Members',
       value: inactiveMembers.length,
       icon: UserX,
-      loading: isLoadingMembers,
+      loading: isLoading,
     },
     {
       title: 'Total Revenue',
@@ -155,15 +177,17 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
+                    <TableHead>Member ID</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingMembers ? (
+                  {isLoading ? (
                      Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                       </TableRow>
@@ -175,6 +199,7 @@ export default function DashboardPage() {
                           <TableCell>
                             <div className="font-medium">{`${member.firstName} ${member.lastName}`}</div>
                           </TableCell>
+                          <TableCell>{member.gymId}</TableCell>
                           <TableCell>
                             <Badge variant={statusVariant[member.isActive ? 'active' : 'inactive']}>
                               {member.isActive ? 'Active' : 'Inactive'}
@@ -213,7 +238,7 @@ export default function DashboardPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center">No inactive members found.</TableCell>
+                      <TableCell colSpan={4} className="text-center">No inactive members found.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -251,6 +276,10 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
+                <div>
+                  <span className="font-semibold">Member ID:</span>{' '}
+                  {selectedMember.gymId}
+                </div>
                 <div>
                   <span className="font-semibold">Status:</span>{' '}
                   <Badge variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>

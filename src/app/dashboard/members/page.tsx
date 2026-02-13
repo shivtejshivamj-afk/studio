@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { Eye, Pencil, PlusCircle, Trash2, Copy } from 'lucide-react';
 import { type Member } from '@/lib/data';
 import {
   Card,
@@ -101,7 +101,7 @@ export default function MembersPage() {
       () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
       [firestore, user]
   );
-  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string, ownerName: string}>(adminProfileRef);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string}>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
       () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
@@ -147,6 +147,17 @@ export default function MembersPage() {
     setActiveDialog(null);
     setSelectedMember(null);
   };
+  
+  const handleCopy = (text: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: 'Copied to clipboard!',
+          description: `ID: ${text}`,
+        });
+      });
+    }
+  };
 
   const handleSaveMember = (values: MemberFormValues) => {
     if (!firestore || !adminProfile?.gymName) {
@@ -180,7 +191,7 @@ export default function MembersPage() {
     } else if (activeDialog === 'edit' && selectedMember) {
       const docRef = doc(firestore, 'members', selectedMember.id);
       const updatedMember = {
-        ...selectedMember, // Keep existing values like gymId
+        ...selectedMember,
         ...values,
       };
       updateDocumentNonBlocking(docRef, updatedMember);
@@ -286,7 +297,22 @@ export default function MembersPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{member.gymId}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {member.gymId}
+                          {isClient && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleCopy(member.gymId)}
+                            >
+                              <Copy className="h-4 w-4" />
+                              <span className="sr-only">Copy Member ID</span>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {member.phone}
                       </TableCell>
@@ -500,8 +526,19 @@ export default function MembersPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <div>
-                  <span className="font-semibold">Member ID:</span>{' '}
-                  {selectedMember.gymId}
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold">Member ID:</span>
+                    {selectedMember.gymId}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleCopy(selectedMember.gymId)}
+                    >
+                      <Copy className="h-4 w-4" />
+                      <span className="sr-only">Copy Member ID</span>
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <span className="font-semibold">Status:</span>{' '}
