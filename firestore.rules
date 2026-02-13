@@ -15,7 +15,7 @@
  *   a document ID in the `/roles_admin` collection. This provides a single, centralized point for
  *   managing permissions.
  * - No Client-Side Role Management: The `/roles_admin` collection is read-only for admins and
- *   denies all client-side writes. Admin roles must be managed securely through the Firebase
+ *   denies all client-side writes except for the initial creation by the user themselves. Admin roles must be managed securely through the Firebase
  *   Console or a trusted server-side process.
  * - Server-Mediated Public Actions: Features like public member check-in are explicitly designed
  *   to be handled by a secure Cloud Function. The rules do not grant public write access to the
@@ -80,16 +80,16 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
 
     /**
-     * @description Protects the admin roles collection. Admins can see who other admins are,
-     *              but cannot add or remove roles from the client to prevent privilege escalation.
-     *              The one exception is that a user can create their own admin role document.
+     * @description Protects the admin roles collection. A user can create and read their own
+     *              admin role document, which is necessary for the app to function. Only existing
+     *              admins can list all other admins. Client-side updates and deletes are forbidden.
      * @path        /roles_admin/{adminId}
+     * @allow       (get) A user reading their own admin document to retrieve their profile (e.g., gymName).
      * @allow       (create) An authenticated user creating their own admin role document during signup.
-     * @deny        (create) Any user trying to create an admin document for someone else.
-     * @principle   Restricts sensitive administrative tasks while allowing for initial admin creation.
+     * @principle   Allowing self-read of a role is essential for the app to determine user-specific context.
      */
     match /roles_admin/{adminId} {
-      allow get: if isAdmin();
+      allow get: if request.auth.uid == adminId;
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
       allow update: if false;
