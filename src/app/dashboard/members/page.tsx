@@ -160,7 +160,10 @@ export default function MembersPage() {
   };
 
   const handleSaveMember = (values: MemberFormValues) => {
-    if (!firestore || !adminProfile?.gymName) {
+    if (!firestore) {
+      return;
+    }
+    if (!adminProfile?.gymName) {
       toast({
         title: 'Cannot Add Member',
         description:
@@ -172,15 +175,15 @@ export default function MembersPage() {
 
     if (activeDialog === 'add') {
         const newDocRef = doc(collection(firestore, 'members'));
-        const generateMemberId = (gymName: string) => {
-            const gymPart = gymName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase().padEnd(4, 'X');
+        const generateMemberId = (memberName: string) => {
+            const namePart = memberName.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase().padEnd(4, 'X');
             const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-            return `${gymPart}${randomPart}`;
+            return `${namePart}${randomPart}`;
         };
         const newMember: Member = {
             ...values,
             id: newDocRef.id,
-            gymId: generateMemberId(adminProfile.gymName),
+            gymId: generateMemberId(values.firstName),
             gymName: adminProfile.gymName,
         };
         setDocumentNonBlocking(newDocRef, newMember, { merge: true });
