@@ -32,22 +32,24 @@ import {
 } from 'firebase/firestore';
 import type { Member } from '@/lib/data';
 
-const memberIdSchema = z.object({
-  memberId: z.string().min(1, 'Member ID is required.'),
+const checkInSchema = z.object({
+  gymIdentifier: z.string().min(1, 'Your Gym Identifier is required.'),
+  memberId: z.string().min(1, 'Your Member ID is required.'),
 });
 
 export function CheckInForm() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
-  const form = useForm<z.infer<typeof memberIdSchema>>({
-    resolver: zodResolver(memberIdSchema),
+  const form = useForm<z.infer<typeof checkInSchema>>({
+    resolver: zodResolver(checkInSchema),
     defaultValues: {
+      gymIdentifier: '',
       memberId: '',
     },
   });
 
-  async function handleMemberIdSubmit(values: z.infer<typeof memberIdSchema>) {
+  async function handleCheckIn(values: z.infer<typeof checkInSchema>) {
     if (!firestore) {
       toast({
         title: 'Error',
@@ -58,25 +60,46 @@ export function CheckInForm() {
     }
 
     try {
-      const membersRef = collection(firestore, 'members');
-      const q = query(
-        membersRef,
-        where('gymId', '==', values.memberId.toUpperCase())
+      // 1. Find the gym by its identifier
+      const adminRolesRef = collection(firestore, 'roles_admin');
+      const gymQuery = query(
+        adminRolesRef,
+        where('gymIdentifier', '==', values.gymIdentifier.toUpperCase())
       );
-      const querySnapshot = await getDocs(q);
+      const gymQuerySnapshot = await getDocs(gymQuery);
 
-      if (querySnapshot.empty) {
+      if (gymQuerySnapshot.empty) {
         toast({
           title: 'Check-in Failed',
-          description: `Member ID "${values.memberId}" not found. Please check your ID and try again.`,
+          description: `Gym with identifier "${values.gymIdentifier}" not found.`,
           variant: 'destructive',
         });
-        form.reset();
+        return;
+      }
+      
+      const gymDoc = gymQuerySnapshot.docs[0];
+      const gymName = gymDoc.data().gymName;
+
+      // 2. Find the member within that gym using their member-specific gymId
+      const membersRef = collection(firestore, 'members');
+      const memberQuery = query(
+        membersRef,
+        where('gymName', '==', gymName),
+        where('gymId', '==', values.memberId.toUpperCase())
+      );
+      const memberQuerySnapshot = await getDocs(memberQuery);
+
+
+      if (memberQuerySnapshot.empty) {
+        toast({
+          title: 'Check-in Failed',
+          description: `Member ID "${values.memberId}" not found in this gym. Please check your ID and try again.`,
+          variant: 'destructive',
+        });
         return;
       }
 
-      // Assuming gymId is unique across all gyms for this implementation
-      const memberDoc = querySnapshot.docs[0];
+      const memberDoc = memberQuerySnapshot.docs[0];
       const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
 
       if (!member.isActive) {
@@ -117,27 +140,46 @@ export function CheckInForm() {
       <CardHeader className="items-center text-center">
         <Dumbbell className="h-12 w-12 text-primary" />
         <CardTitle className="text-3xl font-bold">Member Check-in</CardTitle>
-        <CardDescription>Please enter your Member ID to check in.</CardDescription>
+        <CardDescription>Enter your Gym Identifier and Member ID to check in.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleMemberIdSubmit)}
+            onSubmit={form.handleSubmit(handleCheckIn)}
             className="grid gap-4"
           >
+             <FormField
+              control={form.control}
+              name="gymIdentifier"
+              render={({ field }) => (
+                <FormItem className="grid gap-2">
+                  <FormLabel htmlFor="gym-identifier">
+                    Gym Identifier
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      id="gym-identifier"
+                      placeholder="Enter your Gym's Identifier"
+                      autoComplete="off"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="memberId"
               render={({ field }) => (
                 <FormItem className="grid gap-2">
-                  <FormLabel htmlFor="member-id" className="sr-only">
+                  <FormLabel htmlFor="member-id">
                     Member ID
                   </FormLabel>
                   <FormControl>
                     <Input
                       id="member-id"
                       placeholder="Enter your Member ID (e.g., ALIC7890)"
-                      className="text-center"
                       autoComplete="off"
                       {...field}
                     />
@@ -155,5 +197,3 @@ export function CheckInForm() {
     </Card>
   );
 }
-
-    
