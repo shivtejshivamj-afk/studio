@@ -1,30 +1,18 @@
 /**
- * Core Philosophy: This ruleset enforces a strict, administrator-only security model.
+ * Core Philosophy: This ruleset enforces a strict, administrator-only security model for most operations.
  * All data access and modification are restricted to authenticated users who are explicitly
- * designated as administrators in the `/roles_admin` collection. There is no concept of
- * member self-service or public write access; all operations are mediated by a trusted admin user.
+ * designated as administrators in the `/roles_admin` collection.
+ * 
+ * Public Check-in: A specific exception is made for the public member check-in feature. This is handled
+ * by creating a parallel, publicly-readable collection (`member_profiles_public`) that contains only non-sensitive
+ * information required for validation. The `attendance` collection allows unauthenticated `create` operations,
+ * but the request is rigorously validated against the trusted data in `member_profiles_public`. This prevents
+ * unauthorized reads of private member data while still allowing a public-facing feature.
  *
  * Data Structure: The data is organized into top-level collections for major entities like
  * `members`, `membership_plans`, `trainers`, `attendance`, and `invoices`. This flat structure is intentional
  * to support simple queries that do not require manual index creation. Member-specific data that is
  * not queried across all members (e.g., `memberships`, `payments`) is nested in subcollections.
- *
- * Key Security Decisions:
- * - Admin-Only System: Access to the entire database is granted only to users whose UID exists as
- *   a document ID in the `/roles_admin` collection.
- * - Server-Mediated Public Actions: Features like public member check-in are explicitly designed
- *   to be handled by a secure Cloud Function. The rules do not grant public write access to any
- *   collection.
- * - Default Deny Posture: Any path not explicitly matched is denied by default.
- *
- * Denormalization for Authorization:
- * - Admin roles are managed via "existence over content" in `/roles_admin/{adminId}`. A `get()`
- *   is used in the `isAdmin()` function to verify this.
- *
- * Structural Segregation:
- * - The database uses clear structural separation. All collections have a homogenous security
- *   posture (admin-only). There are no collections that mix public and private data, which
- *   dramatically simplifies rule logic.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -44,12 +32,9 @@ service cloud.firestore {
     /**
      * Checks if the authenticated user has administrative privileges by verifying
      * their UID exists as a document in the `/roles_admin` collection.
-     * This is the primary authorization check for the entire database.
-     * Using get() instead of exists() is crucial to break the circular dependency
-     * where checking for admin status required admin status.
      */
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) != null;
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     /**
@@ -68,21 +53,37 @@ service cloud.firestore {
       return request.resource.data.memberId == resource.data.memberId;
     }
 
+    /**
+     * Validates a public check-in request by cross-referencing it with the trusted,
+     * publicly readable `member_profiles_public` document.
+     */
+    function isPublicCheckInValid() {
+      let incomingData = request.resource.data;
+      // The public member ID from the check-in form.
+      let memberGymId = incomingData.memberGymId;
+
+      // The corresponding public profile document, which is our source of truth.
+      let publicProfile = get(/databases/$(database)/documents/member_profiles_public/$(memberGymId)).data;
+
+      // 1. The member must be active.
+      // 2. The Gym Name from the check-in must match the one in the public profile.
+      // 3. The Gym Identifier must match.
+      // 4. The private member document ID must match.
+      return publicProfile.isActive == true &&
+             publicProfile.gymName == incomingData.gymName &&
+             publicProfile.gymIdentifier == incomingData.gymIdentifier &&
+             publicProfile.memberDocId == incomingData.memberId;
+    }
+
     // ------------------------------------------------------------------------
     // Rule Definitions
     // ------------------------------------------------------------------------
 
     /**
-     * @description Protects the admin roles collection. A user can create their own
-     *              admin role document. Any signed-in user can read an admin profile (for gymName context),
+     * @description Protects admin roles. Any signed-in user can read an admin profile (for context),
      *              but only existing admins can list all other admins. An admin can update their own
-     *              document, but cannot change their gym or owner name to prevent data access issues.
-     *              Deletes are forbidden.
+     *              document, but critical fields are immutable to prevent data access issues.
      * @path        /roles_admin/{adminId}
-     * @allow       (get) Any signed-in user reading an admin document to retrieve context (e.g., gymName).
-     * @allow       (create) An authenticated user creating their own admin role document during signup.
-     * @allow       (update) The admin updating their own profile, but critical fields are immutable.
-     * @principle   Allows the isAdmin() function to work by letting any signed-in user `get` a role document.
      */
     match /roles_admin/{adminId} {
       allow get: if isSignedIn();
@@ -98,19 +99,26 @@ service cloud.firestore {
      * @description Secures the main collection of gym member profiles. Only authenticated
      *              administrators are allowed to read or write member data.
      * @path        /members/{memberId}
-     * @allow       (create) An authenticated admin creating a new member profile.
-     * @deny        (get) A non-admin user trying to read a member profile.
-     * @principle   Enforces role-based access control (RBAC) where all data is private to admins.
      */
     match /members/{memberId} {
       allow get, list, create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Secures the membership subscriptions for a specific member.
-     *              Only admins can manage a member's subscriptions.
+     * @description Secures the public-facing member profiles used for check-in.
+     *              These documents are publicly readable but can only be written by admins.
+     *              This separation allows the public check-in feature to work without exposing
+     *              sensitive member data.
+     * @path        /member_profiles_public/{memberPubId}
+     */
+    match /member_profiles_public/{memberPubId} {
+        allow get: if true;
+        allow list, create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Secures membership subscriptions. Only admins can manage them.
      * @path        /members/{memberId}/memberships/{membershipId}
-     * @principle   Ensures data integrity by validating that subcollection data correctly references its parent.
      */
     match /members/{memberId}/memberships/{membershipId} {
       allow get, list, delete: if isAdmin();
@@ -119,10 +127,8 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures the payment records for a specific member.
-     *              Only admins can manage a member's payments.
+     * @description Secures payment records. Only admins can manage them.
      * @path        /members/{memberId}/payments/{paymentId}
-     * @principle   Ensures data integrity by validating that subcollection data correctly references its parent.
      */
     match /members/{memberId}/payments/{paymentId} {
       allow get, list, delete: if isAdmin();
@@ -131,40 +137,35 @@ service cloud.firestore {
     }
     
     /**
-     * @description Secures the top-level attendance collection. Only admins can read/write.
-     *              Client-side queries must filter by gymName.
+     * @description Secures the attendance collection. Admins can read all records.
+     *              Public (unauthenticated) users can ONLY create new attendance records
+     *              if the request is validated by the `isPublicCheckInValid` function.
      * @path        /attendance/{attendanceId}
-     * @principle   Uses a flat data structure to avoid collection group queries and manual indexes.
      */
     match /attendance/{attendanceId} {
-        allow read, write: if isAdmin();
+        allow read, update, delete: if isAdmin();
+        allow create: if isPublicCheckInValid() || isAdmin();
     }
     
     /**
      * @description Secures the top-level invoices collection. Only admins can read/write.
-     *              Client-side queries must filter by gymName.
      * @path        /invoices/{invoiceId}
-     * @principle   Uses a flat data structure to avoid collection group queries and manual indexes.
      */
     match /invoices/{invoiceId} {
         allow read, write: if isAdmin();
     }
 
     /**
-     * @description Secures the collection of available membership plans.
-     *              Only admins are allowed to define and manage these plans.
+     * @description Secures membership plans. Only admins can manage them.
      * @path        /membership_plans/{planId}
-     * @principle   Enforces role-based access control (RBAC) for global configuration data.
      */
     match /membership_plans/{planId} {
       allow read, write: if isAdmin();
     }
 
     /**
-     * @description Secures the collection of gym trainer profiles. Only admins
-     *              are allowed to manage trainer information.
+     * @description Secures trainer profiles. Only admins can manage them.
      * @path        /trainers/{trainerId}
-     * @principle   Enforces role-based access control (RBAC) for global staff data.
      */
     match /trainers/{trainerId} {
       allow read, write: if isAdmin();
@@ -172,5 +173,3 @@ service cloud.firestore {
 
   }
 }
-
-    

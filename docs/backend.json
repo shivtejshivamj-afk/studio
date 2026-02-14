@@ -19,7 +19,10 @@
           "description": "A unique, human-readable identifier for the gym."
         }
       },
-      "required": ["gymName", "ownerName"]
+      "required": [
+        "gymName",
+        "ownerName"
+      ]
     },
     "Member": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -93,6 +96,46 @@
         "isActive",
         "gymId",
         "gymName"
+      ]
+    },
+    "PublicMemberProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Public Member Profile",
+      "type": "object",
+      "description": "A public-facing, non-sensitive subset of a member's data used for the check-in process.",
+      "properties": {
+        "memberDocId": {
+          "type": "string",
+          "description": "The document ID of the corresponding private Member document."
+        },
+        "gymName": {
+          "type": "string",
+          "description": "The name of the gym the member belongs to."
+        },
+        "gymIdentifier": {
+          "type": "string",
+          "description": "The unique identifier for the gym."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the member's account is currently active."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the member."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the member."
+        }
+      },
+      "required": [
+        "memberDocId",
+        "gymName",
+        "gymIdentifier",
+        "isActive",
+        "firstName",
+        "lastName"
       ]
     },
     "MembershipPlan": {
@@ -267,7 +310,7 @@
         },
         "memberId": {
           "type": "string",
-          "description": "Reference to the Member who checked in. (Relationship: Member 1:N Attendance)"
+          "description": "Reference to the Member who checked in."
         },
         "checkInTime": {
           "type": "string",
@@ -282,13 +325,23 @@
         "gymName": {
           "type": "string",
           "description": "The name of the gym where the check-in occurred."
+        },
+        "gymIdentifier": {
+          "type": "string",
+          "description": "The unique identifier for the gym."
+        },
+        "memberGymId": {
+          "type": "string",
+          "description": "The public, human-readable ID of the member who checked in."
         }
       },
       "required": [
         "id",
         "memberId",
         "checkInTime",
-        "gymName"
+        "gymName",
+        "gymIdentifier",
+        "memberGymId"
       ]
     },
     "Invoice": {
@@ -416,7 +469,13 @@
       "schema": {
         "$ref": "#/backend/entities/Member"
       },
-      "description": "Main collection for storing gym member profiles. Access is restricted to authenticated administrators. 'gymId' field is used by a Cloud Function for public check-ins."
+      "description": "Main collection for storing gym member profiles. Access is restricted to authenticated administrators."
+    },
+    "/member_profiles_public/{memberPubId}": {
+      "schema": {
+        "$ref": "#/backend/entities/PublicMemberProfile"
+      },
+      "description": "Publicly readable, non-sensitive member profiles used for the check-in process. The document ID is the member's human-readable gym ID."
     },
     "/members/{memberId}/memberships/{membershipId}": {
       "schema": {
@@ -456,5 +515,3 @@
     }
   }
 }
-
-    

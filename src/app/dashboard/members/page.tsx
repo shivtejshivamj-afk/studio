@@ -1,7 +1,7 @@
 'use client';
 
 import { Eye, Pencil, PlusCircle, Trash2, Copy } from 'lucide-react';
-import { type Member } from '@/lib/data';
+import { type Member, type PublicMemberProfile } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -101,7 +101,7 @@ export default function MembersPage() {
       () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
       [firestore, user]
   );
-  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string}>(adminProfileRef);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string; gymIdentifier: string}>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
       () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
@@ -160,14 +160,11 @@ export default function MembersPage() {
   };
 
   const handleSaveMember = (values: MemberFormValues) => {
-    if (!firestore) {
-      return;
-    }
-    if (!adminProfile?.gymName) {
+    if (!firestore || !adminProfile?.gymName || !adminProfile?.gymIdentifier) {
       toast({
         title: 'Cannot Add Member',
         description:
-          "Your gym name couldn't be found. Please ensure you have signed up correctly.",
+          "Your gym name or identifier couldn't be found. Please ensure you have signed up correctly.",
         variant: 'destructive',
       });
       return;
@@ -180,13 +177,28 @@ export default function MembersPage() {
             const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
             return `${namePart}${randomPart}`;
         };
+        const memberGymId = generateMemberId(values.firstName);
+        
         const newMember: Member = {
             ...values,
             id: newDocRef.id,
-            gymId: generateMemberId(values.firstName),
+            gymId: memberGymId,
             gymName: adminProfile.gymName,
         };
         setDocumentNonBlocking(newDocRef, newMember, { merge: true });
+
+        // Create public profile
+        const publicProfileRef = doc(firestore, 'member_profiles_public', memberGymId);
+        const publicProfile: PublicMemberProfile = {
+            memberDocId: newMember.id,
+            gymName: adminProfile.gymName,
+            gymIdentifier: adminProfile.gymIdentifier,
+            isActive: newMember.isActive,
+            firstName: newMember.firstName,
+            lastName: newMember.lastName
+        };
+        setDocumentNonBlocking(publicProfileRef, publicProfile, { merge: true });
+
         toast({
             title: 'Member Added',
             description: `The member details for ${values.firstName} ${values.lastName} have been saved.`,
@@ -198,6 +210,16 @@ export default function MembersPage() {
         ...values,
       };
       updateDocumentNonBlocking(docRef, updatedMember);
+      
+      // Update public profile
+      const publicProfileRef = doc(firestore, 'member_profiles_public', selectedMember.gymId);
+      const publicProfileUpdate: Partial<PublicMemberProfile> = {
+          isActive: values.isActive,
+          firstName: values.firstName,
+          lastName: values.lastName
+      };
+      updateDocumentNonBlocking(publicProfileRef, publicProfileUpdate);
+
       toast({
         title: 'Member Updated',
         description: `The member details for ${values.firstName} ${values.lastName} have been saved.`,
@@ -210,6 +232,11 @@ export default function MembersPage() {
     if (selectedMember && firestore) {
       const docRef = doc(firestore, 'members', selectedMember.id);
       deleteDocumentNonBlocking(docRef);
+
+      // Delete public profile
+      const publicProfileRef = doc(firestore, 'member_profiles_public', selectedMember.gymId);
+      deleteDocumentNonBlocking(publicProfileRef);
+
       toast({
         title: 'Member Deleted',
         description: `${selectedMember.firstName} ${selectedMember.lastName} has been deleted.`,

@@ -10,6 +10,15 @@ export type Member = {
   gymName: string;
 };
 
+export type PublicMemberProfile = {
+  memberDocId: string;
+  gymName: string;
+  gymIdentifier: string;
+  isActive: boolean;
+  firstName: string;
+  lastName: string;
+}
+
 export type Plan = {
   id: string;
   name: string;
@@ -32,9 +41,11 @@ export type Trainer = {
 
 export type Attendance = {
   id: string;
-  memberId: string;
+  memberId: string; // The private member document ID
   checkInTime: any;
   gymName: string;
+  gymIdentifier: string;
+  memberGymId: string; // The public member check-in ID
 };
 
 export type Invoice = {
@@ -61,5 +72,3 @@ export const plans: Plan[] = [
   { id: 'p02', name: 'Quarterly', price: 135, duration: 90 },
   { id: 'p03', name: 'Annual', price: 500, duration: 365 },
 ];
-
-    

@@ -22,15 +22,14 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirestore, addDocumentNonBlocking } from '@/firebase';
+import { useFirestore, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
 import {
   collection,
-  query,
-  where,
-  getDocs,
   serverTimestamp,
+  doc,
+  getDoc,
 } from 'firebase/firestore';
-import type { Member } from '@/lib/data';
+import type { PublicMemberProfile } from '@/lib/data';
 
 const checkInSchema = z.object({
   gymIdentifier: z.string().min(1, 'Your Gym Identifier is required.'),
@@ -60,69 +59,57 @@ export function CheckInForm() {
     }
 
     try {
-      // 1. Find the gym by its identifier
-      const adminRolesRef = collection(firestore, 'roles_admin');
-      const gymQuery = query(
-        adminRolesRef,
-        where('gymIdentifier', '==', values.gymIdentifier.toUpperCase())
-      );
-      const gymQuerySnapshot = await getDocs(gymQuery);
-
-      if (gymQuerySnapshot.empty) {
+      // 1. Find the public member profile using their gymId
+      const memberPublicId = values.memberId.toUpperCase();
+      const memberProfileRef = doc(firestore, 'member_profiles_public', memberPublicId);
+      const memberProfileSnap = await getDoc(memberProfileRef);
+      
+      if (!memberProfileSnap.exists()) {
         toast({
           title: 'Check-in Failed',
-          description: `Gym with identifier "${values.gymIdentifier}" not found.`,
+          description: `Member ID "${values.memberId}" not found. Please check your ID and try again.`,
           variant: 'destructive',
         });
         return;
       }
       
-      const gymDoc = gymQuerySnapshot.docs[0];
-      const gymName = gymDoc.data().gymName;
+      const publicProfile = memberProfileSnap.data() as PublicMemberProfile;
 
-      // 2. Find the member within that gym using their member-specific gymId
-      const membersRef = collection(firestore, 'members');
-      const memberQuery = query(
-        membersRef,
-        where('gymName', '==', gymName),
-        where('gymId', '==', values.memberId.toUpperCase())
-      );
-      const memberQuerySnapshot = await getDocs(memberQuery);
-
-
-      if (memberQuerySnapshot.empty) {
+      // 2. Validate the gym identifier
+      if (publicProfile.gymIdentifier.toUpperCase() !== values.gymIdentifier.toUpperCase()) {
         toast({
           title: 'Check-in Failed',
-          description: `Member ID "${values.memberId}" not found in this gym. Please check your ID and try again.`,
+          description: `This Member ID does not belong to the gym with identifier "${values.gymIdentifier}".`,
           variant: 'destructive',
         });
         return;
       }
 
-      const memberDoc = memberQuerySnapshot.docs[0];
-      const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
-
-      if (!member.isActive) {
+      // 3. Check if member is active
+      if (!publicProfile.isActive) {
         toast({
           title: 'Check-in Failed',
-          description: `The membership for ${member.firstName} ${member.lastName} is inactive. Please contact the front desk.`,
+          description: `The membership for ${publicProfile.firstName} ${publicProfile.lastName} is inactive. Please contact the front desk.`,
           variant: 'destructive',
         });
         return;
       }
-
-      // Write to the top-level 'attendance' collection
+      
+      // 4. Write to the top-level 'attendance' collection. The security rule will validate this.
       const attendanceRef = collection(firestore, 'attendance');
       addDocumentNonBlocking(attendanceRef, {
-        memberId: member.id,
+        memberId: publicProfile.memberDocId, // The real document ID
         checkInTime: serverTimestamp(),
-        gymName: member.gymName,
+        gymName: publicProfile.gymName,
+        gymIdentifier: publicProfile.gymIdentifier,
+        memberGymId: memberPublicId, // The human-readable ID
       });
 
       toast({
         title: 'Check-in Successful!',
-        description: `Welcome to ${member.gymName}, ${member.firstName}!`,
+        description: `Welcome to ${publicProfile.gymName}, ${publicProfile.firstName}!`,
       });
+
     } catch (error) {
       console.error('Check-in error', error);
       toast({
