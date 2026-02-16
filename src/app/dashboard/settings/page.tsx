@@ -32,6 +32,7 @@ import {
 import { doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect } from 'react';
+import Link from 'next/link';
 
 const settingsFormSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
@@ -220,7 +221,9 @@ export default function SettingsPage() {
            <div>
             <h3 className="font-semibold">Documentation</h3>
             <p className="text-sm text-muted-foreground">Browse our documentation for detailed guides and tutorials.</p>
-            <Button variant="outline" className="mt-2">View Documentation</Button>
+            <Button variant="outline" className="mt-2" asChild>
+              <Link href="#">View Documentation</Link>
+            </Button>
           </div>
         </CardContent>
       </Card>
