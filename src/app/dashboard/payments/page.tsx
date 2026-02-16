@@ -147,6 +147,25 @@ export default function InvoicingPage() {
   );
   const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
   
+  useEffect(() => {
+    if (!firestore || !invoicesData) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    invoicesData.forEach(invoice => {
+      try {
+        const dueDate = parseISO(invoice.dueDate);
+        if ((invoice.status === 'Pending' || invoice.status === 'Draft') && dueDate < today) {
+          const docRef = doc(firestore, 'invoices', invoice.id);
+          updateDocumentNonBlocking(docRef, { status: 'Overdue' });
+        }
+      } catch (e) {
+        console.error(`Could not parse due date for invoice ${invoice.id}: ${invoice.dueDate}`);
+      }
+    });
+  }, [invoicesData, firestore]);
+
   const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices;
 
   const form = useForm<InvoiceFormValues>({
