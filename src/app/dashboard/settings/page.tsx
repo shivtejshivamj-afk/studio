@@ -215,7 +215,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <h3 className="font-semibold">Contact Support</h3>
-            <p className="text-sm text-muted-foreground">For any questions or issues, please reach out to our support team at <a href="mailto:support@gymtrack.pro" className="text-primary underline">support@gymtrack.pro</a>.</p>
+            <p className="text-sm text-muted-foreground">For any questions or issues, please reach out to our support team at <a href="mailto:shivtej.shivamj@gmail.com" className="text-primary underline">shivtej.shivamj@gmail.com</a> or call us at 7208789589.</p>
           </div>
            <div>
             <h3 className="font-semibold">Documentation</h3>
