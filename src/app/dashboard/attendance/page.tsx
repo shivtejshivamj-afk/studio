@@ -47,9 +47,29 @@ import {
   serverTimestamp,
   Timestamp,
   doc,
+  writeBatch,
 } from 'firebase/firestore';
 import { type Attendance, type Member } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarIcon, Download, Trash2 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { type DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 const statusVariant = {
   'Checked-in': 'default',
@@ -72,6 +92,8 @@ export default function AttendancePage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const adminProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
@@ -198,106 +220,255 @@ export default function AttendancePage() {
       );
   }, [attendanceData, members]);
 
+  const handleDownloadCsv = () => {
+    if (attendanceRecords.length === 0) {
+      toast({
+        title: 'No Data',
+        description: 'There are no attendance records to download.',
+      });
+      return;
+    }
+
+    const csvHeader = 'Member Name,Member ID,Date,Check-in Time\n';
+    const csvRows = attendanceRecords.map(rec =>
+      `"${rec.memberName}","${rec.memberId}","${rec.date}","${rec.checkInTime}"`
+    ).join('\n');
+    const csvContent = csvHeader + csvRows;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `attendance-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteByDateRange = async () => {
+    if (!firestore || !adminProfile?.gymName || !dateRange?.from || !dateRange?.to) {
+      toast({
+        title: 'Deletion Error',
+        description: 'Please select a valid date range to delete records.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Set 'to' date to the end of the day to include all records on that day
+    const fromDate = dateRange.from;
+    const toDate = new Date(dateRange.to);
+    toDate.setHours(23, 59, 59, 999);
+
+    const attendanceColRef = collection(firestore, 'attendance');
+    const q = query(
+      attendanceColRef,
+      where('gymName', '==', adminProfile.gymName),
+      where('checkInTime', '>=', fromDate),
+      where('checkInTime', '<=', toDate)
+    );
+
+    try {
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        toast({
+          title: 'No Records Found',
+          description: 'There are no attendance records in the selected date range to delete.',
+        });
+        setIsDeleteDialogOpen(false);
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      querySnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+
+      toast({
+        title: 'Deletion Successful',
+        description: `${querySnapshot.size} attendance records have been permanently deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting attendance records:", error);
+      toast({
+        title: 'Deletion Failed',
+        description: 'An unexpected error occurred. Please check console for details.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setDateRange(undefined);
+    }
+  };
+
+
   const isLoading = isLoadingAttendance || isLoadingMembers || isLoadingAdminProfile;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Attendance</CardTitle>
-            <CardDescription>
-              View and manage member attendance records for {adminProfile?.gymName || 'your gym'}.
-            </CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Attendance</CardTitle>
+              <CardDescription>
+                View and manage member attendance records for {adminProfile?.gymName || 'your gym'}.
+              </CardDescription>
+            </div>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(handleCheckIn)}
+                className="flex w-full max-w-sm items-start gap-2"
+              >
+                <FormField
+                  control={form.control}
+                  name="memberId"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Input placeholder="Enter Member ID" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isLoading}>Check In</Button>
+              </form>
+            </Form>
           </div>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleCheckIn)}
-              className="flex w-full max-w-sm items-start gap-2"
-            >
-              <FormField
-                control={form.control}
-                name="memberId"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormControl>
-                      <Input placeholder="Enter Member ID" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={isLoading}>Check In</Button>
-            </form>
-          </Form>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Member</TableHead>
-              <TableHead>Member ID</TableHead>
-              <TableHead className="hidden sm:table-cell">Date</TableHead>
-              <TableHead className="hidden md:table-cell">
-                Check-in Time
-              </TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Skeleton className="h-5 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-20" />
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Skeleton className="h-5 w-24" />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Skeleton className="h-5 w-24" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="h-6 w-20 rounded-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : attendanceRecords.length > 0 ? (
-              attendanceRecords.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>
-                    <div className="font-medium">{record.memberName}</div>
-                  </TableCell>
-                  <TableCell>{record.memberId}</TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {record.date}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {record.checkInTime}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={statusVariant[record.status]}>
-                      {record.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
+          <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:gap-4">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="date"
+                  variant={"outline"}
+                  className={cn(
+                    "w-full sm:w-[260px] justify-start text-left font-normal",
+                    !dateRange && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                        {format(dateRange.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Pick a date range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadCsv}>
+              <Download className="h-4 w-4" />
+              Download CSV
+            </Button>
+            <Button variant="destructive" size="sm" className="gap-1" onClick={() => setIsDeleteDialogOpen(true)} disabled={!dateRange?.from || !dateRange?.to}>
+              <Trash2 className="h-4 w-4" />
+              Delete Range
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center">
-                  No attendance records found.
-                </TableCell>
+                <TableHead>Member</TableHead>
+                <TableHead>Member ID</TableHead>
+                <TableHead className="hidden sm:table-cell">Date</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Check-in Time
+                </TableHead>
+                <TableHead className="text-right">Status</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-20" />
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : attendanceRecords.length > 0 ? (
+                attendanceRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>
+                      <div className="font-medium">{record.memberName}</div>
+                    </TableCell>
+                    <TableCell>{record.memberId}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {record.date}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {record.checkInTime}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={statusVariant[record.status]}>
+                        {record.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    No attendance records found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all attendance records from <strong>{dateRange?.from ? format(dateRange.from, 'PPP') : ''}</strong> to <strong>{dateRange?.to ? format(dateRange.to, 'PPP') : ''}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteByDateRange}>
+              Yes, delete records
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
-
-    
