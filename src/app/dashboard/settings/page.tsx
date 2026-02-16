@@ -35,6 +35,9 @@ import { useEffect } from 'react';
 
 const settingsFormSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
+  gymEmail: z.string().email('Please enter a valid email.').optional().or(z.literal('')),
+  gymAddress: z.string().optional(),
+  gymContactNumber: z.string().optional(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
@@ -43,6 +46,9 @@ type AdminProfile = {
   gymName: string;
   ownerName: string;
   gymIdentifier?: string;
+  gymEmail?: string;
+  gymAddress?: string;
+  gymContactNumber?: string;
 };
 
 export default function SettingsPage() {
@@ -60,15 +66,21 @@ export default function SettingsPage() {
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
     defaultValues: {
-        ownerName: '',
+      ownerName: '',
+      gymEmail: '',
+      gymAddress: '',
+      gymContactNumber: '',
     },
   });
   
   useEffect(() => {
     if (adminProfile) {
-        form.reset({
-            ownerName: adminProfile.ownerName,
-        });
+      form.reset({
+        ownerName: adminProfile.ownerName,
+        gymEmail: adminProfile.gymEmail || '',
+        gymAddress: adminProfile.gymAddress || '',
+        gymContactNumber: adminProfile.gymContactNumber || '',
+      });
     }
   }, [adminProfile, form]);
 
@@ -78,6 +90,9 @@ export default function SettingsPage() {
     const docRef = doc(firestore, 'roles_admin', user.uid);
     updateDocumentNonBlocking(docRef, {
       ownerName: values.ownerName,
+      gymEmail: values.gymEmail,
+      gymAddress: values.gymAddress,
+      gymContactNumber: values.gymContactNumber,
     });
     toast({
       title: 'Settings Saved',
@@ -125,6 +140,45 @@ export default function SettingsPage() {
                     <FormLabel>Owner Name</FormLabel>
                     <FormControl>
                       <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="gymEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gym Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="contact@mygym.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="gymAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gym Address</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123 Fitness Ave, Gymtown, USA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+                <FormField
+                control={form.control}
+                name="gymContactNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gym Contact Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(123) 456-7890" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

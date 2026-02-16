@@ -105,6 +105,12 @@ const invoiceSchema = z.object({
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
+type AdminProfile = {
+  gymName: string;
+  gymEmail?: string;
+  gymAddress?: string;
+  gymContactNumber?: string;
+};
 
 export default function InvoicingPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +132,7 @@ export default function InvoicingPage() {
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
     [firestore, user]
   );
-  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{ gymName: string }>(adminProfileRef);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<AdminProfile>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
     () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
@@ -536,8 +542,10 @@ export default function InvoicingPage() {
                     <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
                   </div>
                   <div className="text-right">
-                    <h2 className="text-2xl font-semibold text-gray-800">{selectedInvoice.gymName}</h2>
-                    <p className="text-gray-500">123 Fitness Ave, Gymtown, USA</p>
+                    <h2 className="text-2xl font-semibold text-gray-800">{adminProfile?.gymName}</h2>
+                    {adminProfile?.gymAddress && <p className="text-gray-500">{adminProfile.gymAddress}</p>}
+                    {adminProfile?.gymEmail && <p className="text-gray-500">{adminProfile.gymEmail}</p>}
+                    {adminProfile?.gymContactNumber && <p className="text-gray-500">{adminProfile.gymContactNumber}</p>}
                   </div>
                 </div>
                 <Separator className="my-8" />
@@ -593,7 +601,7 @@ export default function InvoicingPage() {
                 </div>
                  <div className="mt-12 text-center text-gray-500 text-sm">
                     <p>Thank you for your business!</p>
-                    <p>If you have any questions, please contact us at support@gymtrack.pro.</p>
+                    <p>If you have any questions, please contact us at {adminProfile?.gymEmail || 'support@gymtrack.pro'}.</p>
                 </div>
               </div>
             )}
