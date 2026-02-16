@@ -94,6 +94,7 @@ export default function AttendancePage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
+  const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -222,8 +223,18 @@ export default function AttendancePage() {
       );
   }, [attendanceData, members]);
 
+  const filteredAttendanceRecords = useMemo(() => {
+    if (!attendanceRecords) return [];
+    if (!searchQuery) return attendanceRecords;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return attendanceRecords.filter(record =>
+      record.memberName.toLowerCase().includes(lowercasedQuery) ||
+      record.memberId.toLowerCase().includes(lowercasedQuery)
+    );
+  }, [attendanceRecords, searchQuery]);
+
   const handleDownloadPdf = () => {
-    if (attendanceRecords.length === 0) {
+    if (filteredAttendanceRecords.length === 0) {
       toast({
         title: 'No Data',
         description: 'There are no attendance records to download.',
@@ -237,7 +248,7 @@ export default function AttendancePage() {
     autoTable(doc, {
       startY: 20,
       head: [['Member Name', 'Member ID', 'Date', 'Check-in Time', 'Status']],
-      body: attendanceRecords.map(rec => [rec.memberName, rec.memberId, rec.date, rec.checkInTime, rec.status]),
+      body: filteredAttendanceRecords.map(rec => [rec.memberName, rec.memberId, rec.date, rec.checkInTime, rec.status]),
     });
 
     doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -344,6 +355,12 @@ export default function AttendancePage() {
             </Form>
           </div>
           <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:gap-4">
+            <Input
+              placeholder="Search by name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:max-w-xs"
+            />
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -424,8 +441,8 @@ export default function AttendancePage() {
                     </TableCell>
                   </TableRow>
                 ))
-              ) : attendanceRecords.length > 0 ? (
-                attendanceRecords.map((record) => (
+              ) : filteredAttendanceRecords.length > 0 ? (
+                filteredAttendanceRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
                       <div className="font-medium">{record.memberName}</div>
