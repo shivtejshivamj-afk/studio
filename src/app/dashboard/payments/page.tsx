@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  Pencil,
 } from 'lucide-react';
 import { type Member, type Invoice, plans } from '@/lib/data';
 import {
@@ -115,7 +116,7 @@ type AdminProfile = {
 export default function InvoicingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
-  type DialogType = 'add' | 'view' | 'delete' | null;
+  type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -179,7 +180,13 @@ export default function InvoicingPage() {
   const handleOpenDialog = (dialog: DialogType, invoice?: Invoice) => {
     setSelectedInvoice(invoice || null);
     setActiveDialog(dialog);
-    if (dialog === 'add') {
+    if (dialog === 'edit' && invoice) {
+      form.reset({
+        memberId: invoice.memberId,
+        planId: invoice.membershipId,
+        status: invoice.status,
+      });
+    } else if (dialog === 'add') {
       form.reset({
         memberId: undefined,
         planId: undefined,
@@ -215,26 +222,42 @@ export default function InvoicingPage() {
       return;
     }
     
-    const newDocRef = doc(collection(firestore, 'invoices'));
+    if (activeDialog === 'add') {
+      const newDocRef = doc(collection(firestore, 'invoices'));
 
-    const newInvoiceData = {
-      id: newDocRef.id,
-      invoiceNumber: `INV-${String((invoicesData?.length || 0) + 1).padStart(3, '0')}`,
-      memberId: member.id,
-      membershipId: plan.id,
-      totalAmount: plan.price,
-      issueDate: format(new Date(), 'yyyy-MM-dd'),
-      dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-      status: values.status,
-      gymName: adminProfile.gymName,
-    };
-    
-    setDocumentNonBlocking(newDocRef, newInvoiceData, {});
-    
-    toast({
-      title: 'Invoice Created',
-      description: `New invoice for ${member.firstName} ${member.lastName} has been created.`,
-    });
+      const newInvoiceData = {
+        id: newDocRef.id,
+        invoiceNumber: `INV-${String((invoicesData?.length || 0) + 1).padStart(3, '0')}`,
+        memberId: member.id,
+        membershipId: plan.id,
+        totalAmount: plan.price,
+        issueDate: format(new Date(), 'yyyy-MM-dd'),
+        dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+        status: values.status,
+        gymName: adminProfile.gymName,
+      };
+      
+      setDocumentNonBlocking(newDocRef, newInvoiceData, {});
+      
+      toast({
+        title: 'Invoice Created',
+        description: `New invoice for ${member.firstName} ${member.lastName} has been created.`,
+      });
+    } else if (activeDialog === 'edit' && selectedInvoice) {
+      const docRef = doc(firestore, 'invoices', selectedInvoice.id);
+      const updatedData = {
+        memberId: values.memberId,
+        membershipId: values.planId,
+        status: values.status,
+        totalAmount: plan.price,
+      };
+      updateDocumentNonBlocking(docRef, updatedData);
+      toast({
+        title: 'Invoice Updated',
+        description: `Invoice ${selectedInvoice.invoiceNumber} has been updated.`,
+      });
+    }
+
     closeDialogs();
   };
 
@@ -399,6 +422,14 @@ export default function InvoicingPage() {
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View Details</span>
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDialog('edit', invoice)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Edit Invoice</span>
+                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -456,16 +487,16 @@ export default function InvoicingPage() {
       </Card>
 
       <Dialog
-        open={activeDialog === 'add'}
+        open={activeDialog === 'add' || activeDialog === 'edit'}
         onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
         <DialogContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSaveInvoice)}>
               <DialogHeader>
-                <DialogTitle>Create New Invoice</DialogTitle>
+                <DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
                 <DialogDescription>
-                  Select a member and plan to generate an invoice.
+                  {activeDialog === 'edit' ? 'Update the details for this invoice.' : 'Select a member and plan to generate an invoice.'}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -543,7 +574,7 @@ export default function InvoicingPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button>
-                <Button type="submit">Create Invoice</Button>
+                <Button type="submit">{activeDialog === 'edit' ? 'Save Changes' : 'Create Invoice'}</Button>
               </DialogFooter>
             </form>
           </Form>
