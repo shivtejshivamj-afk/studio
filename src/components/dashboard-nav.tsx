@@ -35,9 +35,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from './ui/button';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { doc } from 'firebase/firestore';
+import { Skeleton } from './ui/skeleton';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -55,8 +57,18 @@ export function DashboardNav() {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
+
+  const adminProfileRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } =
+    useDoc<{ ownerName: string }>(adminProfileRef);
+    
+  const isLoading = isUserLoading || isLoadingAdminProfile;
 
   const handleLogout = async () => {
     try {
@@ -75,10 +87,18 @@ export function DashboardNav() {
     }
   };
 
-  const getInitials = (email: string | null | undefined) => {
-    if (!email) return 'AD';
-    const parts = email.split('@');
-    return parts[0].substring(0, 2).toUpperCase();
+  const getInitials = (name?: string, email?: string) => {
+    if (name) {
+      const nameParts = name.split(' ').filter(Boolean);
+      if (nameParts.length > 1) {
+        return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+      }
+      return name.substring(0, 2).toUpperCase();
+    }
+    if (email) {
+      return email.substring(0, 2).toUpperCase();
+    }
+    return 'AD';
   };
 
   return (
@@ -131,17 +151,29 @@ export function DashboardNav() {
               variant="ghost"
               className="flex h-auto w-full items-center justify-start gap-3 p-2 text-left"
             >
-              <Avatar className="h-10 w-10">
-                <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm font-semibold">
-                  {user?.email || 'Admin User'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Administrator
-                </span>
-              </div>
+              {isLoading ? (
+                <>
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex flex-col items-start gap-1 group-data-[collapsible=icon]:hidden">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback>{getInitials(adminProfile?.ownerName, user?.email)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                    <span className="truncate text-sm font-semibold">
+                      {adminProfile?.ownerName || 'Admin User'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Administrator
+                    </span>
+                  </div>
+                </>
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -150,7 +182,16 @@ export function DashboardNav() {
             className="w-56"
             sideOffset={10}
           >
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                        {isLoading ? <Skeleton className="h-4 w-20" /> : adminProfile?.ownerName || 'Admin'}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                        {isUserLoading ? <Skeleton className="mt-1 h-3 w-32" /> : user?.email}
+                    </p>
+                </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
