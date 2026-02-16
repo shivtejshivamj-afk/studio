@@ -382,7 +382,7 @@ export default function InvoicingPage() {
                   <TableCell>{invoice.memberName}</TableCell>
                   <TableCell>{invoice.issueDate}</TableCell>
                   <TableCell>{invoice.dueDate}</TableCell>
-                  <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell>₹{invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[invoice.status]}>
                       {invoice.status}
@@ -508,7 +508,7 @@ export default function InvoicingPage() {
                         <SelectContent>
                           {plans.map((plan) => (
                             <SelectItem key={plan.id} value={plan.id}>
-                              {plan.name} - ${plan.price}
+                              {plan.name} - ₹{plan.price}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -610,7 +610,7 @@ export default function InvoicingPage() {
                   <TableBody>
                     <TableRow>
                       <TableCell className="font-medium text-gray-700">{selectedInvoice.planName} Membership</TableCell>
-                      <TableCell className="text-right text-gray-700">${selectedInvoice.totalAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-gray-700">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -618,12 +618,12 @@ export default function InvoicingPage() {
                     <div className="w-64">
                         <div className="flex justify-between text-gray-700">
                             <p>Subtotal</p>
-                            <p>${selectedInvoice.totalAmount.toFixed(2)}</p>
+                            <p>₹{selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
                         <Separator className="my-2"/>
                          <div className="flex justify-between font-bold text-gray-800 text-lg">
                             <p>Total</p>
-                            <p>${selectedInvoice.totalAmount.toFixed(2)}</p>
+                            <p>₹{selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>

@@ -159,7 +159,7 @@ export default function ReportsPage() {
                   <Skeleton className="h-8 w-32" />
                 ) : (
                   <div className="text-2xl font-bold">
-                    ${totalRevenue.toFixed(2)}
+                    ₹{totalRevenue.toFixed(2)}
                   </div>
                 )}
               </CardContent>
@@ -212,7 +212,7 @@ export default function ReportsPage() {
                   tickLine={false}
                   axisLine={false}
                   tickMargin={10}
-                  tickFormatter={(value) => `$${value}`}
+                  tickFormatter={(value) => `₹${value}`}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
@@ -273,7 +273,7 @@ export default function ReportsPage() {
                     </TableCell>
                     <TableCell>{invoice.memberName}</TableCell>
                     <TableCell>{invoice.issueDate}</TableCell>
-                    <TableCell>${invoice.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell>₹{invoice.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={statusVariant[invoice.status]}>
                         {invoice.status}

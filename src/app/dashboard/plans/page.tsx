@@ -143,7 +143,7 @@ export default function PlansPage() {
                       render={({ field }) => (
                         <FormItem className="grid grid-cols-4 items-center gap-x-4">
                           <FormLabel className="text-right">
-                            Price ($)
+                            Price (₹)
                           </FormLabel>
                           <div className="col-span-3">
                             <FormControl>
@@ -204,7 +204,7 @@ export default function PlansPage() {
             {plans.map((plan) => (
               <TableRow key={plan.id}>
                 <TableCell className="font-medium">{plan.name}</TableCell>
-                <TableCell>${plan.price.toFixed(2)}</TableCell>
+                <TableCell>₹{plan.price.toFixed(2)}</TableCell>
                 <TableCell>{plan.duration} days</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
