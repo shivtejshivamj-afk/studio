@@ -70,6 +70,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { type DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const statusVariant = {
   'Checked-in': 'default',
@@ -220,7 +222,7 @@ export default function AttendancePage() {
       );
   }, [attendanceData, members]);
 
-  const handleDownloadCsv = () => {
+  const handleDownloadPdf = () => {
     if (attendanceRecords.length === 0) {
       toast({
         title: 'No Data',
@@ -229,22 +231,16 @@ export default function AttendancePage() {
       return;
     }
 
-    const csvHeader = 'Member Name,Member ID,Date,Check-in Time\n';
-    const csvRows = attendanceRecords.map(rec =>
-      `"${rec.memberName}","${rec.memberId}","${rec.date}","${rec.checkInTime}"`
-    ).join('\n');
-    const csvContent = csvHeader + csvRows;
+    const doc = new jsPDF();
+    doc.text(`Attendance Report - ${adminProfile?.gymName || 'GymTrack Pro'}`, 14, 16);
+    
+    autoTable(doc, {
+      startY: 20,
+      head: [['Member Name', 'Member ID', 'Date', 'Check-in Time', 'Status']],
+      body: attendanceRecords.map(rec => [rec.memberName, rec.memberId, rec.date, rec.checkInTime, rec.status]),
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `attendance-report-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const handleDeleteByDateRange = async () => {
@@ -384,9 +380,9 @@ export default function AttendancePage() {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadCsv}>
+            <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
               <Download className="h-4 w-4" />
-              Download CSV
+              Download PDF
             </Button>
             <Button variant="destructive" size="sm" className="gap-1" onClick={() => setIsDeleteDialogOpen(true)} disabled={!dateRange?.from || !dateRange?.to}>
               <Trash2 className="h-4 w-4" />
