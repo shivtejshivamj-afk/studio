@@ -23,7 +23,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, FileText } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import {
   useCollection,
@@ -35,6 +35,13 @@ import {
 import { collection, query, where, doc } from 'firebase/firestore';
 import type { Invoice, Member } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const statusVariant = {
   Paid: 'default',
@@ -43,6 +50,7 @@ const statusVariant = {
 export default function ReportsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const [selectedYear, setSelectedYear] = useState('all');
 
   const adminProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
@@ -78,19 +86,40 @@ export default function ReportsPage() {
   const { data: members, isLoading: isLoadingMembers } =
     useCollection<Member>(membersQuery);
 
-  const { totalRevenue, invoicesWithMemberNames, monthlyRevenue } =
+  const { totalRevenue, invoicesWithMemberNames, monthlyRevenue, availableYears, paidInvoicesCount } =
     useMemo(() => {
       if (!paidInvoices || !members) {
         return {
           totalRevenue: 0,
           invoicesWithMemberNames: [],
           monthlyRevenue: [],
+          availableYears: [],
+          paidInvoicesCount: 0,
         };
       }
 
-      const total = paidInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
+      const years = [...new Set(paidInvoices.map(inv => {
+        try {
+          return format(parseISO(inv.issueDate), 'yyyy');
+        } catch {
+          return null;
+        }
+      }).filter(Boolean) as string[])].sort((a,b) => b.localeCompare(a));
+      
+      const filteredInvoices = selectedYear === 'all'
+        ? paidInvoices
+        : paidInvoices.filter(inv => {
+            try {
+              return format(parseISO(inv.issueDate), 'yyyy') === selectedYear;
+            } catch {
+              return false;
+            }
+          });
 
-      const invoices = paidInvoices.map((inv) => {
+
+      const total = filteredInvoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
+
+      const invoices = filteredInvoices.map((inv) => {
         const member = members.find((m) => m.id === inv.memberId);
         return {
           ...inv,
@@ -98,10 +127,10 @@ export default function ReportsPage() {
             ? `${member.firstName} ${member.lastName}`
             : 'Unknown Member',
         };
-      });
+      }).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
 
       const revenueByMonth: { [key: string]: number } = {};
-      paidInvoices.forEach((invoice) => {
+      filteredInvoices.forEach((invoice) => {
         try {
           const month = format(parseISO(invoice.issueDate), 'MMM yyyy');
           if (revenueByMonth[month]) {
@@ -116,14 +145,16 @@ export default function ReportsPage() {
 
       const chartData = Object.entries(revenueByMonth)
         .map(([name, revenue]) => ({ name, revenue }))
-        .sort((a, b) => (new Date(a.name) > new Date(b.name) ? 1 : -1));
+        .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
       return {
         totalRevenue: total,
         invoicesWithMemberNames: invoices,
         monthlyRevenue: chartData,
+        availableYears: years,
+        paidInvoicesCount: filteredInvoices.length,
       };
-    }, [paidInvoices, members]);
+    }, [paidInvoices, members, selectedYear]);
 
   const isLoading =
     isLoadingAdminProfile || isLoadingInvoices || isLoadingMembers;
@@ -139,11 +170,26 @@ export default function ReportsPage() {
     <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Financial Reports</CardTitle>
-          <CardDescription>
-            An overview of your gym's income for{' '}
-            {adminProfile?.gymName || 'your gym'}.
-          </CardDescription>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Financial Reports</CardTitle>
+              <CardDescription>
+                An overview of your gym's income for{' '}
+                {adminProfile?.gymName || 'your gym'}.
+              </CardDescription>
+            </div>
+             <Select value={selectedYear} onValueChange={setSelectedYear} disabled={availableYears.length === 0}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Select a year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                {availableYears.map(year => (
+                  <SelectItem key={year} value={year}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -176,7 +222,7 @@ export default function ReportsPage() {
                   <Skeleton className="h-8 w-16" />
                 ) : (
                   <div className="text-2xl font-bold">
-                    {paidInvoices?.length || 0}
+                    {paidInvoicesCount}
                   </div>
                 )}
               </CardContent>
@@ -220,7 +266,7 @@ export default function ReportsPage() {
             </ChartContainer>
           ) : (
             <div className="flex h-[350px] items-center justify-center text-muted-foreground">
-              No revenue data available to display.
+              No revenue data available to display for the selected period.
             </div>
           )}
         </CardContent>
@@ -230,7 +276,7 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle>Paid Invoices Details</CardTitle>
           <CardDescription>
-            A detailed list of all paid invoices.
+            A detailed list of all paid invoices for the selected period.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -284,7 +330,7 @@ export default function ReportsPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">
-                    No paid invoices found.
+                    No paid invoices found for the selected period.
                   </TableCell>
                 </TableRow>
               )}
