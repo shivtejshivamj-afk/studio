@@ -3,7 +3,6 @@
 import {
   Users,
   Dumbbell,
-  DollarSign,
   UserX,
   Eye,
   Mail,
@@ -47,6 +46,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { differenceInDays, parseISO } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -106,13 +106,33 @@ export default function DashboardPage() {
     }
   }, [firestore, user, adminProfile, toast]);
 
-  const inactiveMembers = useMemo(
-    () => members?.filter((member) => !member.isActive) || [],
-    [members]
-  );
+  const expiringSoonMembers = useMemo(() => {
+    if (!members) return [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return members.filter(member => {
+        if (!member.membershipEndDate) return false;
+        
+        try {
+            const endDate = parseISO(member.membershipEndDate);
+            const diff = differenceInDays(endDate, today);
+            return diff >= 0 && diff <= 7;
+        } catch(e) {
+            console.error("Invalid date format for membershipEndDate", member.membershipEndDate);
+            return false;
+        }
+    });
+  }, [members]);
 
   const activeMembersCount = useMemo(
     () => members?.filter((m) => m.isActive).length || 0,
+    [members]
+  );
+  
+  const inactiveMembersCount = useMemo(
+    () => members?.filter((m) => !m.isActive).length || 0,
     [members]
   );
 
@@ -129,7 +149,7 @@ export default function DashboardPage() {
   const handleSendReminder = (member: Member) => {
     toast({
       title: 'Reminder Sent!',
-      description: `An activation reminder has been sent to ${member.firstName} ${member.lastName}.`,
+      description: `A renewal reminder has been sent to ${member.firstName} ${member.lastName}.`,
     });
   };
 
@@ -159,7 +179,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Inactive Members',
-      value: inactiveMembers.length,
+      value: inactiveMembersCount,
       icon: UserX,
       loading: isLoading,
     },
@@ -221,9 +241,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Inactive Memberships</CardTitle>
+              <CardTitle>Memberships Expiring Soon</CardTitle>
               <CardDescription>
-                Members whose accounts are currently inactive.
+                Members whose subscription will expire in the next 7 days.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -232,7 +252,7 @@ export default function DashboardPage() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Member ID</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Expiry Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -242,12 +262,21 @@ export default function DashboardPage() {
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-28" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                       </TableRow>
                     ))
-                  ) : inactiveMembers.length > 0 ? (
-                    inactiveMembers.map((member) => {
+                  ) : expiringSoonMembers.length > 0 ? (
+                    expiringSoonMembers.map((member) => {
+                      const today = new Date();
+                      const endDate = parseISO(member.membershipEndDate!);
+                      const daysLeft = differenceInDays(endDate, today);
+                      const expiresInText = 
+                        daysLeft < 0 ? 'Expired' :
+                        daysLeft === 0 ? 'Expires today' :
+                        daysLeft === 1 ? 'Expires tomorrow' :
+                        `Expires in ${daysLeft} days`;
+
                       return (
                         <TableRow key={member.id}>
                           <TableCell>
@@ -270,9 +299,12 @@ export default function DashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={statusVariant[member.isActive ? 'active' : 'inactive']}>
-                              {member.isActive ? 'Active' : 'Inactive'}
-                            </Badge>
+                            <div className="flex flex-col">
+                              <span>{member.membershipEndDate}</span>
+                              <Badge variant={daysLeft <= 3 ? 'destructive' : 'secondary'} className="mt-1 w-fit">
+                                  {expiresInText}
+                              </Badge>
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             {isClient ? (
@@ -307,7 +339,7 @@ export default function DashboardPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">No inactive members found.</TableCell>
+                      <TableCell colSpan={4} className="text-center">No members with expiring memberships.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>

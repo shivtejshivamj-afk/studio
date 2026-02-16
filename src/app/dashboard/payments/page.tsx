@@ -243,9 +243,27 @@ export default function InvoicingPage() {
   };
   
   const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft') => {
-    if (!firestore) return;
+    if (!firestore || !members) return;
     const docRef = doc(firestore, 'invoices', invoice.id);
     updateDocumentNonBlocking(docRef, { status });
+
+    if (status === 'Paid') {
+      const member = members.find(m => m.id === invoice.memberId);
+      const plan = plans.find(p => p.id === invoice.membershipId);
+      if (member && plan) {
+          const memberDocRef = doc(firestore, 'members', member.id);
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + plan.duration);
+
+          const memberUpdate = {
+              membershipEndDate: format(endDate, 'yyyy-MM-dd'),
+              activePlanId: plan.id,
+              isActive: true,
+          };
+          updateDocumentNonBlocking(memberDocRef, memberUpdate);
+      }
+    }
+
     toast({
       title: 'Invoice Status Updated',
       description: `Invoice ${invoice.invoiceNumber} has been marked as ${status}.`,

@@ -97,6 +97,15 @@
         "gymName": {
           "type": "string",
           "description": "The name of the gym the member belongs to."
+        },
+        "membershipEndDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The expiry date of the member's current active membership."
+        },
+        "activePlanId": {
+          "type": "string",
+          "description": "The ID of the member's current active membership plan."
         }
       },
       "required": [

@@ -8,6 +8,8 @@ export type Member = {
   isActive: boolean;
   gymId: string;
   gymName: string;
+  membershipEndDate?: string;
+  activePlanId?: string;
 };
 
 export type PublicMemberProfile = {
