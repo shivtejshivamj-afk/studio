@@ -75,7 +75,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import jsPDF from 'jspdf';
 import {
   useCollection,
@@ -154,11 +154,21 @@ export default function InvoicingPage() {
 
   const processedInvoices = useMemo(() => {
     if (!invoicesData || !members) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
       const plan = plans.find(p => p.id === inv.membershipId);
+      
+      let displayStatus = inv.status;
+      if ((inv.status === 'Pending' || inv.status === 'Draft') && parseISO(inv.dueDate) < today) {
+        displayStatus = 'Overdue';
+      }
+
       return {
         ...inv,
+        status: displayStatus,
         memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
         memberEmail: member?.email,
         planName: plan?.name || 'Unknown Plan',
