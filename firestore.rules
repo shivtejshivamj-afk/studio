@@ -112,8 +112,7 @@ service cloud.firestore {
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
-        allow list, create, delete: if isAdmin();
-        allow update: if get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
+        allow list, create, delete, update: if isAdmin();
     }
 
     /**
