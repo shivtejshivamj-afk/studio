@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   LogOut,
   CalendarCheck,
+  Settings,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -24,6 +26,15 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from './ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from './ui/button';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +46,7 @@ const navItems = [
   { href: '/dashboard/plans', icon: Calendar, label: 'Plans' },
   { href: '/dashboard/payments', icon: FileText, label: 'Invoicing' },
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
+  { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function DashboardNav() {
@@ -98,21 +110,52 @@ export function DashboardNav() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarSeparator />
-        <div className="flex items-center gap-3 p-2 group-data-[collapsible=icon]:justify-center">
-           <Avatar className="h-10 w-10">
-            <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-sm truncate">{user?.email || 'Admin User'}</span>
-            <span className="text-xs text-muted-foreground">Administrator</span>
-          </div>
-        </div>
-        
-          <SidebarMenuButton tooltip={{ children: 'Logout' }} onClick={handleLogout}>
-            <LogOut />
-            <span className="group-data-[collapsible=icon]:hidden">Logout</span>
-          </SidebarMenuButton>
-        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="flex h-auto w-full items-center justify-start gap-3 p-2 text-left"
+            >
+              <Avatar className="h-10 w-10">
+                <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                <span className="truncate text-sm font-semibold">
+                  {user?.email || 'Admin User'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Administrator
+                </span>
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            className="w-56"
+            sideOffset={10}
+          >
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </Link>
+            </DropdownMenuItem>
+             <DropdownMenuItem asChild>
+              <Link href="/dashboard/settings#help">
+                <HelpCircle className="mr-2 h-4 w-4" />
+                <span>Help Center</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );

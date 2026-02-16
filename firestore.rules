@@ -89,8 +89,8 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
-      allow update: if request.auth.uid == adminId &&
-                      request.resource.data.gymName == resource.data.gymName;
+      allow update: if request.auth.uid == adminId && (!('gymName' in request.resource.data) ||
+                      request.resource.data.gymName == resource.data.gymName);
       allow delete: if false;
     }
 
