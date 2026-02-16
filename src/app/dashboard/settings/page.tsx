@@ -37,7 +37,7 @@ const settingsFormSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
   gymEmail: z.string().email('Please enter a valid email.').optional().or(z.literal('')),
   gymAddress: z.string().optional(),
-  gymContactNumber: z.string().optional(),
+  gymContactNumber: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
 });
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
