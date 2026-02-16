@@ -257,40 +257,47 @@ export default function AttendancePage() {
       return;
     }
 
+    if (!attendanceData) {
+      toast({
+        title: 'Data Not Ready',
+        description: 'Attendance data is still loading. Please try again in a moment.',
+        variant: 'destructive',
+      });
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+
     // Set 'to' date to the end of the day to include all records on that day
     const fromDate = dateRange.from;
     const toDate = new Date(dateRange.to);
     toDate.setHours(23, 59, 59, 999);
 
-    const attendanceColRef = collection(firestore, 'attendance');
-    const q = query(
-      attendanceColRef,
-      where('gymName', '==', adminProfile.gymName),
-      where('checkInTime', '>=', fromDate),
-      where('checkInTime', '<=', toDate)
-    );
+    const recordsToDelete = attendanceData.filter(att => {
+      const checkInDate = (att.checkInTime as Timestamp)?.toDate();
+      return checkInDate && checkInDate >= fromDate && checkInDate <= toDate;
+    });
+
+    if (recordsToDelete.length === 0) {
+      toast({
+        title: 'No Records Found',
+        description: 'There are no attendance records in the selected date range to delete.',
+      });
+      setIsDeleteDialogOpen(false);
+      return;
+    }
 
     try {
-      const querySnapshot = await getDocs(q);
-      if (querySnapshot.empty) {
-        toast({
-          title: 'No Records Found',
-          description: 'There are no attendance records in the selected date range to delete.',
-        });
-        setIsDeleteDialogOpen(false);
-        return;
-      }
-
       const batch = writeBatch(firestore);
-      querySnapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
+      recordsToDelete.forEach(record => {
+        const docRef = doc(firestore, 'attendance', record.id);
+        batch.delete(docRef);
       });
 
       await batch.commit();
 
       toast({
         title: 'Deletion Successful',
-        description: `${querySnapshot.size} attendance records have been permanently deleted.`,
+        description: `${recordsToDelete.length} attendance records have been permanently deleted.`,
       });
     } catch (error) {
       console.error("Error deleting attendance records:", error);
