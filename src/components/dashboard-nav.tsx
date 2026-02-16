@@ -11,7 +11,7 @@ import {
   LogOut,
   CalendarCheck,
   Settings,
-  HelpCircle,
+  BarChart,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +45,7 @@ const navItems = [
   { href: '/dashboard/trainers', icon: Dumbbell, label: 'Trainers' },
   { href: '/dashboard/plans', icon: Calendar, label: 'Plans' },
   { href: '/dashboard/payments', icon: FileText, label: 'Invoicing' },
+  { href: '/dashboard/reports', icon: BarChart, label: 'Reports' },
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
 ];
 
