@@ -90,8 +90,7 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
       allow update: if request.auth.uid == adminId &&
-                      request.resource.data.gymName == resource.data.gymName &&
-                      request.resource.data.ownerName == resource.data.ownerName;
+                      request.resource.data.gymName == resource.data.gymName;
       allow delete: if false;
     }
 

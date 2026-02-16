@@ -183,27 +183,25 @@ export default function DashboardPage() {
             <CardContent>
               {isLoadingAdminProfile ? (
                 <Skeleton className="h-8 w-32" />
-              ) : (
-                 adminProfile?.gymIdentifier ? (
-                  <div className="flex items-center gap-2">
-                    <div className="text-2xl font-bold">
-                      {adminProfile.gymIdentifier}
-                    </div>
-                    {isClient && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleCopy(adminProfile.gymIdentifier!)}
-                      >
-                        <Copy className="h-4 w-4" />
-                        <span className="sr-only">Copy Gym Identifier</span>
-                      </Button>
-                    )}
+              ) : adminProfile?.gymIdentifier ? (
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold">
+                    {adminProfile.gymIdentifier}
                   </div>
-                ) : (
-                    <Skeleton className="h-8 w-32" />
-                )
+                  {isClient && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleCopy(adminProfile.gymIdentifier!)}
+                    >
+                      <Copy className="h-4 w-4" />
+                      <span className="sr-only">Copy Gym Identifier</span>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Generating...</div>
               )}
             </CardContent>
           </Card>
