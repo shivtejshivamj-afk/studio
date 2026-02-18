@@ -1,6 +1,15 @@
 'use client';
 
-import { Eye, Pencil, PlusCircle, Trash2, Copy } from 'lucide-react';
+import {
+  Eye,
+  Pencil,
+  PlusCircle,
+  Trash2,
+  Copy,
+  MoreVertical,
+  UserCheck,
+  UserX,
+} from 'lucide-react';
 import { type Member, type PublicMemberProfile } from '@/lib/data';
 import {
   Card,
@@ -27,6 +36,13 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -330,7 +346,7 @@ export default function MembersPage() {
                     <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
                   </TableRow>
                 ))
               ) : (
@@ -368,45 +384,64 @@ export default function MembersPage() {
                         {member.joinDate}
                       </TableCell>
                       <TableCell>
-                        <Switch
-                          checked={member.isActive}
-                          onCheckedChange={(newStatus) => handleStatusToggle(member, newStatus)}
-                          aria-label={`Set ${member.firstName} ${member.lastName} to ${member.isActive ? 'inactive' : 'active'}`}
-                        />
+                        <Badge
+                          variant={statusVariant[member.isActive ? 'active' : 'inactive']}
+                        >
+                          {member.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         {isClient ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenDialog('view', member)}
-                            >
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenDialog('edit', member)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                handleOpenDialog('delete', member)
-                              }
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </div>
+                           <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                                <span className="sr-only">Actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleOpenDialog('view', member)}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                <span>View</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleOpenDialog('edit', member)}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                <span>Edit</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {member.isActive ? (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusToggle(member, false)}
+                                >
+                                  <UserX className="mr-2 h-4 w-4" />
+                                  <span>Deactivate</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusToggle(member, true)}
+                                >
+                                  <UserCheck className="mr-2 h-4 w-4" />
+                                  <span>Activate</span>
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleOpenDialog('delete', member)
+                                }
+                                className="text-destructive"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         ) : (
-                          <div className="h-10 w-20" />
+                          <div className="h-10 w-8" />
                         )}
                       </TableCell>
                     </TableRow>
