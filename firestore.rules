@@ -112,9 +112,9 @@ service cloud.firestore {
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
         allow list: if isAdmin();
-        allow create: if isAdmin() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == request.resource.data.gymName;
-        allow update: if isAdmin() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
-        allow delete: if isAdmin() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
+        allow create: if request.auth.uid != null && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == request.resource.data.gymName;
+        allow update: if request.auth.uid != null && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
+        allow delete: if request.auth.uid != null && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
     }
 
     /**
