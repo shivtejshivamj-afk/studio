@@ -6,7 +6,6 @@ import {
   PlusCircle,
   Trash2,
   Copy,
-  MoreVertical,
   UserCheck,
   UserX,
 } from 'lucide-react';
@@ -36,13 +35,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -395,54 +387,52 @@ export default function MembersPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {isClient ? (
-                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                                <span className="sr-only">Actions</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleOpenDialog('view', member)}
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                <span>View</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleOpenDialog('edit', member)}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                <span>Edit</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {member.isActive ? (
-                                <DropdownMenuItem
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDialog('view', member)}
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">View Member</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDialog('edit', member)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Edit Member</span>
+                            </Button>
+                             {member.isActive ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={() => handleStatusToggle(member, false)}
                                 >
-                                  <UserX className="mr-2 h-4 w-4" />
-                                  <span>Deactivate</span>
-                                </DropdownMenuItem>
+                                  <UserX className="h-4 w-4" />
+                                  <span className="sr-only">Deactivate Member</span>
+                                </Button>
                               ) : (
-                                <DropdownMenuItem
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={() => handleStatusToggle(member, true)}
                                 >
-                                  <UserCheck className="mr-2 h-4 w-4" />
-                                  <span>Activate</span>
-                                </DropdownMenuItem>
+                                  <UserCheck className="h-4 w-4" />
+                                  <span className="sr-only">Activate Member</span>
+                                </Button>
                               )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleOpenDialog('delete', member)
-                                }
-                                className="text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Delete</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDialog('delete', member)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete Member</span>
+                            </Button>
+                          </div>
                         ) : (
                           <div className="h-10 w-8" />
                         )}
@@ -546,28 +536,27 @@ export default function MembersPage() {
                     </FormItem>
                   )}
                 />
-                {activeDialog === 'edit' && (
-                   <FormField
-                    control={form.control}
-                    name="isActive"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                          <FormLabel>Active Membership</FormLabel>
-                          <FormDescription>
-                            Indicates if the member has an active subscription.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Active Membership</FormLabel>
+                        <FormDescription>
+                          Indicates if the member has an active subscription.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          aria-label={`Set member status to ${field.value ? 'inactive' : 'active'}`}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={closeDialogs}>
