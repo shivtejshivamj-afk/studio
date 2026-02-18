@@ -99,13 +99,12 @@ const statusVariant = {
   Paid: 'default',
   Pending: 'secondary',
   Overdue: 'destructive',
-  Draft: 'outline',
 } as const;
 
 const invoiceSchema = z.object({
   memberId: z.string().min(1, { message: 'Please select a member.' }),
   planId: z.string().min(1, { message: 'Please select a plan.' }),
-  status: z.enum(['Paid', 'Pending', 'Overdue', 'Draft']),
+  status: z.enum(['Paid', 'Pending', 'Overdue']),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -160,7 +159,7 @@ export default function InvoicingPage() {
     invoicesData.forEach(invoice => {
       try {
         const dueDate = parseISO(invoice.dueDate);
-        if ((invoice.status === 'Pending' || invoice.status === 'Draft') && dueDate < today) {
+        if (invoice.status === 'Pending' && dueDate < today) {
           const docRef = doc(firestore, 'invoices', invoice.id);
           updateDocumentNonBlocking(docRef, { status: 'Overdue' });
         }
@@ -186,7 +185,7 @@ export default function InvoicingPage() {
       const plan = plans.find(p => p.id === inv.membershipId);
       
       let displayStatus = inv.status;
-      if ((inv.status === 'Pending' || inv.status === 'Draft') && parseISO(inv.dueDate) < today) {
+      if (inv.status === 'Pending' && parseISO(inv.dueDate) < today) {
         displayStatus = 'Overdue';
       }
 
@@ -231,7 +230,7 @@ export default function InvoicingPage() {
       form.reset({
         memberId: undefined,
         planId: undefined,
-        status: 'Draft',
+        status: 'Pending',
       });
     }
   };
@@ -316,7 +315,7 @@ export default function InvoicingPage() {
     }
   };
   
-  const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft') => {
+  const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue') => {
     if (!firestore || !members) return;
     const docRef = doc(firestore, 'invoices', invoice.id);
     updateDocumentNonBlocking(docRef, { status });
@@ -648,7 +647,6 @@ export default function InvoicingPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Draft">Draft</SelectItem>
                           <SelectItem value="Pending">Pending</SelectItem>
                           <SelectItem value="Paid">Paid</SelectItem>
                           <SelectItem value="Overdue">Overdue</SelectItem>

@@ -58,7 +58,7 @@ export type Invoice = {
   issueDate: string;
   dueDate: string;
   totalAmount: number;
-  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
+  status: 'Paid' | 'Pending' | 'Overdue';
   gymName: string;
 
   // These are for UI display and will be added after fetching
