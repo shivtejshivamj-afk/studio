@@ -105,16 +105,13 @@ service cloud.firestore {
 
     /**
      * @description Secures the public-facing member profiles used for check-in.
-     *              These documents are publicly readable. Write access is restricted
-     *              to administrators to resolve a persistent permission error.
+     *              These documents are publicly readable for the check-in process.
+     *              All write operations (create, update, delete) are restricted to administrators.
      * @path        /member_profiles_public/{memberPubId}
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
-        allow list: if isAdmin();
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
+        allow list, create, update, delete: if isAdmin();
     }
 
     /**
