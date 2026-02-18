@@ -81,7 +81,6 @@ const memberFormSchema = z.object({
     .min(10, 'Phone number must be at least 10 digits.')
     .regex(/^\d+$/, 'Phone number must only contain digits.'),
   joinDate: z.string().min(1, 'Join date is required.'),
-  isActive: z.boolean().default(true),
 });
 
 type MemberFormValues = z.infer<typeof memberFormSchema>;
@@ -129,7 +128,6 @@ export default function MembersPage() {
         email: member.email,
         phone: member.phone,
         joinDate: member.joinDate,
-        isActive: member.isActive,
       });
     } else if (dialog === 'add') {
       form.reset({
@@ -138,7 +136,6 @@ export default function MembersPage() {
         email: '',
         phone: '',
         joinDate: new Date().toISOString().split('T')[0],
-        isActive: true,
       });
     }
   };
@@ -184,6 +181,7 @@ export default function MembersPage() {
             id: newDocRef.id,
             gymId: memberGymId,
             gymName: adminProfile.gymName,
+            isActive: false,
         };
         setDocumentNonBlocking(newDocRef, newMember, { merge: true });
 
@@ -214,7 +212,6 @@ export default function MembersPage() {
       // Update public profile
       const publicProfileRef = doc(firestore, 'member_profiles_public', selectedMember.gymId);
       const publicProfileUpdate: Partial<PublicMemberProfile> = {
-          isActive: values.isActive,
           firstName: values.firstName,
           lastName: values.lastName
       };
@@ -488,26 +485,6 @@ export default function MembersPage() {
                         <Input type="date" {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel>Active Membership</FormLabel>
-                        <FormDescription>
-                          Indicates if the member has an active subscription.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
                     </FormItem>
                   )}
                 />
