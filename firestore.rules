@@ -122,10 +122,7 @@ service cloud.firestore {
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
-        allow list: if isAdmin();
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
+        allow list, write: if isAdmin();
     }
 
     /**
