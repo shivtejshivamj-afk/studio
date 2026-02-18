@@ -36,6 +36,13 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
+    
+    /**
+     * Checks if the user is an admin for a specific gym.
+     */
+    function isGymAdmin(gymIdentifier) {
+      return isAdmin() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymIdentifier == gymIdentifier;
+    }
 
     /**
      * Ensures the incoming 'memberId' field matches the parent document's ID in the path.
@@ -106,12 +113,15 @@ service cloud.firestore {
     /**
      * @description Secures the public-facing member profiles used for check-in.
      *              These documents are publicly readable for the check-in process.
-     *              All write operations (create, update, delete) are restricted to administrators.
+     *              Write operations are restricted to admins of the corresponding gym.
      * @path        /member_profiles_public/{memberPubId}
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
-        allow list, create, update, delete: if isAdmin();
+        allow list: if isAdmin();
+        allow create: if isGymAdmin(request.resource.data.gymIdentifier);
+        allow update: if isGymAdmin(resource.data.gymIdentifier);
+        allow delete: if isGymAdmin(resource.data.gymIdentifier);
     }
 
     /**
