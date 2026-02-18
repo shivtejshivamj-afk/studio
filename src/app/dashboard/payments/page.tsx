@@ -10,6 +10,9 @@ import {
   Clock,
   AlertCircle,
   Pencil,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
 } from 'lucide-react';
 import { type Member, type Invoice, plans } from '@/lib/data';
 import {
@@ -120,6 +123,7 @@ export default function InvoicingPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' }>({ key: 'issueDate', direction: 'descending' });
   const invoiceContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -193,8 +197,26 @@ export default function InvoicingPage() {
         memberEmail: member?.email,
         planName: plan?.name || 'Unknown Plan',
       };
-    }).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+    });
   }, [invoicesData, members]);
+
+  const requestSort = (key: string) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const getSortIndicator = (key: string) => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 inline-block opacity-30" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp className="ml-2 h-4 w-4 inline-block" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4 inline-block" />;
+  };
 
   const handleOpenDialog = (dialog: DialogType, invoice?: Invoice) => {
     setSelectedInvoice(invoice || null);
@@ -356,11 +378,39 @@ export default function InvoicingPage() {
     }
   };
 
-  const filteredInvoices = processedInvoices.filter(
-    (invoice) =>
-      invoice.memberName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredInvoices = useMemo(() => {
+    let sortableItems = [...processedInvoices].filter(
+      (invoice) =>
+        invoice.memberName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        const aValue = a[sortConfig.key as keyof typeof a];
+        const bValue = b[sortConfig.key as keyof typeof b];
+
+        if (aValue === undefined || aValue === null) return 1;
+        if (bValue === undefined || bValue === null) return -1;
+        
+        let comparison = 0;
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+          comparison = aValue - bValue;
+        } else {
+            if (aValue > bValue) {
+              comparison = 1;
+            } else if (aValue < bValue) {
+              comparison = -1;
+            }
+        }
+
+        return sortConfig.direction === 'descending' ? comparison * -1 : comparison;
+      });
+    }
+    return sortableItems;
+  }, [processedInvoices, searchQuery, sortConfig]);
 
   return (
     <>
@@ -395,12 +445,30 @@ export default function InvoicingPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice ID</TableHead>
-                <TableHead>Member</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('invoiceNumber')}>
+                  Invoice ID
+                  {getSortIndicator('invoiceNumber')}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('memberName')}>
+                  Member
+                  {getSortIndicator('memberName')}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('issueDate')}>
+                  Issue Date
+                  {getSortIndicator('issueDate')}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('dueDate')}>
+                  Due Date
+                  {getSortIndicator('dueDate')}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('totalAmount')}>
+                  Amount
+                  {getSortIndicator('totalAmount')}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
+                  Status
+                  {getSortIndicator('status')}
+                </TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
