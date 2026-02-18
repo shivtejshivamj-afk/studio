@@ -117,15 +117,15 @@ service cloud.firestore {
     /**
      * @description Secures the public-facing member profiles used for check-in.
      *              These documents are publicly readable for the check-in process.
-     *              Write operations are restricted to admins of the corresponding gym.
+     *              Write operations are restricted to admins.
      * @path        /member_profiles_public/{memberPubId}
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
         allow list: if isAdmin();
-        allow create: if isGymAdmin(request.resource.data.gymIdentifier);
-        allow update: if isGymAdmin(resource.data.gymIdentifier);
-        allow delete: if isGymAdmin(resource.data.gymIdentifier);
+        allow create: if isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
     }
 
     /**
