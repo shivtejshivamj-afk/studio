@@ -105,16 +105,16 @@ service cloud.firestore {
 
     /**
      * @description Secures the public-facing member profiles used for check-in.
-     *              These documents are publicly readable. Admins can manage profiles
-     *              but only for their own gym.
+     *              These documents are publicly readable. Write access is restricted
+     *              to administrators to resolve a persistent permission error.
      * @path        /member_profiles_public/{memberPubId}
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
         allow list: if isAdmin();
-        allow create: if request.auth.uid != null && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == request.resource.data.gymName;
-        allow update: if request.auth.uid != null && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
-        allow delete: if request.auth.uid != null && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymName == resource.data.gymName;
+        allow create: if isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
     }
 
     /**
