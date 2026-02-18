@@ -6,8 +6,6 @@ import {
   PlusCircle,
   Trash2,
   Copy,
-  UserCheck,
-  UserX,
 } from 'lucide-react';
 import { type Member, type PublicMemberProfile } from '@/lib/data';
 import {
@@ -167,28 +165,6 @@ export default function MembersPage() {
     }
   };
   
-  const handleStatusToggle = (member: Member, newStatus: boolean) => {
-    if (!firestore) {
-      toast({
-        title: 'Error',
-        description: 'Database connection not available.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const memberRef = doc(firestore, 'members', member.id);
-    updateDocumentNonBlocking(memberRef, { isActive: newStatus });
-
-    const publicProfileRef = doc(firestore, 'member_profiles_public', member.gymId);
-    updateDocumentNonBlocking(publicProfileRef, { isActive: newStatus });
-
-    toast({
-      title: 'Status Updated',
-      description: `${member.firstName} ${member.lastName}'s status has been changed to ${newStatus ? 'Active' : 'Inactive'}.`,
-    });
-  };
-
   const handleSaveMember = (values: MemberFormValues) => {
     if (!firestore || !adminProfile?.gymName || !adminProfile?.gymIdentifier) {
       toast({
@@ -404,25 +380,6 @@ export default function MembersPage() {
                               <Pencil className="h-4 w-4" />
                               <span className="sr-only">Edit Member</span>
                             </Button>
-                             {member.isActive ? (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleStatusToggle(member, false)}
-                                >
-                                  <UserX className="h-4 w-4" />
-                                  <span className="sr-only">Deactivate Member</span>
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleStatusToggle(member, true)}
-                                >
-                                  <UserCheck className="h-4 w-4" />
-                                  <span className="sr-only">Activate Member</span>
-                                </Button>
-                              )}
                             <Button
                               variant="ghost"
                               size="icon"
