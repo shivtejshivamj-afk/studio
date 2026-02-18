@@ -42,8 +42,13 @@ service cloud.firestore {
      * This is a more robust check that ensures the gymIdentifier property exists before comparison.
      */
     function isGymAdmin(gymIdentifier) {
+      if (!isSignedIn()) {
+        return false;
+      }
       let adminDoc = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      return isAdmin() && 
+      // Ensure adminDoc and its data are not null, and that gymIdentifier exists.
+      return adminDoc != null && 
+             adminDoc.data != null &&
              'gymIdentifier' in adminDoc.data &&
              adminDoc.data.gymIdentifier == gymIdentifier;
     }
@@ -117,12 +122,15 @@ service cloud.firestore {
     /**
      * @description Secures the public-facing member profiles used for check-in.
      *              These documents are publicly readable for the check-in process.
-     *              Write operations are restricted to admins.
+     *              Write operations are restricted to admins of the corresponding gym.
      * @path        /member_profiles_public/{memberPubId}
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
-        allow list, write: if isAdmin();
+        allow list: if isAdmin();
+        allow create: if isGymAdmin(request.resource.data.gymIdentifier);
+        allow update: if isGymAdmin(resource.data.gymIdentifier);
+        allow delete: if isGymAdmin(resource.data.gymIdentifier);
     }
 
     /**
