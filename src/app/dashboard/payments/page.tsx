@@ -81,6 +81,7 @@ import {
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   useCollection,
   useFirestore,
@@ -344,37 +345,112 @@ export default function InvoicingPage() {
   };
 
   const handleDownloadPdf = () => {
-    if (!selectedInvoice || !invoiceContentRef.current) return;
+    if (!selectedInvoice) {
+      toast({
+        title: 'Error',
+        description: 'No invoice selected to download.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
     
-    const originalColors = new Map();
-    const elements = invoiceContentRef.current.querySelectorAll('*');
-    elements.forEach(el => {
-        const style = window.getComputedStyle(el);
-        originalColors.set(el, style.color);
-        (el as HTMLElement).style.color = 'black';
+    // Using a unicode-safe prefix for the PDF
+    const currencyPrefix = '₹';
+
+    // --- Header ---
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', 14, 22);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    let rightColY = 22;
+    if (adminProfile?.gymName) {
+      doc.text(adminProfile.gymName, 196, rightColY, { align: 'right' });
+      rightColY += 6;
+    }
+    if (adminProfile?.gymAddress) {
+      doc.text(adminProfile.gymAddress, 196, rightColY, { align: 'right' });
+      rightColY += 6;
+    }
+    if (adminProfile?.gymEmail) {
+      doc.text(adminProfile.gymEmail, 196, rightColY, { align: 'right' });
+      rightColY += 6;
+    }
+    if (adminProfile?.gymContactNumber) {
+      doc.text(adminProfile.gymContactNumber, 196, rightColY, { align: 'right' });
+    }
+
+    // --- Line Separator ---
+    doc.setLineWidth(0.5);
+    doc.line(14, 48, 196, 48);
+
+    // --- Bill To & Invoice Details ---
+    let detailsY = 58;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BILL TO', 14, detailsY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(selectedInvoice.memberName || 'N/A', 14, detailsY + 6);
+    doc.text(selectedInvoice.memberEmail || 'N/A', 14, detailsY + 12);
+    
+    const detailsX = 130;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Number:', detailsX, detailsY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(selectedInvoice.invoiceNumber, 196, detailsY, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Issue Date:', detailsX, detailsY + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.text(selectedInvoice.issueDate, 196, detailsY + 6, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Due Date:', detailsX, detailsY + 12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(selectedInvoice.dueDate, 196, detailsY + 12, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Status:', detailsX, detailsY + 18);
+    doc.setFont('helvetica', 'normal');
+    doc.text(selectedInvoice.status, 196, detailsY + 18, { align: 'right' });
+
+    // --- Table ---
+    autoTable(doc, {
+      startY: detailsY + 30,
+      head: [['Description', 'Amount']],
+      body: [
+        [`${selectedInvoice.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [241, 245, 249] }, // bg-slate-100
+      didDrawPage: (data) => {
+        // --- Totals Section ---
+        const finalY = (data.cursor?.y || 0) + 10;
+        doc.setFontSize(10);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.text('Subtotal', 150, finalY, { align: 'right' });
+        doc.text(`${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`, 196, finalY, { align: 'right' });
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total', 150, finalY + 7, { align: 'right' });
+        doc.text(`${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`, 196, finalY + 7, { align: 'right' });
+        
+        // --- Footer ---
+        const pageHeight = doc.internal.pageSize.getHeight();
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text('Thank you for your business!', 105, pageHeight - 20, { align: 'center' });
+        if (adminProfile?.gymEmail) {
+            doc.text(`For any questions, please contact us at ${adminProfile.gymEmail}.`, 105, pageHeight - 15, { align: 'center' });
+        }
+      },
     });
 
-
-    if (typeof window !== 'undefined') {
-        const doc = new jsPDF({
-            orientation: 'p',
-            unit: 'pt',
-            format: 'a4',
-        });
-        doc.html(invoiceContentRef.current, {
-            callback: function (doc) {
-                doc.save(`invoice-${selectedInvoice.invoiceNumber}.pdf`);
-                elements.forEach(el => {
-                    (el as HTMLElement).style.color = originalColors.get(el);
-                });
-            },
-            x: 10,
-            y: 10,
-            html2canvas: {
-                scale: 0.7
-            }
-        });
-    }
+    doc.save(`invoice-${selectedInvoice.invoiceNumber}.pdf`);
   };
 
   const filteredInvoices = useMemo(() => {
