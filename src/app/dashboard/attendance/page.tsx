@@ -85,9 +85,7 @@ type AttendanceRecord = {
   id: string;
   memberId: string;
   memberName: string;
-  date: string;
-  checkInTime: string;
-  checkOutTime: string | null;
+  checkIn: string;
   status: 'Checked-in';
 };
 
@@ -199,33 +197,32 @@ export default function AttendancePage() {
 
   const attendanceRecords: AttendanceRecord[] = useMemo(() => {
     if (!attendanceData || !members) return [];
-    return attendanceData
+
+    const sortedAttendance = [...attendanceData].sort((a,b) => {
+        const dateA = (a.checkInTime as Timestamp)?.toDate()?.getTime() || 0;
+        const dateB = (b.checkInTime as Timestamp)?.toDate()?.getTime() || 0;
+        return dateB - dateA;
+    });
+
+    return sortedAttendance
       .map((att) => {
         const member = members.find((m) => m.id === att.memberId);
         if (!member) return null;
 
         const checkInDate = (att.checkInTime as Timestamp)?.toDate();
         if (!checkInDate) return null;
-        
-        const checkOutDate = (att.checkOutTime as Timestamp)?.toDate();
 
         return {
           id: att.id,
           memberId: member.gymId,
           memberName: `${member.firstName} ${member.lastName}`,
-          date: format(checkInDate, 'yyyy-MM-dd'),
-          checkInTime: format(checkInDate, 'hh:mm a'),
-          checkOutTime: checkOutDate ? format(checkOutDate, 'hh:mm a') : null,
+          checkIn: format(checkInDate, 'PP, p'),
           status: 'Checked-in',
         };
       })
       .filter((rec): rec is AttendanceRecord => rec !== null)
-      .sort(
-        (a, b) =>
-          new Date(b.date + ' ' + b.checkInTime).getTime() -
-          new Date(a.date + ' ' + a.checkInTime).getTime()
-      );
   }, [attendanceData, members]);
+
 
   const filteredAttendanceRecords = useMemo(() => {
     if (!attendanceRecords) return [];
@@ -251,8 +248,8 @@ export default function AttendancePage() {
     
     autoTable(doc, {
       startY: 20,
-      head: [['Member Name', 'Member ID', 'Date', 'Check-in Time', 'Check-out Time', 'Status']],
-      body: filteredAttendanceRecords.map(rec => [rec.memberName, rec.memberId, rec.date, rec.checkInTime, rec.checkOutTime || 'N/A', rec.status]),
+      head: [['Member Name', 'Member ID', 'Check-in Time', 'Status']],
+      body: filteredAttendanceRecords.map(rec => [rec.memberName, rec.memberId, rec.checkIn, rec.status]),
     });
 
     doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -417,11 +414,7 @@ export default function AttendancePage() {
               <TableRow>
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
-                <TableHead className="hidden sm:table-cell">Date</TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Check-in Time
-                </TableHead>
-                <TableHead className="hidden lg:table-cell">Check-out Time</TableHead>
+                <TableHead>Check-in Time</TableHead>
                 <TableHead className="text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -435,14 +428,8 @@ export default function AttendancePage() {
                     <TableCell>
                       <Skeleton className="h-5 w-20" />
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Skeleton className="h-5 w-24" />
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Skeleton className="h-5 w-24" />
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <Skeleton className="h-5 w-24" />
+                    <TableCell>
+                      <Skeleton className="h-5 w-32" />
                     </TableCell>
                     <TableCell className="text-right">
                       <Skeleton className="h-6 w-20 rounded-full" />
@@ -456,14 +443,8 @@ export default function AttendancePage() {
                       <div className="font-medium">{record.memberName}</div>
                     </TableCell>
                     <TableCell>{record.memberId}</TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {record.date}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {record.checkInTime}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {record.checkOutTime || 'N/A'}
+                    <TableCell>
+                      {record.checkIn}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant={statusVariant[record.status]}>
@@ -474,7 +455,7 @@ export default function AttendancePage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     No attendance records found.
                   </TableCell>
                 </TableRow>
