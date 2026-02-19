@@ -57,7 +57,7 @@ export default function DashboardLayout({
         <header className="flex h-14 items-center border-b px-6 md:hidden">
           <SidebarTrigger />
         </header>
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 animate-fade-in">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );
