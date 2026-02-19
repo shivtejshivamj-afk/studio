@@ -12,6 +12,8 @@ import {
   CalendarCheck,
   Settings,
   BarChart,
+  User,
+  CheckSquare,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -106,8 +108,8 @@ export function DashboardNav() {
       <SidebarRail />
       <SidebarHeader>
         <div className="flex w-full items-center justify-between">
-            <Link href="/dashboard" className="flex items-center gap-2">
-                <Dumbbell className="h-8 w-8 text-primary" />
+            <Link href="/dashboard" className="group flex items-center gap-2 transition-transform hover:scale-105">
+                <Dumbbell className="h-8 w-8 text-primary transition-transform duration-300 group-hover:rotate-12" />
                 <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">GymTrack Pro</h1>
             </Link>
           <SidebarTrigger className="hidden md:flex" />
