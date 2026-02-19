@@ -45,6 +45,7 @@ export type Attendance = {
   id: string;
   memberId: string; // The private member document ID
   checkInTime: any;
+  checkOutTime?: any;
   gymName: string;
   gymIdentifier: string;
   memberGymId: string; // The public member check-in ID
