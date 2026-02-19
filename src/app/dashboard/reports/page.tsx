@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, FileText } from 'lucide-react';
+import { IndianRupee, FileText } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import {
@@ -167,7 +167,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 animate-fade-in">
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -198,7 +198,7 @@ export default function ReportsPage() {
                 <CardTitle className="text-sm font-medium">
                   Total Revenue
                 </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 {isLoading ? (
