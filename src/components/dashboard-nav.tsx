@@ -11,6 +11,7 @@ import {
   CalendarCheck,
   Settings,
   BarChart,
+  BookOpenCheck,
 } from 'lucide-react';
 import {
   Sidebar,
