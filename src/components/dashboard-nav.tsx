@@ -48,7 +48,6 @@ const navItems = [
   { href: '/dashboard/payments', icon: FileText, label: 'Invoicing' },
   { href: '/dashboard/reports', icon: BarChart, label: 'Reports' },
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
-  { href: '/dashboard/documentation', icon: BookOpenCheck, label: 'Documentation' },
 ];
 
 export function DashboardNav() {
