@@ -573,7 +573,7 @@ export default function SettingsPage() {
           </Accordion>
              <div className="border-t pt-4 mt-4">
               <h3 className="font-semibold">Contact Support</h3>
-              <p className="text-sm text-muted-foreground">Can't find what you're looking for? Reach out to our support team at <a href="mailto:support@gymtrack.pro" className="text-primary underline">support@gymtrack.pro</a>.</p>
+              <p className="text-sm text-muted-foreground">Can't find what you're looking for? Reach out to our support team at <a href="mailto:shivtej.shivamj@gmail.com" className="text-primary underline">shivtej.shivamj@gmail.com</a>.</p>
             </div>
           </CardContent>
         </Card>
