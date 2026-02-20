@@ -31,18 +31,47 @@ import {
 } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+// Imports from plans page
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreVertical, PlusCircle } from 'lucide-react';
+import { plans } from '@/lib/data';
+
+
+// Settings form schema
 const settingsFormSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
   gymEmail: z.string().email('Please enter a valid email.').optional().or(z.literal('')),
   gymAddress: z.string().optional(),
   gymContactNumber: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
 });
-
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
-
 type AdminProfile = {
   gymName: string;
   ownerName: string;
@@ -52,11 +81,56 @@ type AdminProfile = {
   gymContactNumber?: string;
 };
 
+
+// Plan form schema from plans page
+const planFormSchema = z.object({
+  name: z.string().min(1, { message: 'Plan name is required.' }),
+  price: z.coerce
+    .number()
+    .positive({ message: 'Price must be a positive number.' }),
+  duration: z.coerce
+    .number()
+    .int()
+    .positive({ message: 'Duration must be a positive number of days.' }),
+});
+type PlanFormValues = z.infer<typeof planFormSchema>;
+
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
 
+  // state and logic for plans from plans page
+  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
+  
+  const planForm = useForm<PlanFormValues>({
+    resolver: zodResolver(planFormSchema),
+    defaultValues: {
+      name: '',
+      price: 0,
+      duration: 0,
+    },
+  });
+
+  function handleSavePlan(values: PlanFormValues) {
+    console.log(values); // The data is not persistent, so just log it.
+    toast({
+      title: 'Plan Added',
+      description: `The new plan "${values.name}" has been saved.`,
+    });
+    setIsPlanDialogOpen(false);
+    planForm.reset();
+  }
+
+  const handlePlanDialogOpenChange = (open: boolean) => {
+    setIsPlanDialogOpen(open);
+    if (!open) {
+      planForm.reset();
+    }
+  };
+  
+  // existing settings logic
   const adminProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
     [firestore, user]
@@ -64,7 +138,7 @@ export default function SettingsPage() {
   const { data: adminProfile, isLoading: isLoadingAdminProfile } =
     useDoc<AdminProfile>(adminProfileRef);
 
-  const form = useForm<SettingsFormValues>({
+  const settingsForm = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
     defaultValues: {
       ownerName: '',
@@ -76,14 +150,14 @@ export default function SettingsPage() {
   
   useEffect(() => {
     if (adminProfile) {
-      form.reset({
+      settingsForm.reset({
         ownerName: adminProfile.ownerName,
         gymEmail: adminProfile.gymEmail || '',
         gymAddress: adminProfile.gymAddress || '',
         gymContactNumber: adminProfile.gymContactNumber || '',
       });
     }
-  }, [adminProfile, form]);
+  }, [adminProfile, settingsForm]);
 
 
   async function handleSaveChanges(values: SettingsFormValues) {
@@ -102,7 +176,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 animate-fade-in">
       <Card>
         <CardHeader>
           <CardTitle>Profile Settings</CardTitle>
@@ -128,13 +202,13 @@ export default function SettingsPage() {
                 <Skeleton className="h-10 w-32" />
              </div>
           ) : (
-          <Form {...form}>
+          <Form {...settingsForm}>
             <form
-              onSubmit={form.handleSubmit(handleSaveChanges)}
+              onSubmit={settingsForm.handleSubmit(handleSaveChanges)}
               className="max-w-xl space-y-6"
             >
               <FormField
-                control={form.control}
+                control={settingsForm.control}
                 name="ownerName"
                 render={({ field }) => (
                   <FormItem>
@@ -147,7 +221,7 @@ export default function SettingsPage() {
                 )}
               />
                <FormField
-                control={form.control}
+                control={settingsForm.control}
                 name="gymEmail"
                 render={({ field }) => (
                   <FormItem>
@@ -160,7 +234,7 @@ export default function SettingsPage() {
                 )}
               />
                <FormField
-                control={form.control}
+                control={settingsForm.control}
                 name="gymAddress"
                 render={({ field }) => (
                   <FormItem>
@@ -173,7 +247,7 @@ export default function SettingsPage() {
                 )}
               />
                 <FormField
-                control={form.control}
+                control={settingsForm.control}
                 name="gymContactNumber"
                 render={({ field }) => (
                   <FormItem>
@@ -199,14 +273,149 @@ export default function SettingsPage() {
                   </FormControl>
                    <FormDescription>This is your unique ID for member check-ins.</FormDescription>
                </FormItem>
-              <Button type="submit" disabled={form.formState.isSubmitting || !adminProfile}>Save Changes</Button>
+              <Button type="submit" disabled={settingsForm.formState.isSubmitting || !adminProfile}>Save Changes</Button>
             </form>
           </Form>
           )}
         </CardContent>
       </Card>
       
-      
+      {/* Plans Card from plans page */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Membership Plans</CardTitle>
+              <CardDescription>
+                Manage your gym's membership plans.
+              </CardDescription>
+            </div>
+            <Dialog open={isPlanDialogOpen} onOpenChange={handlePlanDialogOpenChange}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-1">
+                  <PlusCircle className="h-4 w-4" />
+                  Add Plan
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <Form {...planForm}>
+                  <form onSubmit={planForm.handleSubmit(handleSavePlan)}>
+                    <DialogHeader>
+                      <DialogTitle>Add New Plan</DialogTitle>
+                      <DialogDescription>
+                        Define a new membership plan for your gym.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <FormField
+                        control={planForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem className="grid grid-cols-4 items-center gap-x-4">
+                            <FormLabel className="text-right">
+                              Plan Name
+                            </FormLabel>
+                            <div className="col-span-3">
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={planForm.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem className="grid grid-cols-4 items-center gap-x-4">
+                            <FormLabel className="text-right">
+                              Price (₹)
+                            </FormLabel>
+                            <div className="col-span-3">
+                              <FormControl>
+                                <Input type="number" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={planForm.control}
+                        name="duration"
+                        render={({ field }) => (
+                          <FormItem className="grid grid-cols-4 items-center gap-x-4">
+                            <FormLabel className="text-right">
+                              Duration (days)
+                            </FormLabel>
+                            <div className="col-span-3">
+                              <FormControl>
+                                <Input type="number" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handlePlanDialogOpenChange(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit">Save Plan</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Plan Name</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {plans.map((plan) => (
+                <TableRow key={plan.id}>
+                  <TableCell className="font-medium">{plan.name}</TableCell>
+                  <TableCell>₹{plan.price.toFixed(2)}</TableCell>
+                  <TableCell>{plan.duration} days</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive">
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
        <Card id="help">
         <CardHeader>
