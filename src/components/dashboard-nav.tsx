@@ -11,6 +11,7 @@ import {
   CalendarCheck,
   Settings,
   BarChart,
+  BookOpenCheck,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -47,6 +48,7 @@ const navItems = [
   { href: '/dashboard/payments', icon: FileText, label: 'Invoicing' },
   { href: '/dashboard/reports', icon: BarChart, label: 'Reports' },
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
+  { href: '/dashboard/documentation', icon: BookOpenCheck, label: 'Documentation' },
 ];
 
 export function DashboardNav() {
@@ -180,6 +182,11 @@ export function DashboardNav() {
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/dashboard/documentation')}>
+              <BookOpenCheck className="mr-2 h-4 w-4" />
+              <span>Documentation</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>

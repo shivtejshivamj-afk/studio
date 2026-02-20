@@ -63,7 +63,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreVertical, PlusCircle, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -421,15 +421,15 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h3 className="font-semibold">Contact Support</h3>
-              <p className="text-sm text-muted-foreground">For any questions or issues, please reach out to our support team at <a href="mailto:shivtej.shivamj@gmail.com" className="text-primary underline">shivtej.shivamj@gmail.com</a> or call us at 7208789589.</p>
-            </div>
-            <div>
               <h3 className="font-semibold">Documentation</h3>
-              <p className="text-sm text-muted-foreground">Browse our documentation for detailed guides and tutorials.</p>
+              <p className="text-sm text-muted-foreground">Browse our comprehensive documentation for detailed guides, tutorials, and answers to frequently asked questions.</p>
               <Button variant="outline" className="mt-2" asChild>
-                <Link href="#">View Documentation</Link>
+                <Link href="/dashboard/documentation">View Documentation</Link>
               </Button>
+            </div>
+             <div>
+              <h3 className="font-semibold">Contact Support</h3>
+              <p className="text-sm text-muted-foreground">Can't find what you're looking for? Reach out to our support team at <a href="mailto:support@gymtrack.pro" className="text-primary underline">support@gymtrack.pro</a>.</p>
             </div>
           </CardContent>
         </Card>
