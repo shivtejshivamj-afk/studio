@@ -30,7 +30,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import {
   useCollection,
   useFirestore,
@@ -102,7 +102,7 @@ export default function AttendancePage() {
     [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } =
-    useDoc<{ gymName: string }>(adminProfileRef);
+    useDoc<{ gymName: string, gymIdentifier: string }>(adminProfileRef);
 
   const attendanceQuery = useMemoFirebase(
     () =>
@@ -138,7 +138,7 @@ export default function AttendancePage() {
   });
 
   async function handleCheckIn(values: z.infer<typeof checkInSchema>) {
-    if (!firestore || !adminProfile?.gymName) {
+    if (!firestore || !adminProfile?.gymName || !adminProfile?.gymIdentifier) {
       toast({
         title: 'Check-in Error',
         description: 'Could not determine your gym. Please sign in again.',
@@ -168,6 +168,29 @@ export default function AttendancePage() {
       const memberDoc = querySnapshot.docs[0];
       const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
 
+      // Check if the member has already checked in today
+      const todayStart = startOfDay(new Date());
+      const todayEnd = endOfDay(new Date());
+
+      const attendanceCheckQuery = query(
+        collection(firestore, 'attendance'),
+        where('memberId', '==', member.id),
+        where('checkInTime', '>=', todayStart),
+        where('checkInTime', '<=', todayEnd)
+      );
+
+      const attendanceSnapshot = await getDocs(attendanceCheckQuery);
+
+      if (!attendanceSnapshot.empty) {
+        toast({
+          title: 'Already Checked In',
+          description: `${member.firstName} ${member.lastName} has already checked in today.`,
+          variant: 'destructive',
+        });
+        form.reset();
+        return;
+      }
+
       const attendanceRef = collection(
         firestore,
         'attendance'
@@ -176,6 +199,8 @@ export default function AttendancePage() {
         memberId: member.id,
         checkInTime: serverTimestamp(),
         gymName: adminProfile.gymName,
+        gymIdentifier: adminProfile.gymIdentifier,
+        memberGymId: member.gymId,
       });
 
       toast({

@@ -22,13 +22,17 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirestore, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
+import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import {
   collection,
   serverTimestamp,
   doc,
   getDoc,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
+import { startOfDay, endOfDay } from 'date-fns';
 import type { PublicMemberProfile } from '@/lib/data';
 
 const checkInSchema = z.object({
@@ -95,7 +99,30 @@ export function CheckInForm() {
         return;
       }
       
-      // 4. Write to the top-level 'attendance' collection. The security rule will validate this.
+      // 4. Check if already checked in today
+      const todayStart = startOfDay(new Date());
+      const todayEnd = endOfDay(new Date());
+
+      const attendanceQuery = query(
+        collection(firestore, 'attendance'),
+        where('memberId', '==', publicProfile.memberDocId),
+        where('checkInTime', '>=', todayStart),
+        where('checkInTime', '<=', todayEnd)
+      );
+      
+      const attendanceSnapshot = await getDocs(attendanceQuery);
+
+      if (!attendanceSnapshot.empty) {
+        toast({
+          title: 'Already Checked In',
+          description: `You have already checked in today, ${publicProfile.firstName}.`,
+          variant: 'destructive',
+        });
+        form.reset();
+        return;
+      }
+
+      // 5. Write to the top-level 'attendance' collection. The security rule will validate this.
       const attendanceRef = collection(firestore, 'attendance');
       addDocumentNonBlocking(attendanceRef, {
         memberId: publicProfile.memberDocId, // The real document ID
