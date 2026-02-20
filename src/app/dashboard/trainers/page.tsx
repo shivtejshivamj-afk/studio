@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, MoreVertical, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
 import { type Trainer } from '@/lib/data';
 import {
   Card,
@@ -18,12 +18,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -312,33 +306,36 @@ export default function TrainersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {isClient && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost">
-                              <MoreVertical className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleOpenDialog('view', trainer)}
-                            >
-                              <Eye className="mr-2 h-4 w-4" /> View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleOpenDialog('edit', trainer)}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleOpenDialog('delete', trainer)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      {isClient ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDialog('view', trainer)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">View Trainer</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDialog('edit', trainer)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Edit Trainer</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDialog('delete', trainer)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Trainer</span>
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="h-10 w-28" />
                       )}
                     </TableCell>
                   </TableRow>
