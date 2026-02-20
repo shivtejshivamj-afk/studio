@@ -49,8 +49,6 @@ const navItems = [
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
 ];
 
-const settingsNavItem = { href: '/dashboard/settings', icon: Settings, label: 'Settings' };
-
 export function DashboardNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -129,19 +127,6 @@ export function DashboardNav() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu className="p-2">
-            <SidebarMenuItem key={settingsNavItem.href}>
-                <Link href={settingsNavItem.href}>
-                    <SidebarMenuButton
-                        isActive={pathname.startsWith(settingsNavItem.href)}
-                        tooltip={{ children: settingsNavItem.label }}
-                    >
-                        <settingsNavItem.icon />
-                        <span className="group-data-[collapsible=icon]:hidden">{settingsNavItem.label}</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-        </SidebarMenu>
         <SidebarSeparator />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
