@@ -35,7 +35,6 @@ import {
 import { collection, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 
 import {
   Table,
@@ -420,13 +419,6 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold">Documentation</h3>
-              <p className="text-sm text-muted-foreground">Browse our comprehensive documentation for detailed guides, tutorials, and answers to frequently asked questions.</p>
-              <Button variant="outline" className="mt-2" asChild>
-                <Link href="/dashboard/documentation">View Documentation</Link>
-              </Button>
-            </div>
              <div>
               <h3 className="font-semibold">Contact Support</h3>
               <p className="text-sm text-muted-foreground">Can't find what you're looking for? Reach out to our support team at <a href="mailto:support@gymtrack.pro" className="text-primary underline">support@gymtrack.pro</a>.</p>

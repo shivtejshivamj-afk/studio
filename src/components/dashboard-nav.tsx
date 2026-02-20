@@ -11,7 +11,6 @@ import {
   CalendarCheck,
   Settings,
   BarChart,
-  BookOpenCheck,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -180,10 +179,6 @@ export function DashboardNav() {
             <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/dashboard/documentation')}>
-              <BookOpenCheck className="mr-2 h-4 w-4" />
-              <span>Documentation</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive">
