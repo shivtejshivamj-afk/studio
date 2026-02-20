@@ -14,7 +14,7 @@ import {
   ArrowUp,
   ArrowUpDown,
 } from 'lucide-react';
-import { type Member, type Invoice, plans } from '@/lib/data';
+import { type Member, type Invoice, type MembershipPlan } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -151,6 +151,12 @@ export default function InvoicingPage() {
   );
   const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
   
+  const plansQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'membership_plans'), where('isAvailable', '==', true)) : null),
+    [firestore]
+  );
+  const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
+  
   useEffect(() => {
     if (!firestore || !invoicesData) return;
 
@@ -170,14 +176,14 @@ export default function InvoicingPage() {
     });
   }, [invoicesData, firestore]);
 
-  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices;
+  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices || isLoadingPlans;
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
   });
 
   const processedInvoices = useMemo(() => {
-    if (!invoicesData || !members) return [];
+    if (!invoicesData || !members || !plans) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
 
@@ -198,7 +204,7 @@ export default function InvoicingPage() {
         planName: plan?.name || 'Unknown Plan',
       };
     });
-  }, [invoicesData, members]);
+  }, [invoicesData, members, plans]);
 
   const requestSort = (key: string) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -242,7 +248,7 @@ export default function InvoicingPage() {
   };
 
   const handleSaveInvoice = (values: InvoiceFormValues) => {
-    if (!firestore || !members || !adminProfile?.gymName) {
+    if (!firestore || !members || !adminProfile?.gymName || !plans) {
         toast({
             title: 'Cannot Create Invoice',
             description: "Could not determine your gym. Please ensure you have signed up correctly.",
@@ -317,7 +323,7 @@ export default function InvoicingPage() {
   };
   
   const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue') => {
-    if (!firestore || !members) return;
+    if (!firestore || !members || !plans) return;
     const docRef = doc(firestore, 'invoices', invoice.id);
     updateDocumentNonBlocking(docRef, { status });
 
@@ -327,7 +333,7 @@ export default function InvoicingPage() {
       if (member && plan) {
           const memberDocRef = doc(firestore, 'members', member.id);
           const endDate = new Date();
-          endDate.setDate(endDate.getDate() + plan.duration);
+          endDate.setDate(endDate.getDate() + plan.durationInDays);
 
           const memberUpdate = {
               membershipEndDate: format(endDate, 'yyyy-MM-dd'),
@@ -357,7 +363,7 @@ export default function InvoicingPage() {
     const doc = new jsPDF();
     
     // Using a unicode-safe prefix for the PDF
-    const currencyPrefix = '₹';
+    const currencyPrefix = 'Rs. ';
 
     // --- Header ---
     doc.setFontSize(20);
@@ -699,7 +705,7 @@ export default function InvoicingPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {plans.map((plan) => (
+                          {plans?.map((plan) => (
                             <SelectItem key={plan.id} value={plan.id}>
                               {plan.name} - ₹{plan.price}
                             </SelectItem>

@@ -21,11 +21,13 @@ export type PublicMemberProfile = {
   lastName: string;
 }
 
-export type Plan = {
+export type MembershipPlan = {
   id: string;
   name: string;
+  description: string;
   price: number;
-  duration: number; // in days
+  durationInDays: number;
+  isAvailable: boolean;
 };
 
 export type Trainer = {
@@ -67,11 +69,3 @@ export type Invoice = {
   memberEmail?: string;
   planName?: string;
 };
-
-
-// Plans are kept as static data for now.
-export const plans: Plan[] = [
-  { id: 'p01', name: 'Monthly', price: 50, duration: 30 },
-  { id: 'p02', name: 'Quarterly', price: 135, duration: 90 },
-  { id: 'p03', name: 'Annual', price: 500, duration: 365 },
-];
