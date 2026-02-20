@@ -60,7 +60,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, PlusCircle } from 'lucide-react';
+import { MoreVertical, PlusCircle, Pencil, Trash2 } from 'lucide-react';
 import { plans } from '@/lib/data';
 
 
@@ -382,9 +382,7 @@ export default function SettingsPage() {
                 <TableHead>Plan Name</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Duration</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -394,21 +392,20 @@ export default function SettingsPage() {
                   <TableCell>₹{plan.price.toFixed(2)}</TableCell>
                   <TableCell>{plan.duration} days</TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="ghost">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="ghost" size="icon">
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">Edit Plan</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete Plan</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
