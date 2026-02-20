@@ -6,15 +6,11 @@ import {
   Users,
   Dumbbell,
   FileText,
-  Calendar,
   LayoutDashboard,
   LogOut,
   CalendarCheck,
   Settings,
   BarChart,
-  User,
-  CheckSquare,
-  Wallet,
 } from 'lucide-react';
 import {
   Sidebar,
