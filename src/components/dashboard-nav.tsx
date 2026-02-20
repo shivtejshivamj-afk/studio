@@ -47,7 +47,6 @@ const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/members', icon: Users, label: 'Members' },
   { href: '/dashboard/trainers', icon: Dumbbell, label: 'Trainers' },
-  { href: '/dashboard/plans', icon: Calendar, label: 'Plans' },
   { href: '/dashboard/payments', icon: FileText, label: 'Invoicing' },
   { href: '/dashboard/reports', icon: BarChart, label: 'Reports' },
   { href: '/dashboard/attendance', icon: CalendarCheck, label: 'Attendance' },
