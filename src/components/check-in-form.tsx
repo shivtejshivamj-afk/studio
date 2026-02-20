@@ -22,7 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirestore, addDocumentNonBlocking } from '@/firebase';
+import { useFirestore, setDocumentNonBlocking } from '@/firebase';
 import {
   collection,
   serverTimestamp,
@@ -32,7 +32,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import type { PublicMemberProfile } from '@/lib/data';
 
 const checkInSchema = z.object({
@@ -100,19 +100,12 @@ export function CheckInForm() {
       }
       
       // 4. Check if already checked in today
-      const todayStart = startOfDay(new Date());
-      const todayEnd = endOfDay(new Date());
+      const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
+      const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
+      const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
+      const attendanceDocSnap = await getDoc(attendanceDocRef);
 
-      const attendanceQuery = query(
-        collection(firestore, 'attendance'),
-        where('memberId', '==', publicProfile.memberDocId),
-        where('checkInTime', '>=', todayStart),
-        where('checkInTime', '<=', todayEnd)
-      );
-      
-      const attendanceSnapshot = await getDocs(attendanceQuery);
-
-      if (!attendanceSnapshot.empty) {
+      if (attendanceDocSnap.exists()) {
         toast({
           title: 'Already Checked In',
           description: `You have already checked in today, ${publicProfile.firstName}.`,
@@ -123,14 +116,14 @@ export function CheckInForm() {
       }
 
       // 5. Write to the top-level 'attendance' collection. The security rule will validate this.
-      const attendanceRef = collection(firestore, 'attendance');
-      addDocumentNonBlocking(attendanceRef, {
+      setDocumentNonBlocking(attendanceDocRef, {
+        id: attendanceDocId,
         memberId: publicProfile.memberDocId, // The real document ID
         checkInTime: serverTimestamp(),
         gymName: publicProfile.gymName,
         gymIdentifier: publicProfile.gymIdentifier,
         memberGymId: memberPublicId, // The human-readable ID
-      });
+      }, {});
 
       toast({
         title: 'Check-in Successful!',

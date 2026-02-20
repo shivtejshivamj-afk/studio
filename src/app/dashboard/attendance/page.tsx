@@ -35,7 +35,7 @@ import {
   useCollection,
   useFirestore,
   useMemoFirebase,
-  addDocumentNonBlocking,
+  setDocumentNonBlocking,
   useUser,
   useDoc,
 } from '@/firebase';
@@ -48,6 +48,7 @@ import {
   Timestamp,
   doc,
   writeBatch,
+  getDoc,
 } from 'firebase/firestore';
 import { type Attendance, type Member } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -168,20 +169,13 @@ export default function AttendancePage() {
       const memberDoc = querySnapshot.docs[0];
       const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
 
-      // Check if the member has already checked in today
-      const todayStart = startOfDay(new Date());
-      const todayEnd = endOfDay(new Date());
+      // Check if the member has already checked in today using a predictable doc ID
+      const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
+      const attendanceDocId = `${member.id}_${checkInDateStr}`;
+      const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
+      const attendanceDocSnap = await getDoc(attendanceDocRef);
 
-      const attendanceCheckQuery = query(
-        collection(firestore, 'attendance'),
-        where('memberId', '==', member.id),
-        where('checkInTime', '>=', todayStart),
-        where('checkInTime', '<=', todayEnd)
-      );
-
-      const attendanceSnapshot = await getDocs(attendanceCheckQuery);
-
-      if (!attendanceSnapshot.empty) {
+      if (attendanceDocSnap.exists()) {
         toast({
           title: 'Already Checked In',
           description: `${member.firstName} ${member.lastName} has already checked in today.`,
@@ -191,17 +185,14 @@ export default function AttendancePage() {
         return;
       }
 
-      const attendanceRef = collection(
-        firestore,
-        'attendance'
-      );
-      addDocumentNonBlocking(attendanceRef, {
+      setDocumentNonBlocking(attendanceDocRef, {
+        id: attendanceDocId,
         memberId: member.id,
         checkInTime: serverTimestamp(),
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
         memberGymId: member.gymId,
-      });
+      }, {});
 
       toast({
         title: 'Check-in Successful!',
