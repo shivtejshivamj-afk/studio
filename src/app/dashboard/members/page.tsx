@@ -250,12 +250,13 @@ export default function MembersPage() {
 
   const handleDeleteConfirm = () => {
     if (selectedMember && firestore) {
-      const docRef = doc(firestore, 'members', selectedMember.id);
-      deleteDocumentNonBlocking(docRef);
-
-      // Delete public profile
+      // Delete public profile FIRST, as its security rule depends on the main member doc.
       const publicProfileRef = doc(firestore, 'member_profiles_public', selectedMember.gymId);
       deleteDocumentNonBlocking(publicProfileRef);
+
+      // Then delete the main member document.
+      const docRef = doc(firestore, 'members', selectedMember.id);
+      deleteDocumentNonBlocking(docRef);
 
       toast({
         title: 'Member Deleted',
