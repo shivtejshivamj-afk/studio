@@ -10,9 +10,6 @@ import {
   Clock,
   AlertCircle,
   Pencil,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -141,7 +138,6 @@ export default function InvoicingPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Invoice; direction: OrderByDirection }>({ key: 'issueDate', direction: 'desc' });
   const invoiceContentRef = useRef<HTMLDivElement>(null);
   
   // Pagination State
@@ -198,7 +194,7 @@ export default function InvoicingPage() {
     let q = query(
       collection(firestore, 'invoices'),
       where('gymIdentifier', '==', adminProfile.gymIdentifier),
-      orderBy(sortConfig.key, sortConfig.direction)
+      orderBy('issueDate', 'desc')
     );
 
     if (cursor) {
@@ -228,7 +224,7 @@ export default function InvoicingPage() {
     });
 
     return () => unsubscribe();
-  }, [firestore, adminProfile, page, pageCursors, sortConfig, toast]);
+  }, [firestore, adminProfile, page, pageCursors, toast]);
 
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
 
@@ -277,27 +273,6 @@ export default function InvoicingPage() {
       };
     });
   }, [invoicesData, members, plans]);
-
-  const requestSort = (key: keyof Invoice) => {
-    let direction: OrderByDirection = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-    // Reset pagination when sorting changes
-    setPage(1);
-    setPageCursors([null]);
-  };
-  
-  const getSortIndicator = (key: string) => {
-    if (sortConfig.key !== key) {
-      return <ArrowUpDown className="ml-2 h-4 w-4 inline-block opacity-30" />;
-    }
-    if (sortConfig.direction === 'asc') {
-      return <ArrowUp className="ml-2 h-4 w-4 inline-block" />;
-    }
-    return <ArrowDown className="ml-2 h-4 w-4 inline-block" />;
-  };
 
   const handleOpenDialog = (dialog: DialogType, invoice?: Invoice) => {
     setSelectedInvoice(invoice || null);
@@ -509,7 +484,7 @@ export default function InvoicingPage() {
         [`${selectedInvoice.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`],
       ],
       theme: 'grid',
-      headStyles: { fillColor: [241, 245, 249] }, // bg-slate-100
+      headStyles: { fillColor: [241, 245, 249], textColor: [20, 20, 20], fontStyle: 'bold' },
       didDrawPage: (data) => {
         // --- Totals Section ---
         const finalY = (data.cursor?.y || 0) + 10;
@@ -580,29 +555,12 @@ export default function InvoicingPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('invoiceNumber')}>
-                  Invoice ID
-                  {getSortIndicator('invoiceNumber')}
-                </TableHead>
-                <TableHead>
-                  Member
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('issueDate')}>
-                  Issue Date
-                  {getSortIndicator('issueDate')}
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('dueDate')}>
-                  Due Date
-                  {getSortIndicator('dueDate')}
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('totalAmount')}>
-                  Amount
-                  {getSortIndicator('totalAmount')}
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
-                  Status
-                  {getSortIndicator('status')}
-                </TableHead>
+                <TableHead>Invoice ID</TableHead>
+                <TableHead>Member</TableHead>
+                <TableHead>Issue Date</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
