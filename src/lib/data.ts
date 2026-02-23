@@ -27,7 +27,7 @@ export type MembershipPlan = {
   name: string;
   description: string;
   price: number;
-  durationInDays: number;
+  durationInMonths: number;
   isAvailable: boolean;
   gymIdentifier: string;
 };
@@ -71,5 +71,8 @@ export type Invoice = {
   // These are for UI display and will be added after fetching
   memberName?: string;
   memberEmail?: string;
+  memberPhone?: string;
   planName?: string;
 };
+
+    

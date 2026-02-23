@@ -97,10 +97,10 @@ const planFormSchema = z.object({
   price: z.coerce
     .number()
     .positive({ message: 'Price must be a positive number.' }),
-  durationInDays: z.coerce
+  durationInMonths: z.coerce
     .number()
     .int()
-    .positive({ message: 'Duration must be a positive number of days.' }),
+    .positive({ message: 'Duration must be a positive number of months.' }),
   isAvailable: z.boolean().default(true),
 });
 type PlanFormValues = z.infer<typeof planFormSchema>;
@@ -162,7 +162,7 @@ export default function SettingsPage() {
         name: plan.name,
         description: plan.description,
         price: plan.price,
-        durationInDays: plan.durationInDays,
+        durationInMonths: plan.durationInMonths,
         isAvailable: plan.isAvailable,
       });
     } else if (dialogType === 'add') {
@@ -170,7 +170,7 @@ export default function SettingsPage() {
         name: '',
         description: '',
         price: 0,
-        durationInDays: 30,
+        durationInMonths: 1,
         isAvailable: true,
       });
     }
@@ -385,7 +385,7 @@ export default function SettingsPage() {
                     <TableRow key={plan.id}>
                       <TableCell className="font-medium">{plan.name}</TableCell>
                       <TableCell>₹{plan.price.toFixed(2)}</TableCell>
-                      <TableCell>{plan.durationInDays} days</TableCell>
+                      <TableCell>{plan.durationInMonths} months</TableCell>
                       <TableCell>
                         <Badge variant={plan.isAvailable ? 'default' : 'secondary'}>
                           {plan.isAvailable ? 'Available' : 'Unavailable'}
@@ -638,10 +638,10 @@ export default function SettingsPage() {
                   />
                   <FormField
                     control={planForm.control}
-                    name="durationInDays"
+                    name="durationInMonths"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Duration (days)</FormLabel>
+                        <FormLabel>Duration (months)</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>
@@ -707,3 +707,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    

@@ -82,7 +82,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addMonths } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -272,6 +272,7 @@ export default function InvoicingPage() {
         status: displayStatus,
         memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
         memberEmail: member?.email,
+        memberPhone: member?.phone,
         planName: plan?.name || 'Unknown Plan',
       };
     });
@@ -407,8 +408,7 @@ export default function InvoicingPage() {
       const plan = plans.find(p => p.id === invoice.membershipId);
       if (member && plan) {
           const memberDocRef = doc(firestore, 'members', member.id);
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + plan.durationInDays);
+          const endDate = addMonths(new Date(), plan.durationInMonths);
 
           const memberUpdate = {
               membershipEndDate: format(endDate, 'yyyy-MM-dd'),
@@ -476,6 +476,9 @@ export default function InvoicingPage() {
     doc.setFont('helvetica', 'normal');
     doc.text(selectedInvoice.memberName || 'N/A', 14, detailsY + 6);
     doc.text(selectedInvoice.memberEmail || 'N/A', 14, detailsY + 12);
+    if (selectedInvoice.memberPhone) {
+      doc.text(selectedInvoice.memberPhone, 14, detailsY + 18);
+    }
     
     const detailsX = 130;
     doc.setFont('helvetica', 'bold');
@@ -620,7 +623,10 @@ export default function InvoicingPage() {
                 filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.memberName}</TableCell>
+                  <TableCell>
+                    <div>{invoice.memberName}</div>
+                    {invoice.memberPhone && <div className="text-sm text-muted-foreground">{invoice.memberPhone}</div>}
+                  </TableCell>
                   <TableCell>{invoice.issueDate}</TableCell>
                   <TableCell>{invoice.dueDate}</TableCell>
                   <TableCell>₹{invoice.totalAmount.toFixed(2)}</TableCell>
@@ -857,6 +863,7 @@ export default function InvoicingPage() {
                     <h3 className="font-semibold text-gray-600 mb-2">BILL TO</h3>
                     <p className="font-bold text-gray-800">{selectedInvoice.memberName}</p>
                     <p className="text-gray-600">{selectedInvoice.memberEmail}</p>
+                    {selectedInvoice.memberPhone && <p className="text-gray-600">{selectedInvoice.memberPhone}</p>}
                   </div>
                   <div className="text-right">
                     <div className="grid grid-cols-2">
@@ -942,3 +949,5 @@ export default function InvoicingPage() {
     </>
   );
 }
+
+    
