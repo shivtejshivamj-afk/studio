@@ -94,6 +94,7 @@ import {
   useUser,
   useDoc,
   setDocumentNonBlocking,
+  useCollection,
 } from '@/firebase';
 import {
     collection,
@@ -169,13 +170,13 @@ export default function InvoicingPage() {
     () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'members'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
-  const { data: members, isLoading: isLoadingMembers } = useMemoFirebase(() => useCollection<Member>(membersQuery), [membersQuery]);
+  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
   
   const plansQuery = useMemoFirebase(
     () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
-  const { data: plans, isLoading: isLoadingPlans } = useMemoFirebase(() => useCollection<MembershipPlan>(plansQuery), [plansQuery]);
+  const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
   
   useEffect(() => {
      if (firestore && adminProfile?.gymIdentifier) {
@@ -227,7 +228,7 @@ export default function InvoicingPage() {
     });
 
     return () => unsubscribe();
-  }, [firestore, adminProfile, page, pageCursors, sortConfig]);
+  }, [firestore, adminProfile, page, pageCursors, sortConfig, toast]);
 
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
 

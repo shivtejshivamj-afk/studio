@@ -31,7 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import {
   useFirestore,
   useMemoFirebase,
@@ -137,8 +137,7 @@ export default function AttendancePage() {
         : null,
     [firestore, adminProfile]
   );
-  const { data: members, isLoading: isLoadingMembers } =
-    useMemoFirebase(() => useCollection<Member>(membersQuery), [membersQuery]);
+  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
 
   useEffect(() => {
     if (!firestore || !adminProfile?.gymIdentifier) return;
@@ -150,12 +149,10 @@ export default function AttendancePage() {
         );
         // Apply date range filter to count query as well
         if (dateRange?.from) {
-            countQuery = query(countQuery, where('checkInTime', '>=', dateRange.from));
+            countQuery = query(countQuery, where('checkInTime', '>=', startOfDay(dateRange.from)));
         }
         if (dateRange?.to) {
-            const toDate = new Date(dateRange.to);
-            toDate.setHours(23, 59, 59, 999);
-            countQuery = query(countQuery, where('checkInTime', '<=', toDate));
+            countQuery = query(countQuery, where('checkInTime', '<=', endOfDay(dateRange.to)));
         }
         const snapshot = await getCountFromServer(countQuery);
         setTotalRecords(snapshot.data().count);
@@ -178,13 +175,10 @@ export default function AttendancePage() {
     );
 
     if (dateRange?.from) {
-      q = query(q, where('checkInTime', '>=', dateRange.from));
+      q = query(q, where('checkInTime', '>=', startOfDay(dateRange.from)));
     }
     if (dateRange?.to) {
-        // To include the whole day, set time to end of day
-        const toDate = new Date(dateRange.to);
-        toDate.setHours(23, 59, 59, 999);
-        q = query(q, where('checkInTime', '<=', toDate));
+        q = query(q, where('checkInTime', '<=', endOfDay(dateRange.to)));
     }
 
     if (cursor) {
