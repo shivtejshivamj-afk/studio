@@ -127,8 +127,7 @@ service cloud.firestore {
      * @path        /members/{memberId}
      */
     match /members/{memberId} {
-      allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
-      allow list: if isAdmin();
+      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
       allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
@@ -173,8 +172,7 @@ service cloud.firestore {
      * @path        /attendance/{attendanceId}
      */
     match /attendance/{attendanceId} {
-        allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
-        allow list: if isAdmin();
+        allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
         allow create: if isPublicCheckInValid() || request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
     
@@ -183,8 +181,7 @@ service cloud.firestore {
      * @path        /invoices/{invoiceId}
      */
     match /invoices/{invoiceId} {
-        allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
-        allow list: if isAdmin();
+        allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
         allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
@@ -193,8 +190,7 @@ service cloud.firestore {
      * @path        /membership_plans/{planId}
      */
     match /membership_plans/{planId} {
-      allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
-      allow list: if isAdmin();
+      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
       allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
@@ -203,8 +199,7 @@ service cloud.firestore {
      * @path        /trainers/{trainerId}
      */
     match /trainers/{trainerId} {
-      allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
-      allow list: if isAdmin();
+      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
       allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 

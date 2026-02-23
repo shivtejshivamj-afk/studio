@@ -24,10 +24,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase'; 
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const formSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
@@ -55,6 +55,7 @@ export function SignupForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      // 1. Create the Authentication Account
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
@@ -63,28 +64,28 @@ export function SignupForm() {
       const user = userCredential.user;
 
       if (user && firestore) {
+        // 2. Create the Admin Document in 'roles_admin'
+        // Using the user.uid as the document ID keeps it unique
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
         
-        const generateGymIdentifier = (gymName: string) => {
-            const namePart = gymName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 8).toUpperCase();
-            const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-            return `${namePart}-${randomPart}`;
-        };
-        const gymIdentifier = generateGymIdentifier(values.gymName);
-        
-        // CRITICAL: Await the creation of the admin role document to prevent a race condition.
-        // This ensures the role exists before the user is redirected and attempts to fetch data.
+        // 3. SECURE SETUP: gymIdentifier = user.uid
+        // This is the "Key" that makes your 20 gyms private
         await setDoc(adminRoleRef, {
-          gymName: values.gymName,
           ownerName: values.ownerName,
-          gymIdentifier: gymIdentifier,
+          gymName: values.gymName,
+          email: values.email,
+          gymIdentifier: user.uid, 
+          role: 'admin',
+          createdAt: serverTimestamp(),
         });
       }
       
       toast({
         title: "Account Created!",
-        description: "You have been successfully signed up and granted admin privileges."
+        description: "Welcome! Your gym management dashboard is ready."
       });
+
+      // 4. Send to dashboard
       router.push('/dashboard');
 
     } catch (error: any) {
@@ -171,9 +172,6 @@ export function SignupForm() {
                       ) : (
                         <Eye className="h-4 w-4" />
                       )}
-                      <span className="sr-only">
-                        {showPassword ? 'Hide password' : 'Show password'}
-                      </span>
                     </Button>
                   </div>
                   <FormMessage />
