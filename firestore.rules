@@ -123,11 +123,12 @@ service cloud.firestore {
 
     /**
      * @description Secures the main collection of gym member profiles. Access is strictly scoped to the
-     *              admin of the corresponding gym.
+     *              admin of the corresponding gym. List is allowed for any admin, but client queries must filter.
      * @path        /members/{memberId}
      */
     match /members/{memberId} {
-      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow list: if isAdmin();
       allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
@@ -172,7 +173,8 @@ service cloud.firestore {
      * @path        /attendance/{attendanceId}
      */
     match /attendance/{attendanceId} {
-        allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+        allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+        allow list: if isAdmin();
         allow create: if isPublicCheckInValid() || request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
     
@@ -181,7 +183,8 @@ service cloud.firestore {
      * @path        /invoices/{invoiceId}
      */
     match /invoices/{invoiceId} {
-        allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+        allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+        allow list: if isAdmin();
         allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
@@ -190,7 +193,8 @@ service cloud.firestore {
      * @path        /membership_plans/{planId}
      */
     match /membership_plans/{planId} {
-      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow list: if isAdmin();
       allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
@@ -199,7 +203,8 @@ service cloud.firestore {
      * @path        /trainers/{trainerId}
      */
     match /trainers/{trainerId} {
-      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow get, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow list: if isAdmin();
       allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
