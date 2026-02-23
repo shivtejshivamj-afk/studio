@@ -153,7 +153,9 @@ export default function AttendancePage() {
             countQuery = query(countQuery, where('checkInTime', '>=', dateRange.from));
         }
         if (dateRange?.to) {
-            countQuery = query(countQuery, where('checkInTime', '<=', dateRange.to));
+            const toDate = new Date(dateRange.to);
+            toDate.setHours(23, 59, 59, 999);
+            countQuery = query(countQuery, where('checkInTime', '<=', toDate));
         }
         const snapshot = await getCountFromServer(countQuery);
         setTotalRecords(snapshot.data().count);
@@ -212,7 +214,7 @@ export default function AttendancePage() {
     });
 
     return () => unsubscribe();
-  }, [firestore, adminProfile, dateRange, page, pageCursors]);
+  }, [firestore, adminProfile, dateRange, page, pageCursors, toast]);
 
   const form = useForm<z.infer<typeof checkInSchema>>({
     resolver: zodResolver(checkInSchema),
