@@ -89,23 +89,6 @@ export default function DashboardPage() {
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    if (firestore && user?.uid && adminProfile && !adminProfile.gymIdentifier && adminProfile.gymName) {
-      const generateGymIdentifier = (gymName: string) => {
-        const namePart = gymName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 8).toUpperCase();
-        const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-        return `${namePart}-${randomPart}`;
-      };
-      const gymIdentifier = generateGymIdentifier(adminProfile.gymName);
-      const docRef = doc(firestore, 'roles_admin', user.uid);
-      updateDocumentNonBlocking(docRef, { gymIdentifier });
-      toast({
-        title: "Gym Identifier Generated",
-        description: `A unique identifier for your gym has been created.`
-      });
-    }
-  }, [firestore, user, adminProfile, toast]);
-
   const expiringSoonMembers = useMemo(() => {
     if (!members) return [];
 

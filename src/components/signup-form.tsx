@@ -65,16 +65,20 @@ export function SignupForm() {
 
       if (user && firestore) {
         // 2. Create the Admin Document in 'roles_admin'
-        // Using the user.uid as the document ID keeps it unique
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+        
+        const generateGymIdentifier = (gymName: string) => {
+            const namePart = gymName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 8).toUpperCase();
+            const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+            return `${namePart}-${randomPart}`;
+        };
+        const gymIdentifier = generateGymIdentifier(values.gymName);
         
         await setDoc(adminRoleRef, {
           ownerName: values.ownerName,
           gymName: values.gymName,
+          gymIdentifier: gymIdentifier,
           email: values.email,
-          // The gymIdentifier is NOT set on signup.
-          // It will be generated on the first visit to the dashboard
-          // to create a more human-readable ID.
           role: 'admin',
           createdAt: serverTimestamp(),
         });

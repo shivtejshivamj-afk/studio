@@ -34,7 +34,8 @@
       },
       "required": [
         "gymName",
-        "ownerName"
+        "ownerName",
+        "gymIdentifier"
       ]
     },
     "Member": {
