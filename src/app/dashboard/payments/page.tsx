@@ -885,8 +885,8 @@ export default function InvoicingPage() {
                 <Table className="mb-8">
                   <TableHeader>
                     <TableRow className="bg-gray-100">
-                      <TableHead className="text-gray-800">Description</TableHead>
-                      <TableHead className="text-right text-gray-800">Amount</TableHead>
+                      <TableHead className="font-semibold text-black">Description</TableHead>
+                      <TableHead className="text-right font-semibold text-black">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -949,5 +949,3 @@ export default function InvoicingPage() {
     </>
   );
 }
-
-    
