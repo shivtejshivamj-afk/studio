@@ -155,14 +155,27 @@ export default function MembersPage() {
   };
   
   const handleCopy = (text: string) => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        toast({
-          title: 'Copied to clipboard!',
-          description: `ID: ${text}`,
-        });
+    if (!navigator.clipboard) {
+      toast({
+        title: 'Clipboard Not Available',
+        description: 'Could not access the clipboard. Please copy manually.',
+        variant: 'destructive',
       });
+      return;
     }
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: 'Copied to clipboard!',
+        description: `ID: ${text}`,
+      });
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      toast({
+        title: 'Copy Failed',
+        description: 'Could not copy to clipboard due to browser permissions. Please copy manually.',
+        variant: 'destructive',
+      });
+    });
   };
   
   const handleSaveMember = (values: MemberFormValues) => {
