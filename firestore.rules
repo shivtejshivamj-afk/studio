@@ -27,11 +27,16 @@ service cloud.firestore {
 
     /**
      * Checks if the authenticated user has administrative privileges by verifying
-     * their UID exists as a document in the `/roles_admin` collection.
-     * Uses get() for stronger consistency over exists().
+     * their UID exists as a document in the `/roles_admin` collection and that
+     * the critical 'gymIdentifier' field has been written.
+     * This adds an extra layer of consistency check against post-signup race conditions.
      */
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) != null;
+      if (!isSignedIn()) {
+        return false;
+      }
+      let adminDoc = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return adminDoc != null && 'gymIdentifier' in adminDoc.data;
     }
     
     /**
@@ -82,11 +87,11 @@ service cloud.firestore {
 
     /**
      * Validates a public check-in request by cross-referencing it with the trusted,
-     * publicly readable `member_profiles_public` document.
+     * publicly readable `member_profiles_public` document. This can be used for
+     * both public check-ins and admin-initiated check-ins to ensure consistency.
      */
     function isPublicCheckInValid() {
       let incomingData = request.resource.data;
-      // The public member ID from the check-in form.
       let memberGymId = incomingData.memberGymId;
 
       // The corresponding public profile document, which is our source of truth.
@@ -171,14 +176,15 @@ service cloud.firestore {
     
     /**
      * @description Secures the attendance collection. Admins can read records for their gym.
-     *              Public (unauthenticated) users can ONLY create new attendance records
-     *              if the request is validated by the `isPublicCheckInValid` function.
+     *              Public users (and admins acting on their behalf) can ONLY create
+     *              new records if the request is validated by `isPublicCheckInValid`.
      * @path        /attendance/{attendanceId}
      */
     match /attendance/{attendanceId} {
         allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
         allow list: if isAdmin();
-        allow create: if isPublicCheckInValid() || isGymAdmin(request.resource.data.gymIdentifier);
+        // This rule now securely handles both public and admin check-ins without depending on `isGymAdmin` for creation.
+        allow create: if isPublicCheckInValid();
     }
     
     /**

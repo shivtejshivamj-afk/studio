@@ -163,17 +163,24 @@ export default function AttendancePage() {
 
       const publicProfile = publicProfileSnap.data() as PublicMemberProfile;
       
-      // Validate that the member belongs to the admin's gym
       if (publicProfile.gymIdentifier !== adminProfile.gymIdentifier) {
           toast({
               title: 'Check-in Failed',
-              description: `Member ID "${values.memberId}" does not belong to your gym.`,
+              description: `This member does not belong to your gym.`,
               variant: 'destructive',
           });
           return;
       }
+      
+      if (!publicProfile.isActive) {
+        toast({
+          title: 'Check-in Failed',
+          description: `The membership for ${publicProfile.firstName} ${publicProfile.lastName} is inactive. Please contact the front desk.`,
+          variant: 'destructive',
+        });
+        return;
+      }
 
-      // Check if the member has already checked in today using a predictable doc ID
       const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
       const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
       const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
@@ -189,13 +196,14 @@ export default function AttendancePage() {
         return;
       }
 
+      // This data structure now perfectly matches what `isPublicCheckInValid` expects.
       setDocumentNonBlocking(attendanceDocRef, {
         id: attendanceDocId,
-        memberId: publicProfile.memberDocId, // Use the private document ID
+        memberId: publicProfile.memberDocId, 
         checkInTime: serverTimestamp(),
-        gymName: adminProfile.gymName,
-        gymIdentifier: adminProfile.gymIdentifier,
-        memberGymId: publicProfileSnap.id, // Use the public gym ID
+        gymName: publicProfile.gymName,
+        gymIdentifier: publicProfile.gymIdentifier,
+        memberGymId: publicProfileSnap.id,
       }, {});
 
       toast({
