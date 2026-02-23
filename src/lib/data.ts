@@ -8,6 +8,7 @@ export type Member = {
   isActive: boolean;
   gymId: string;
   gymName: string;
+  gymIdentifier: string;
   membershipEndDate?: string;
   activePlanId?: string;
 };
@@ -28,6 +29,7 @@ export type MembershipPlan = {
   price: number;
   durationInDays: number;
   isAvailable: boolean;
+  gymIdentifier: string;
 };
 
 export type Trainer = {
@@ -41,6 +43,7 @@ export type Trainer = {
   bio?: string;
   isActive: boolean;
   gymName: string;
+  gymIdentifier: string;
 };
 
 export type Attendance = {
@@ -63,6 +66,7 @@ export type Invoice = {
   totalAmount: number;
   status: 'Paid' | 'Pending' | 'Overdue';
   gymName: string;
+  gymIdentifier: string;
 
   // These are for UI display and will be added after fetching
   memberName?: string;

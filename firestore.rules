@@ -1,18 +1,14 @@
 /**
- * Core Philosophy: This ruleset enforces a strict, administrator-only security model for most operations.
- * All data access and modification are restricted to authenticated users who are explicitly
- * designated as administrators in the `/roles_admin` collection.
- * 
+ * Core Philosophy: This ruleset enforces a strict, multi-tenant security model.
+ * All data access and modification are restricted to authenticated administrators who are explicitly
+ * designated as administrators in the `/roles_admin` collection. Each piece of data is scoped
+ * to a specific gym via a `gymIdentifier`, ensuring complete data isolation between different gyms.
+ *
  * Public Check-in: A specific exception is made for the public member check-in feature. This is handled
  * by creating a parallel, publicly-readable collection (`member_profiles_public`) that contains only non-sensitive
  * information required for validation. The `attendance` collection allows unauthenticated `create` operations,
  * but the request is rigorously validated against the trusted data in `member_profiles_public`. This prevents
  * unauthorized reads of private member data while still allowing a public-facing feature.
- *
- * Data Structure: The data is organized into top-level collections for major entities like
- * `members`, `membership_plans`, `trainers`, `attendance`, and `invoices`. This flat structure is intentional
- * to support simple queries that do not require manual index creation. Member-specific data that is
- * not queried across all members (e.g., `memberships`, `payments`) is nested in subcollections.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -52,6 +48,20 @@ service cloud.firestore {
              adminDoc.data != null &&
              'gymIdentifier' in adminDoc.data &&
              adminDoc.data.gymIdentifier == gymIdentifier;
+    }
+    
+    /**
+     * Gets the gymIdentifier of the currently authenticated admin user.
+     */
+    function getAdminGymIdentifier() {
+      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymIdentifier;
+    }
+    
+    /**
+     * Gets the gymIdentifier from the member document associated with a subcollection.
+     */
+    function getParentMemberGymIdentifier(memberId) {
+      return get(/databases/$(database)/documents/members/$(memberId)).data.gymIdentifier;
     }
 
     /**
@@ -106,18 +116,19 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
-      allow update: if request.auth.uid == adminId && (!('gymName' in request.resource.data) ||
-                      request.resource.data.gymName == resource.data.gymName);
+      allow update: if request.auth.uid == adminId && (!('gymIdentifier' in request.resource.data) ||
+                      request.resource.data.gymIdentifier == resource.data.gymIdentifier);
       allow delete: if false;
     }
 
     /**
-     * @description Secures the main collection of gym member profiles. Only authenticated
-     *              administrators are allowed to read or write member data.
+     * @description Secures the main collection of gym member profiles. Access is strictly scoped to the
+     *              admin of the corresponding gym.
      * @path        /members/{memberId}
      */
     match /members/{memberId} {
-      allow get, list, create, update, delete: if isAdmin();
+      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
     /**
@@ -135,58 +146,61 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures membership subscriptions. Only admins can manage them.
+     * @description Secures membership subscriptions. Access is scoped to the admin of the parent member's gym.
      * @path        /members/{memberId}/memberships/{membershipId}
      */
     match /members/{memberId}/memberships/{membershipId} {
-      allow get, list, delete: if isAdmin();
-      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
-      allow update: if isAdmin() && isMemberIdImmutable();
+      allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier();
+      allow create: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier() && hasCorrectMemberIdOnCreate(memberId);
+      allow update: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier() && isMemberIdImmutable();
     }
 
     /**
-     * @description Secures payment records. Only admins can manage them.
+     * @description Secures payment records. Access is scoped to the admin of the parent member's gym.
      * @path        /members/{memberId}/payments/{paymentId}
      */
     match /members/{memberId}/payments/{paymentId} {
-      allow get, list, delete: if isAdmin();
-      allow create: if isAdmin() && hasCorrectMemberIdOnCreate(memberId);
-      allow update: if isAdmin() && isMemberIdImmutable();
+      allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier();
+      allow create: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier() && hasCorrectMemberIdOnCreate(memberId);
+      allow update: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier() && isMemberIdImmutable();
     }
     
     /**
-     * @description Secures the attendance collection. Admins can read all records.
+     * @description Secures the attendance collection. Admins can read records for their gym.
      *              Public (unauthenticated) users can ONLY create new attendance records
      *              if the request is validated by the `isPublicCheckInValid` function.
      * @path        /attendance/{attendanceId}
      */
     match /attendance/{attendanceId} {
-        allow read, update, delete: if isAdmin();
-        allow create: if isPublicCheckInValid() || isAdmin();
+        allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+        allow create: if isPublicCheckInValid() || request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
     
     /**
-     * @description Secures the top-level invoices collection. Only admins can read/write.
+     * @description Secures the top-level invoices collection. Access is scoped to the gym admin.
      * @path        /invoices/{invoiceId}
      */
     match /invoices/{invoiceId} {
-        allow read, write: if isAdmin();
+        allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+        allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
     /**
-     * @description Secures membership plans. Only admins can manage them.
+     * @description Secures membership plans. Access is scoped to the gym admin.
      * @path        /membership_plans/{planId}
      */
     match /membership_plans/{planId} {
-      allow read, write: if isAdmin();
+      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
     /**
-     * @description Secures trainer profiles. Only admins can manage them.
+     * @description Secures trainer profiles. Access is scoped to the gym admin.
      * @path        /trainers/{trainerId}
      */
     match /trainers/{trainerId} {
-      allow read, write: if isAdmin();
+      allow read, update, delete: if resource.data.gymIdentifier == getAdminGymIdentifier();
+      allow create: if request.resource.data.gymIdentifier == getAdminGymIdentifier();
     }
 
   }

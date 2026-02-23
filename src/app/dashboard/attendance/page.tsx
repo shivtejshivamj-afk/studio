@@ -107,10 +107,10 @@ export default function AttendancePage() {
 
   const attendanceQuery = useMemoFirebase(
     () =>
-      firestore && adminProfile?.gymName
+      firestore && adminProfile?.gymIdentifier
         ? query(
             collection(firestore, 'attendance'),
-            where('gymName', '==', adminProfile.gymName)
+            where('gymIdentifier', '==', adminProfile.gymIdentifier)
           )
         : null,
     [firestore, adminProfile]
@@ -120,10 +120,10 @@ export default function AttendancePage() {
 
   const membersQuery = useMemoFirebase(
     () =>
-      firestore && adminProfile?.gymName
+      firestore && adminProfile?.gymIdentifier
         ? query(
             collection(firestore, 'members'),
-            where('gymName', '==', adminProfile.gymName)
+            where('gymIdentifier', '==', adminProfile.gymIdentifier)
           )
         : null,
     [firestore, adminProfile]
@@ -152,7 +152,7 @@ export default function AttendancePage() {
       const membersRef = collection(firestore, 'members');
       const q = query(
         membersRef,
-        where('gymName', '==', adminProfile.gymName),
+        where('gymIdentifier', '==', adminProfile.gymIdentifier),
         where('gymId', '==', values.memberId.toUpperCase())
       );
       const querySnapshot = await getDocs(q);

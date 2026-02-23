@@ -32,7 +32,7 @@ import {
   setDocumentNonBlocking,
   deleteDocumentNonBlocking,
 } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import {
@@ -125,8 +125,8 @@ export default function SettingsPage() {
     useDoc<AdminProfile>(adminProfileRef);
 
   const plansQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'membership_plans') : null),
-    [firestore]
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
+    [firestore, adminProfile]
   );
   const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
 
@@ -182,13 +182,14 @@ export default function SettingsPage() {
   };
 
   function handleSavePlan(values: PlanFormValues) {
-    if (!firestore) return;
+    if (!firestore || !adminProfile?.gymIdentifier) return;
 
     if (dialogState === 'add') {
       const newDocRef = doc(collection(firestore, 'membership_plans'));
-      const newPlan = {
+      const newPlan: MembershipPlan = {
         ...values,
         id: newDocRef.id,
+        gymIdentifier: adminProfile.gymIdentifier,
       };
       setDocumentNonBlocking(newDocRef, newPlan, { merge: true });
       toast({

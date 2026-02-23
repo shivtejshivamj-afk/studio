@@ -57,14 +57,14 @@ export default function ReportsPage() {
     [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } =
-    useDoc<{ gymName: string }>(adminProfileRef);
+    useDoc<{ gymName: string, gymIdentifier: string }>(adminProfileRef);
 
   const invoicesQuery = useMemoFirebase(
     () =>
-      firestore && adminProfile?.gymName
+      firestore && adminProfile?.gymIdentifier
         ? query(
             collection(firestore, 'invoices'),
-            where('gymName', '==', adminProfile.gymName),
+            where('gymIdentifier', '==', adminProfile.gymIdentifier),
             where('status', '==', 'Paid')
           )
         : null,
@@ -75,10 +75,10 @@ export default function ReportsPage() {
 
   const membersQuery = useMemoFirebase(
     () =>
-      firestore && adminProfile?.gymName
+      firestore && adminProfile?.gymIdentifier
         ? query(
             collection(firestore, 'members'),
-            where('gymName', '==', adminProfile.gymName)
+            where('gymIdentifier', '==', adminProfile.gymIdentifier)
           )
         : null,
     [firestore, adminProfile]

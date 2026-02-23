@@ -72,10 +72,10 @@ export default function DashboardPage() {
 
   const membersQuery = useMemoFirebase(
     () =>
-      firestore && adminProfile?.gymName
+      firestore && adminProfile?.gymIdentifier
         ? query(
             collection(firestore, 'members'),
-            where('gymName', '==', adminProfile.gymName)
+            where('gymIdentifier', '==', adminProfile.gymIdentifier)
           )
         : null,
     [firestore, adminProfile]

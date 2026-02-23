@@ -110,7 +110,7 @@ export default function MembersPage() {
   const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string; gymIdentifier: string}>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
-      () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
+      () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'members'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
       [firestore, adminProfile]
   );
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
@@ -190,6 +190,7 @@ export default function MembersPage() {
             id: newDocRef.id,
             gymId: memberGymId,
             gymName: adminProfile.gymName,
+            gymIdentifier: adminProfile.gymIdentifier,
         };
         setDocumentNonBlocking(newDocRef, newMember, { merge: true });
 

@@ -98,6 +98,10 @@
           "type": "string",
           "description": "The name of the gym the member belongs to."
         },
+        "gymIdentifier": {
+          "type": "string",
+          "description": "The unique identifier for the gym, used for data scoping."
+        },
         "membershipEndDate": {
           "type": "string",
           "format": "date",
@@ -117,7 +121,8 @@
         "joinDate",
         "isActive",
         "gymId",
-        "gymName"
+        "gymName",
+        "gymIdentifier"
       ]
     },
     "PublicMemberProfile": {
@@ -196,6 +201,10 @@
         "isAvailable": {
           "type": "boolean",
           "description": "Indicates if the membership plan is currently available for purchase."
+        },
+        "gymIdentifier": {
+          "type": "string",
+          "description": "The unique identifier for the gym, used for data scoping."
         }
       },
       "required": [
@@ -204,7 +213,8 @@
         "description",
         "price",
         "durationInDays",
-        "isAvailable"
+        "isAvailable",
+        "gymIdentifier"
       ]
     },
     "Membership": {
@@ -306,6 +316,10 @@
         "gymName": {
           "type": "string",
           "description": "The name of the gym the trainer belongs to."
+        },
+        "gymIdentifier": {
+          "type": "string",
+          "description": "The unique identifier for the gym, used for data scoping."
         }
       },
       "required": [
@@ -317,7 +331,8 @@
         "specialization",
         "hireDate",
         "isActive",
-        "gymName"
+        "gymName",
+        "gymIdentifier"
       ]
     },
     "Attendance": {
@@ -409,6 +424,10 @@
         "gymName": {
           "type": "string",
           "description": "The name of the gym where the invoice was issued."
+        },
+        "gymIdentifier": {
+          "type": "string",
+          "description": "The unique identifier for the gym, used for data scoping."
         }
       },
       "required": [
@@ -420,7 +439,8 @@
         "dueDate",
         "totalAmount",
         "status",
-        "gymName"
+        "gymName",
+        "gymIdentifier"
       ]
     },
     "Payment": {
@@ -491,7 +511,7 @@
       "schema": {
         "$ref": "#/backend/entities/Member"
       },
-      "description": "Main collection for storing gym member profiles. Access is restricted to authenticated administrators."
+      "description": "Main collection for storing gym member profiles. Access is restricted to authenticated administrators of the corresponding gym."
     },
     "/member_profiles_public/{memberPubId}": {
       "schema": {
@@ -515,25 +535,25 @@
       "schema": {
         "$ref": "#/backend/entities/Attendance"
       },
-      "description": "Top-level collection for storing all gym check-in records. Access is restricted per-document based on gymName. This flat structure avoids the need for collection group queries and manual index creation."
+      "description": "Top-level collection for storing all gym check-in records. Access is restricted per-document based on gymIdentifier. This flat structure avoids the need for collection group queries and manual index creation."
     },
     "/invoices/{invoiceId}": {
       "schema": {
         "$ref": "#/backend/entities/Invoice"
       },
-      "description": "Top-level collection for storing all invoices. Access is restricted per-document based on gymName. This flat structure avoids the need for collection group queries and manual index creation."
+      "description": "Top-level collection for storing all invoices. Access is restricted per-document based on gymIdentifier. This flat structure avoids the need for collection group queries and manual index creation."
     },
     "/membership_plans/{planId}": {
       "schema": {
         "$ref": "#/backend/entities/MembershipPlan"
       },
-      "description": "Collection for defining and managing different gym membership plans. Access is restricted to authenticated administrators."
+      "description": "Collection for defining and managing different gym membership plans. Access is restricted to authenticated administrators of the corresponding gym."
     },
     "/trainers/{trainerId}": {
       "schema": {
         "$ref": "#/backend/entities/Trainer"
       },
-      "description": "Collection for storing information about gym trainers. Access is restricted to authenticated administrators."
+      "description": "Collection for storing information about gym trainers. Access is restricted to authenticated administrators of the corresponding gym."
     }
   }
 }

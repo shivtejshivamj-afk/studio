@@ -103,10 +103,10 @@ export default function TrainersPage() {
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
     [firestore, user]
   );
-  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{ gymName: string }>(adminProfileRef);
+  const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{ gymName: string, gymIdentifier: string }>(adminProfileRef);
 
   const trainersQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'trainers'), where('gymName', '==', adminProfile.gymName)) : null),
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'trainers'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
   const { data: trainers, isLoading: isLoadingTrainers } = useCollection<Trainer>(trainersQuery);
@@ -155,11 +155,11 @@ export default function TrainersPage() {
   };
 
   const handleSaveTrainer = (values: TrainerFormValues) => {
-    if (!firestore || !adminProfile?.gymName) {
+    if (!firestore || !adminProfile?.gymName || !adminProfile.gymIdentifier) {
       toast({
         title: 'Cannot Add Trainer',
         description:
-          "Your gym name couldn't be found. Please ensure you have signed up correctly.",
+          "Your gym couldn't be found. Please ensure you have signed up correctly.",
         variant: 'destructive',
       });
       return;
@@ -167,10 +167,11 @@ export default function TrainersPage() {
 
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'trainers'));
-      const newTrainer = {
+      const newTrainer: Trainer = {
         ...values,
         id: newDocRef.id,
         gymName: adminProfile.gymName,
+        gymIdentifier: adminProfile.gymIdentifier
       };
       setDocumentNonBlocking(newDocRef, newTrainer, { merge: true });
       toast({
@@ -181,7 +182,6 @@ export default function TrainersPage() {
       const docRef = doc(firestore, 'trainers', selectedTrainer.id);
       const updatedData = {
         ...values,
-        gymName: adminProfile.gymName,
       };
       updateDocumentNonBlocking(docRef, updatedData);
       toast({

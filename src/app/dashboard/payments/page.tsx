@@ -111,6 +111,7 @@ const invoiceSchema = z.object({
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 type AdminProfile = {
   gymName: string;
+  gymIdentifier: string;
   gymEmail?: string;
   gymAddress?: string;
   gymContactNumber?: string;
@@ -140,20 +141,20 @@ export default function InvoicingPage() {
   const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<AdminProfile>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'members'), where('gymName', '==', adminProfile.gymName)) : null),
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'members'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
 
   const invoicesQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymName ? query(collection(firestore, 'invoices'), where('gymName', '==', adminProfile.gymName)) : null),
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'invoices'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
   const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
   
   const plansQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'membership_plans'), where('isAvailable', '==', true)) : null),
-    [firestore]
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
+    [firestore, adminProfile]
   );
   const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
   
@@ -248,7 +249,7 @@ export default function InvoicingPage() {
   };
 
   const handleSaveInvoice = (values: InvoiceFormValues) => {
-    if (!firestore || !members || !adminProfile?.gymName || !plans) {
+    if (!firestore || !members || !adminProfile?.gymName || !adminProfile.gymIdentifier || !plans) {
         toast({
             title: 'Cannot Create Invoice',
             description: "Could not determine your gym. Please ensure you have signed up correctly.",
@@ -272,7 +273,7 @@ export default function InvoicingPage() {
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
 
-      const newInvoiceData = {
+      const newInvoiceData: Invoice = {
         id: newDocRef.id,
         invoiceNumber: `INV-${String((invoicesData?.length || 0) + 1).padStart(3, '0')}`,
         memberId: member.id,
@@ -282,6 +283,7 @@ export default function InvoicingPage() {
         dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         status: values.status,
         gymName: adminProfile.gymName,
+        gymIdentifier: adminProfile.gymIdentifier,
       };
       
       setDocumentNonBlocking(newDocRef, newInvoiceData, {});
