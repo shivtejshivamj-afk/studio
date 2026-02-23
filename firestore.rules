@@ -148,8 +148,9 @@ service cloud.firestore {
         allow get: if true;
         allow list: if isAdmin();
         allow create: if isGymAdmin(request.resource.data.gymIdentifier);
-        allow update: if isGymAdmin(resource.data.gymIdentifier);
-        allow delete: if isGymAdmin(resource.data.gymIdentifier);
+        // For updates and deletes, we cross-reference the main member document
+        // to ensure the gymIdentifier is authoritative, making the rule more robust.
+        allow update, delete: if isGymAdmin(get(/databases/$(database)/documents/members/$(resource.data.memberDocId)).data.gymIdentifier);
     }
 
     /**
