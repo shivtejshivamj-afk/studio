@@ -68,13 +68,13 @@ export function SignupForm() {
         // Using the user.uid as the document ID keeps it unique
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
         
-        // 3. SECURE SETUP: gymIdentifier = user.uid
-        // This is the "Key" that makes your 20 gyms private
         await setDoc(adminRoleRef, {
           ownerName: values.ownerName,
           gymName: values.gymName,
           email: values.email,
-          gymIdentifier: user.uid, 
+          // The gymIdentifier is NOT set on signup.
+          // It will be generated on the first visit to the dashboard
+          // to create a more human-readable ID.
           role: 'admin',
           createdAt: serverTimestamp(),
         });

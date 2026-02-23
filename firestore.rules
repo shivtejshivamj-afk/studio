@@ -116,8 +116,11 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
-      allow update: if request.auth.uid == adminId && (!('gymIdentifier' in request.resource.data) ||
-                      request.resource.data.gymIdentifier == resource.data.gymIdentifier);
+      allow update: if request.auth.uid == adminId &&
+                 // gymIdentifier can be written once if it does not exist...
+                 (!('gymIdentifier' in resource.data) || 
+                  // ...or if it exists, it cannot be changed.
+                  request.resource.data.gymIdentifier == resource.data.gymIdentifier);
       allow delete: if false;
     }
 
