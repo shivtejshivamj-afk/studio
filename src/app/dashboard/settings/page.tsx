@@ -235,6 +235,8 @@ export default function SettingsPage() {
     });
   }
 
+  const isLoading = isLoadingAdminProfile || isLoadingPlans;
+
   return (
     <>
       <div className="grid gap-6 animate-fade-in">
