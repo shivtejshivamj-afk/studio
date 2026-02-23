@@ -175,7 +175,16 @@ export default function TrainersPage() {
         setIsLoading(false);
     }, (error) => {
         console.error("Error fetching trainers:", error);
-        toast({ title: "Error", description: "Could not fetch trainers.", variant: "destructive" });
+        if (error.code === 'failed-precondition') {
+             toast({
+                title: "Database Index Required",
+                description: "The query for trainers needs a database index. Please open the developer console for a direct link to create it in Firebase.",
+                variant: "destructive",
+                duration: 15000,
+             });
+        } else {
+            toast({ title: "Error", description: "Could not fetch trainers.", variant: "destructive" });
+        }
         setIsLoading(false);
     });
 

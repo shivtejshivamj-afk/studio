@@ -31,7 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import {
   useFirestore,
   useMemoFirebase,
@@ -197,8 +197,16 @@ export default function AttendancePage() {
       setIsLoading(false);
     }, (error) => {
       console.error('Failed to fetch attendance data:', error);
-      toast({ title: "Error", description: `Could not fetch attendance records. ${error.message}`, variant: "destructive"});
-      // You may get a "missing index" error which is expected. The console will provide a link to create it.
+      if (error.code === 'failed-precondition') {
+          toast({
+            title: "Database Index Required",
+            description: "The query for attendance records needs a database index. Please check the developer console for a direct link to create it in Firebase.",
+            variant: "destructive",
+            duration: 15000,
+          });
+      } else {
+        toast({ title: "Error", description: `Could not fetch attendance records. ${error.message}`, variant: "destructive"});
+      }
       setIsLoading(false);
     });
 

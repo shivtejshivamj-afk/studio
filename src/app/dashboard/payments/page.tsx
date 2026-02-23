@@ -213,7 +213,16 @@ export default function InvoicingPage() {
       setIsLoading(false);
     }, (error) => {
       console.error('Failed to fetch invoices:', error);
-      toast({ title: "Error", description: `Could not fetch invoices. ${error.message}`, variant: "destructive" });
+      if (error.code === 'failed-precondition') {
+          toast({
+            title: "Database Index Required",
+            description: "The query for invoices needs a database index. Please check the developer console for a direct link to create it in Firebase. This is needed for sorting.",
+            variant: "destructive",
+            duration: 15000,
+          });
+      } else {
+        toast({ title: "Error", description: `Could not fetch invoices. ${error.message}`, variant: "destructive" });
+      }
       setIsLoading(false);
     });
 
