@@ -32,9 +32,10 @@ service cloud.firestore {
     /**
      * Checks if the authenticated user has administrative privileges by verifying
      * their UID exists as a document in the `/roles_admin` collection.
+     * Uses get() for stronger consistency over exists().
      */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) != null;
     }
     
     /**
