@@ -30,7 +30,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo } from 'react';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import {
   useCollection,
   useFirestore,
@@ -190,7 +190,6 @@ export default function AttendancePage() {
         toast({
           title: 'Already Checked In',
           description: `${publicProfile.firstName} ${publicProfile.lastName} has already checked in today.`,
-          variant: 'destructive',
         });
         form.reset();
         return;
@@ -253,14 +252,24 @@ export default function AttendancePage() {
 
 
   const filteredAttendanceRecords = useMemo(() => {
-    if (!attendanceRecords) return [];
-    if (!searchQuery) return attendanceRecords;
+    let dateFilteredRecords = attendanceRecords;
+    if (dateRange?.from) {
+      const from = startOfDay(dateRange.from);
+      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+      dateFilteredRecords = attendanceRecords.filter(record => {
+        const checkIn = new Date(record.checkIn);
+        return checkIn >= from && checkIn <= to;
+      });
+    }
+
+    if (!searchQuery) return dateFilteredRecords;
+
     const lowercasedQuery = searchQuery.toLowerCase();
-    return attendanceRecords.filter(record =>
+    return dateFilteredRecords.filter(record =>
       record.memberName.toLowerCase().includes(lowercasedQuery) ||
       record.memberId.toLowerCase().includes(lowercasedQuery)
     );
-  }, [attendanceRecords, searchQuery]);
+  }, [attendanceRecords, searchQuery, dateRange]);
 
   const handleDownloadPdf = () => {
     if (filteredAttendanceRecords.length === 0) {

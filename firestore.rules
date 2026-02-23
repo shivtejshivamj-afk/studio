@@ -36,6 +36,7 @@ service cloud.firestore {
         return false;
       }
       let adminDoc = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // This is the key change: ensure the doc exists AND the identifier has been written.
       return adminDoc != null && 'gymIdentifier' in adminDoc.data;
     }
     
@@ -44,15 +45,12 @@ service cloud.firestore {
      * This is a more robust check that ensures the gymIdentifier property exists before comparison.
      */
     function isGymAdmin(gymIdentifier) {
-      if (!isSignedIn()) {
+      if (!isAdmin()) {
         return false;
       }
-      let adminDoc = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      // Ensure adminDoc and its data are not null, and that gymIdentifier exists.
-      return adminDoc != null && 
-             adminDoc.data != null &&
-             'gymIdentifier' in adminDoc.data &&
-             adminDoc.data.gymIdentifier == gymIdentifier;
+      let adminDocData = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data;
+      // isAdmin() already confirmed adminDocData is not null and has gymIdentifier.
+      return adminDocData.gymIdentifier == gymIdentifier;
     }
     
     /**
@@ -183,7 +181,7 @@ service cloud.firestore {
     match /attendance/{attendanceId} {
         allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
         allow list: if isAdmin();
-        // This rule now securely handles both public and admin check-ins without depending on `isGymAdmin` for creation.
+        // This rule now securely handles both public and admin check-ins.
         allow create: if isPublicCheckInValid();
     }
     
