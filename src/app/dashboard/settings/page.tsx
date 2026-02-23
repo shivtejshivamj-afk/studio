@@ -85,7 +85,7 @@ type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 type AdminProfile = {
   gymName: string;
   ownerName: string;
-  gymIdentifier?: string;
+  gymIdentifier: string;
   gymEmail?: string;
   gymAddress?: string;
   gymContactNumber?: string;
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                   <FormItem>
                     <FormLabel>Gym Identifier</FormLabel>
                     <FormControl>
-                      <Input value={adminProfile?.gymIdentifier || 'Not generated'} disabled />
+                      <Input value={adminProfile?.gymIdentifier || ''} disabled />
                     </FormControl>
                     <FormDescription>This is your unique ID for member check-ins.</FormDescription>
                   </FormItem>

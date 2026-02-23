@@ -43,14 +43,13 @@ import {
   collection,
   query,
   where,
-  getDocs,
   serverTimestamp,
   Timestamp,
   doc,
   writeBatch,
   getDoc,
 } from 'firebase/firestore';
-import { type Attendance, type Member } from '@/lib/data';
+import { type Attendance, type Member, type PublicMemberProfile } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Download, Trash2 } from 'lucide-react';
 import {
@@ -149,36 +148,41 @@ export default function AttendancePage() {
     }
 
     try {
-      const membersRef = collection(firestore, 'members');
-      const q = query(
-        membersRef,
-        where('gymIdentifier', '==', adminProfile.gymIdentifier),
-        where('gymId', '==', values.memberId.toUpperCase())
-      );
-      const querySnapshot = await getDocs(q);
+      const memberPublicId = values.memberId.toUpperCase();
+      const publicProfileRef = doc(firestore, 'member_profiles_public', memberPublicId);
+      const publicProfileSnap = await getDoc(publicProfileRef);
 
-      if (querySnapshot.empty) {
+      if (!publicProfileSnap.exists()) {
         toast({
           title: 'Check-in Failed',
-          description: `Member ID "${values.memberId}" not found in this gym. Please try again.`,
+          description: `Member ID "${values.memberId}" not found. Please try again.`,
           variant: 'destructive',
         });
         return;
       }
 
-      const memberDoc = querySnapshot.docs[0];
-      const member = { ...memberDoc.data(), id: memberDoc.id } as Member;
+      const publicProfile = publicProfileSnap.data() as PublicMemberProfile;
+      
+      // Validate that the member belongs to the admin's gym
+      if (publicProfile.gymIdentifier !== adminProfile.gymIdentifier) {
+          toast({
+              title: 'Check-in Failed',
+              description: `Member ID "${values.memberId}" does not belong to your gym.`,
+              variant: 'destructive',
+          });
+          return;
+      }
 
       // Check if the member has already checked in today using a predictable doc ID
       const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
-      const attendanceDocId = `${member.id}_${checkInDateStr}`;
+      const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
       const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
       const attendanceDocSnap = await getDoc(attendanceDocRef);
 
       if (attendanceDocSnap.exists()) {
         toast({
           title: 'Already Checked In',
-          description: `${member.firstName} ${member.lastName} has already checked in today.`,
+          description: `${publicProfile.firstName} ${publicProfile.lastName} has already checked in today.`,
           variant: 'destructive',
         });
         form.reset();
@@ -187,16 +191,16 @@ export default function AttendancePage() {
 
       setDocumentNonBlocking(attendanceDocRef, {
         id: attendanceDocId,
-        memberId: member.id,
+        memberId: publicProfile.memberDocId, // Use the private document ID
         checkInTime: serverTimestamp(),
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
-        memberGymId: member.gymId,
+        memberGymId: publicProfileSnap.id, // Use the public gym ID
       }, {});
 
       toast({
         title: 'Check-in Successful!',
-        description: `Welcome back, ${member.firstName} ${member.lastName}!`,
+        description: `Welcome back, ${publicProfile.firstName} ${publicProfile.lastName}!`,
       });
     } catch (error) {
       console.error('Error checking in:', error);

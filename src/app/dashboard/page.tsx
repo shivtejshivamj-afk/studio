@@ -68,7 +68,7 @@ export default function DashboardPage() {
     [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } =
-    useDoc<{ gymName: string; gymIdentifier?: string }>(adminProfileRef);
+    useDoc<{ gymName: string; gymIdentifier: string }>(adminProfileRef);
 
   const membersQuery = useMemoFirebase(
     () =>
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                   )}
                 </div>
               ) : (
-                <div className="text-sm text-muted-foreground">Generating...</div>
+                <Skeleton className="h-8 w-32" />
               )}
             </CardContent>
           </Card>
@@ -310,7 +310,7 @@ export default function DashboardPage() {
                                   size="icon"
                                   onClick={() => handleSendReminder(member)}
                                 >
-                                  <Mail className="h-4 w-4" />
+                                  <Mail className="mr-2 h-4 w-4" />
                                   <span className="sr-only">
                                     Send Reminder
                                   </span>
