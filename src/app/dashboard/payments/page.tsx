@@ -13,12 +13,15 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { type Member, type Invoice, type MembershipPlan } from '@/lib/data';
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -83,7 +86,6 @@ import { format, parseISO } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
-  useCollection,
   useFirestore,
   useMemoFirebase,
   addDocumentNonBlocking,
@@ -93,7 +95,19 @@ import {
   useDoc,
   setDocumentNonBlocking,
 } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import {
+    collection,
+    doc,
+    query,
+    where,
+    orderBy,
+    limit,
+    startAfter,
+    getCountFromServer,
+    onSnapshot,
+    type QueryDocumentSnapshot,
+    type OrderByDirection,
+} from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const statusVariant = {
@@ -117,6 +131,8 @@ type AdminProfile = {
   gymContactNumber?: string;
 };
 
+const INVOICES_PER_PAGE = 10;
+
 export default function InvoicingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
@@ -124,8 +140,17 @@ export default function InvoicingPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' }>({ key: 'issueDate', direction: 'descending' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Invoice; direction: OrderByDirection }>({ key: 'issueDate', direction: 'desc' });
   const invoiceContentRef = useRef<HTMLDivElement>(null);
+  
+  // Pagination State
+  const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [totalRecords, setTotalRecords] = useState(0);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -144,44 +169,79 @@ export default function InvoicingPage() {
     () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'members'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
-  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
-
-  const invoicesQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'invoices'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
-    [firestore, adminProfile]
-  );
-  const { data: invoicesData, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
+  const { data: members, isLoading: isLoadingMembers } = useMemoFirebase(() => useCollection<Member>(membersQuery), [membersQuery]);
   
   const plansQuery = useMemoFirebase(
     () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
     [firestore, adminProfile]
   );
-  const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
+  const { data: plans, isLoading: isLoadingPlans } = useMemoFirebase(() => useCollection<MembershipPlan>(plansQuery), [plansQuery]);
   
   useEffect(() => {
-    if (!firestore || !invoicesData) return;
+     if (firestore && adminProfile?.gymIdentifier) {
+      const getCount = async () => {
+        const q = query(collection(firestore, 'invoices'), where('gymIdentifier', '==', adminProfile.gymIdentifier));
+        const snapshot = await getCountFromServer(q);
+        setTotalRecords(snapshot.data().count);
+      };
+      getCount();
+    }
+  }, [firestore, adminProfile]);
+  
+  useEffect(() => {
+    if (!firestore || !adminProfile?.gymIdentifier) return;
+    
+    setIsLoading(true);
+    const cursor = pageCursors[page - 1];
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    let q = query(
+      collection(firestore, 'invoices'),
+      where('gymIdentifier', '==', adminProfile.gymIdentifier),
+      orderBy(sortConfig.key, sortConfig.direction)
+    );
 
-    invoicesData.forEach(invoice => {
-      try {
-        const dueDate = parseISO(invoice.dueDate);
-        if (invoice.status === 'Pending' && dueDate < today) {
-          const docRef = doc(firestore, 'invoices', invoice.id);
-          updateDocumentNonBlocking(docRef, { status: 'Overdue' });
-        }
-      } catch (e) {
-        console.error(`Could not parse due date for invoice ${invoice.id}: ${invoice.dueDate}`);
-      }
+    if (cursor) {
+      q = query(q, startAfter(cursor));
+    }
+    
+    q = query(q, limit(INVOICES_PER_PAGE));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice));
+      setInvoicesData(data);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      setIsLoading(false);
+    }, (error) => {
+      console.error('Failed to fetch invoices:', error);
+      toast({ title: "Error", description: `Could not fetch invoices. ${error.message}`, variant: "destructive" });
+      setIsLoading(false);
     });
-  }, [invoicesData, firestore]);
 
-  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices || isLoadingPlans;
+    return () => unsubscribe();
+  }, [firestore, adminProfile, page, pageCursors, sortConfig]);
+
+  const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
   });
+
+  const totalPages = Math.ceil(totalRecords / INVOICES_PER_PAGE);
+
+  const goToNextPage = () => {
+    if (page < totalPages) {
+      setPageCursors(prev => [...prev, lastDoc]);
+      setPage(prev => prev + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (page > 1) {
+      setPageCursors(prev => prev.slice(0, -1));
+      setPage(prev => prev - 1);
+    }
+  };
+
 
   const processedInvoices = useMemo(() => {
     if (!invoicesData || !members || !plans) return [];
@@ -207,19 +267,22 @@ export default function InvoicingPage() {
     });
   }, [invoicesData, members, plans]);
 
-  const requestSort = (key: string) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
+  const requestSort = (key: keyof Invoice) => {
+    let direction: OrderByDirection = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
     }
     setSortConfig({ key, direction });
+    // Reset pagination when sorting changes
+    setPage(1);
+    setPageCursors([null]);
   };
   
   const getSortIndicator = (key: string) => {
     if (sortConfig.key !== key) {
       return <ArrowUpDown className="ml-2 h-4 w-4 inline-block opacity-30" />;
     }
-    if (sortConfig.direction === 'ascending') {
+    if (sortConfig.direction === 'asc') {
       return <ArrowUp className="ml-2 h-4 w-4 inline-block" />;
     }
     return <ArrowDown className="ml-2 h-4 w-4 inline-block" />;
@@ -275,7 +338,7 @@ export default function InvoicingPage() {
 
       const newInvoiceData: Invoice = {
         id: newDocRef.id,
-        invoiceNumber: `INV-${String((invoicesData?.length || 0) + 1).padStart(3, '0')}`,
+        invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
         memberId: member.id,
         membershipId: plan.id,
         totalAmount: plan.price,
@@ -462,38 +525,14 @@ export default function InvoicingPage() {
   };
 
   const filteredInvoices = useMemo(() => {
-    let sortableItems = [...processedInvoices].filter(
+    if (!searchQuery) return processedInvoices;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return processedInvoices.filter(
       (invoice) =>
-        invoice.memberName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
+        invoice.memberName?.toLowerCase().includes(lowercasedQuery) ||
+        invoice.invoiceNumber.toLowerCase().includes(lowercasedQuery)
     );
-
-    if (sortConfig.key) {
-      sortableItems.sort((a, b) => {
-        const aValue = a[sortConfig.key as keyof typeof a];
-        const bValue = b[sortConfig.key as keyof typeof b];
-
-        if (aValue === undefined || aValue === null) return 1;
-        if (bValue === undefined || bValue === null) return -1;
-        
-        let comparison = 0;
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          comparison = aValue.localeCompare(bValue);
-        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
-          comparison = aValue - bValue;
-        } else {
-            if (aValue > bValue) {
-              comparison = 1;
-            } else if (aValue < bValue) {
-              comparison = -1;
-            }
-        }
-
-        return sortConfig.direction === 'descending' ? comparison * -1 : comparison;
-      });
-    }
-    return sortableItems;
-  }, [processedInvoices, searchQuery, sortConfig]);
+  }, [processedInvoices, searchQuery]);
 
   return (
     <>
@@ -532,9 +571,8 @@ export default function InvoicingPage() {
                   Invoice ID
                   {getSortIndicator('invoiceNumber')}
                 </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => requestSort('memberName')}>
+                <TableHead>
                   Member
-                  {getSortIndicator('memberName')}
                 </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => requestSort('issueDate')}>
                   Issue Date
@@ -556,7 +594,7 @@ export default function InvoicingPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isDataLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
@@ -565,7 +603,7 @@ export default function InvoicingPage() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
                   </TableRow>
                 ))
               ) : filteredInvoices.length > 0 ? (
@@ -646,7 +684,7 @@ export default function InvoicingPage() {
               ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">
+                  <TableCell colSpan={7} className="text-center h-24">
                     No invoices found.
                   </TableCell>
                 </TableRow>
@@ -654,6 +692,33 @@ export default function InvoicingPage() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter>
+          <div className="flex items-center justify-between w-full">
+            <div className="text-xs text-muted-foreground">
+              Page {page} of {totalPages > 0 ? totalPages : 1}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPrevPage}
+                disabled={page <= 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextPage}
+                disabled={page >= totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </CardFooter>
       </Card>
 
       <Dialog

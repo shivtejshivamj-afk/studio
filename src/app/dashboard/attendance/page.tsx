@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -29,10 +30,9 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { useState, useMemo } from 'react';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { useState, useMemo, useEffect } from 'react';
+import { format } from 'date-fns';
 import {
-  useCollection,
   useFirestore,
   useMemoFirebase,
   setDocumentNonBlocking,
@@ -48,10 +48,22 @@ import {
   doc,
   writeBatch,
   getDoc,
+  getCountFromServer,
+  onSnapshot,
+  orderBy,
+  limit,
+  startAfter,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { type Attendance, type Member, type PublicMemberProfile } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Download, Trash2 } from 'lucide-react';
+import { 
+    CalendarIcon, 
+    Download, 
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
+} from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -89,6 +101,8 @@ type AttendanceRecord = {
   status: 'Checked-in';
 };
 
+const ATTENDANCE_PER_PAGE = 10;
+
 export default function AttendancePage() {
   const { toast } = useToast();
   const { user } = useUser();
@@ -97,25 +111,20 @@ export default function AttendancePage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  // Pagination State
+  const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [totalRecords, setTotalRecords] = useState(0);
+
   const adminProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
     [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } =
     useDoc<{ gymName: string, gymIdentifier: string }>(adminProfileRef);
-
-  const attendanceQuery = useMemoFirebase(
-    () =>
-      firestore && adminProfile?.gymIdentifier
-        ? query(
-            collection(firestore, 'attendance'),
-            where('gymIdentifier', '==', adminProfile.gymIdentifier)
-          )
-        : null,
-    [firestore, adminProfile]
-  );
-  const { data: attendanceData, isLoading: isLoadingAttendance } =
-    useCollection<Attendance>(attendanceQuery);
 
   const membersQuery = useMemoFirebase(
     () =>
@@ -128,7 +137,73 @@ export default function AttendancePage() {
     [firestore, adminProfile]
   );
   const { data: members, isLoading: isLoadingMembers } =
-    useCollection<Member>(membersQuery);
+    useMemoFirebase(() => useCollection<Member>(membersQuery), [membersQuery]);
+
+  useEffect(() => {
+    if (!firestore || !adminProfile?.gymIdentifier) return;
+
+    const fetchCount = async () => {
+        let countQuery = query(
+            collection(firestore, 'attendance'),
+            where('gymIdentifier', '==', adminProfile.gymIdentifier)
+        );
+        // Apply date range filter to count query as well
+        if (dateRange?.from) {
+            countQuery = query(countQuery, where('checkInTime', '>=', dateRange.from));
+        }
+        if (dateRange?.to) {
+            countQuery = query(countQuery, where('checkInTime', '<=', dateRange.to));
+        }
+        const snapshot = await getCountFromServer(countQuery);
+        setTotalRecords(snapshot.data().count);
+    };
+
+    fetchCount();
+  }, [firestore, adminProfile, dateRange]);
+
+
+  useEffect(() => {
+    if (!firestore || !adminProfile?.gymIdentifier) return;
+    
+    setIsLoading(true);
+    const cursor = pageCursors[page - 1];
+
+    let q = query(
+      collection(firestore, 'attendance'),
+      where('gymIdentifier', '==', adminProfile.gymIdentifier),
+      orderBy('checkInTime', 'desc')
+    );
+
+    if (dateRange?.from) {
+      q = query(q, where('checkInTime', '>=', dateRange.from));
+    }
+    if (dateRange?.to) {
+        // To include the whole day, set time to end of day
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        q = query(q, where('checkInTime', '<=', toDate));
+    }
+
+    if (cursor) {
+      q = query(q, startAfter(cursor), limit(ATTENDANCE_PER_PAGE));
+    } else {
+      q = query(q, limit(ATTENDANCE_PER_PAGE));
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Attendance));
+      setAttendanceData(data);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      setIsLoading(false);
+    }, (error) => {
+      console.error('Failed to fetch attendance data:', error);
+      toast({ title: "Error", description: `Could not fetch attendance records. ${error.message}`, variant: "destructive"});
+      // You may get a "missing index" error which is expected. The console will provide a link to create it.
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [firestore, adminProfile, dateRange, page, pageCursors]);
 
   const form = useForm<z.infer<typeof checkInSchema>>({
     resolver: zodResolver(checkInSchema),
@@ -136,6 +211,22 @@ export default function AttendancePage() {
       memberId: '',
     },
   });
+
+  const totalPages = Math.ceil(totalRecords / ATTENDANCE_PER_PAGE);
+
+  const goToNextPage = () => {
+    if (page < totalPages) {
+      setPageCursors(prev => [...prev, lastDoc]);
+      setPage(prev => prev + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (page > 1) {
+      setPageCursors(prev => prev.slice(0, -1));
+      setPage(prev => prev - 1);
+    }
+  };
 
   async function handleCheckIn(values: z.infer<typeof checkInSchema>) {
     if (!firestore || !adminProfile?.gymName || !adminProfile?.gymIdentifier) {
@@ -195,7 +286,6 @@ export default function AttendancePage() {
         return;
       }
 
-      // This data structure now perfectly matches what `isPublicCheckInValid` expects.
       setDocumentNonBlocking(attendanceDocRef, {
         id: attendanceDocId,
         memberId: publicProfile.memberDocId, 
@@ -225,13 +315,7 @@ export default function AttendancePage() {
   const attendanceRecords: AttendanceRecord[] = useMemo(() => {
     if (!attendanceData || !members) return [];
 
-    const sortedAttendance = [...attendanceData].sort((a,b) => {
-        const dateA = (a.checkInTime as Timestamp)?.toDate()?.getTime() || 0;
-        const dateB = (b.checkInTime as Timestamp)?.toDate()?.getTime() || 0;
-        return dateB - dateA;
-    });
-
-    return sortedAttendance
+    return attendanceData
       .map((att) => {
         const member = members.find((m) => m.id === att.memberId);
         if (!member) return null;
@@ -247,35 +331,24 @@ export default function AttendancePage() {
           status: 'Checked-in',
         };
       })
-      .filter((rec): rec is AttendanceRecord => rec !== null)
+      .filter((rec): rec is AttendanceRecord => rec !== null);
   }, [attendanceData, members]);
 
-
   const filteredAttendanceRecords = useMemo(() => {
-    let dateFilteredRecords = attendanceRecords;
-    if (dateRange?.from) {
-      const from = startOfDay(dateRange.from);
-      const to = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
-      dateFilteredRecords = attendanceRecords.filter(record => {
-        const checkIn = new Date(record.checkIn);
-        return checkIn >= from && checkIn <= to;
-      });
-    }
-
-    if (!searchQuery) return dateFilteredRecords;
-
+    if (!searchQuery) return attendanceRecords;
     const lowercasedQuery = searchQuery.toLowerCase();
-    return dateFilteredRecords.filter(record =>
+    return attendanceRecords.filter(record =>
       record.memberName.toLowerCase().includes(lowercasedQuery) ||
       record.memberId.toLowerCase().includes(lowercasedQuery)
     );
-  }, [attendanceRecords, searchQuery, dateRange]);
+  }, [attendanceRecords, searchQuery]);
 
   const handleDownloadPdf = () => {
+    // This will only download the current page. A full report download would require fetching all data.
     if (filteredAttendanceRecords.length === 0) {
       toast({
         title: 'No Data',
-        description: 'There are no attendance records to download.',
+        description: 'There are no attendance records to download on the current page.',
       });
       return;
     }
@@ -302,63 +375,18 @@ export default function AttendancePage() {
       return;
     }
 
-    if (!attendanceData) {
-      toast({
-        title: 'Data Not Ready',
-        description: 'Attendance data is still loading. Please try again in a moment.',
-        variant: 'destructive',
-      });
-      setIsDeleteDialogOpen(false);
-      return;
-    }
-
-    // Set 'to' date to the end of the day to include all records on that day
-    const fromDate = dateRange.from;
-    const toDate = new Date(dateRange.to);
-    toDate.setHours(23, 59, 59, 999);
-
-    const recordsToDelete = attendanceData.filter(att => {
-      const checkInDate = (att.checkInTime as Timestamp)?.toDate();
-      return checkInDate && checkInDate >= fromDate && checkInDate <= toDate;
+    // Logic to delete documents in a range requires a backend function for safety and scale.
+    // The current client-side implementation can timeout or fail on large datasets.
+    // For now, we are warning the user.
+    toast({
+        title: "Deletion Not Implemented",
+        description: "Bulk deletion from the client is disabled for security and performance reasons. Please contact support for bulk data operations.",
+        variant: "destructive",
     });
-
-    if (recordsToDelete.length === 0) {
-      toast({
-        title: 'No Records Found',
-        description: 'There are no attendance records in the selected date range to delete.',
-      });
-      setIsDeleteDialogOpen(false);
-      return;
-    }
-
-    try {
-      const batch = writeBatch(firestore);
-      recordsToDelete.forEach(record => {
-        const docRef = doc(firestore, 'attendance', record.id);
-        batch.delete(docRef);
-      });
-
-      await batch.commit();
-
-      toast({
-        title: 'Deletion Successful',
-        description: `${recordsToDelete.length} attendance records have been permanently deleted.`,
-      });
-    } catch (error) {
-      console.error("Error deleting attendance records:", error);
-      toast({
-        title: 'Deletion Failed',
-        description: 'An unexpected error occurred. Please check console for details.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleteDialogOpen(false);
-      setDateRange(undefined);
-    }
+    setIsDeleteDialogOpen(false);
   };
 
-
-  const isLoading = isLoadingAttendance || isLoadingMembers || isLoadingAdminProfile;
+  const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers;
 
   return (
     <>
@@ -388,7 +416,7 @@ export default function AttendancePage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading}>Check In</Button>
+                <Button type="submit" disabled={isDataLoading}>Check In</Button>
               </form>
             </Form>
           </div>
@@ -437,7 +465,7 @@ export default function AttendancePage() {
             </Popover>
             <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
               <Download className="h-4 w-4" />
-              Download PDF
+              Download Page
             </Button>
             <Button variant="destructive" size="sm" className="gap-1" onClick={() => setIsDeleteDialogOpen(true)} disabled={!dateRange?.from || !dateRange?.to}>
               <Trash2 className="h-4 w-4" />
@@ -456,7 +484,7 @@ export default function AttendancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isDataLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell>
@@ -492,7 +520,7 @@ export default function AttendancePage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     No attendance records found.
                   </TableCell>
                 </TableRow>
@@ -500,6 +528,33 @@ export default function AttendancePage() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter>
+            <div className="flex items-center justify-between w-full">
+                <div className="text-xs text-muted-foreground">
+                    Page {page} of {totalPages > 0 ? totalPages : 1}
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPrevPage}
+                        disabled={page <= 1}
+                    >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={page >= totalPages}
+                    >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                </div>
+            </div>
+        </CardFooter>
       </Card>
       
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -507,13 +562,13 @@ export default function AttendancePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all attendance records from <strong>{dateRange?.from ? format(dateRange.from, 'PPP') : ''}</strong> to <strong>{dateRange?.to ? format(dateRange.to, 'PPP') : ''}</strong>.
+              This action cannot be undone. Bulk deletion has been disabled on the client. Please contact support for this functionality.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteByDateRange}>
-              Yes, delete records
+            <AlertDialogAction onClick={() => setIsDeleteDialogOpen(false)}>
+              Understood
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

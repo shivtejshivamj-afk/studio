@@ -1,11 +1,19 @@
 'use client';
 
-import { Eye, Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { 
+    Eye, 
+    Pencil, 
+    PlusCircle, 
+    Trash2,
+    ChevronLeft,
+    ChevronRight 
+} from 'lucide-react';
 import { type Trainer } from '@/lib/data';
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -55,7 +63,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import {
-  useCollection,
   useFirestore,
   useMemoFirebase,
   setDocumentNonBlocking,
@@ -64,7 +71,18 @@ import {
   useUser,
   useDoc,
 } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { 
+    collection, 
+    doc, 
+    query, 
+    where, 
+    orderBy, 
+    limit, 
+    startAfter,
+    getCountFromServer,
+    onSnapshot,
+    type QueryDocumentSnapshot,
+} from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const trainerFormSchema = z.object({
@@ -88,6 +106,8 @@ const statusVariant = {
   inactive: 'secondary',
 } as const;
 
+const TRAINERS_PER_PAGE = 8;
+
 export default function TrainersPage() {
   const { toast } = useToast();
   type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
@@ -99,19 +119,69 @@ export default function TrainersPage() {
   const { user } = useUser();
   const firestore = useFirestore();
 
+  // Pagination state
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [totalTrainers, setTotalTrainers] = useState(0);
+
   const adminProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
     [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{ gymName: string, gymIdentifier: string }>(adminProfileRef);
 
-  const trainersQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'trainers'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
-    [firestore, adminProfile]
-  );
-  const { data: trainers, isLoading: isLoadingTrainers } = useCollection<Trainer>(trainersQuery);
+    useEffect(() => {
+    if (firestore && adminProfile?.gymIdentifier) {
+      const getCount = async () => {
+        const q = query(collection(firestore, 'trainers'), where('gymIdentifier', '==', adminProfile.gymIdentifier));
+        const snapshot = await getCountFromServer(q);
+        setTotalTrainers(snapshot.data().count);
+      };
+      getCount();
+    }
+  }, [firestore, adminProfile]);
   
-  const isLoading = isLoadingAdminProfile || isLoadingTrainers;
+  useEffect(() => {
+    if (!firestore || !adminProfile?.gymIdentifier) return;
+
+    setIsLoading(true);
+
+    const cursor = pageCursors[page - 1];
+    
+    let q = query(
+        collection(firestore, 'trainers'),
+        where('gymIdentifier', '==', adminProfile.gymIdentifier),
+        orderBy('firstName')
+    );
+
+    if (cursor) {
+        q = query(q, startAfter(cursor), limit(TRAINERS_PER_PAGE));
+    } else {
+        q = query(q, limit(TRAINERS_PER_PAGE));
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+            const trainerData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Trainer));
+            setTrainers(trainerData);
+            setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        } else {
+            setTrainers([]);
+            setLastDoc(null);
+        }
+        setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching trainers:", error);
+        toast({ title: "Error", description: "Could not fetch trainers.", variant: "destructive" });
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+}, [firestore, adminProfile, page, pageCursors]);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -120,6 +190,23 @@ export default function TrainersPage() {
   const form = useForm<TrainerFormValues>({
     resolver: zodResolver(trainerFormSchema),
   });
+
+  const totalPages = Math.ceil(totalTrainers / TRAINERS_PER_PAGE);
+
+  const goToNextPage = () => {
+    if (page < totalPages) {
+      setPageCursors(prev => [...prev, lastDoc]);
+      setPage(prev => prev + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (page > 1) {
+      setPageCursors(prev => prev.slice(0, -1));
+      setPage(prev => prev - 1);
+    }
+  };
+
 
   const handleOpenDialog = (dialog: DialogType, trainer?: Trainer) => {
     setSelectedTrainer(trainer || null);
@@ -257,7 +344,7 @@ export default function TrainersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isLoading || isLoadingAdminProfile ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell>
@@ -276,11 +363,11 @@ export default function TrainersPage() {
                       <Skeleton className="h-6 w-16 rounded-full" />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8" />
+                      <Skeleton className="h-8 w-24" />
                     </TableCell>
                   </TableRow>
                 ))
-              ) : (
+              ) : filteredTrainers.length > 0 ? (
                 filteredTrainers.map((trainer) => (
                   <TableRow key={trainer.id}>
                     <TableCell>
@@ -340,10 +427,41 @@ export default function TrainersPage() {
                     </TableCell>
                   </TableRow>
                 ))
+              ) : (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center h-24">No trainers found.</TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter>
+          <div className="flex items-center justify-between w-full">
+            <div className="text-xs text-muted-foreground">
+              Page {page} of {totalPages > 0 ? totalPages : 1}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPrevPage}
+                disabled={page <= 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextPage}
+                disabled={page >= totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </CardFooter>
       </Card>
 
       {/* Add/Edit Dialog */}
