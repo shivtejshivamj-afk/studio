@@ -527,7 +527,7 @@ export default function InvoicingPage() {
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text('Thank you for your business!', 105, pageHeight - 20, { align: 'center' });
+        doc.text('Thanks for joining! Let’s make every workout count.', 105, pageHeight - 20, { align: 'center' });
         if (adminProfile?.gymEmail) {
             doc.text(`For any questions, please contact us at ${adminProfile.gymEmail}.`, 105, pageHeight - 15, { align: 'center' });
         }
@@ -885,8 +885,8 @@ export default function InvoicingPage() {
                 <Table className="mb-8">
                   <TableHeader>
                     <TableRow className="bg-gray-100">
-                      <TableHead className="font-semibold text-black">Description</TableHead>
-                      <TableHead className="text-right font-semibold text-black">Amount</TableHead>
+                      <TableHead className="font-semibold text-gray-800">Description</TableHead>
+                      <TableHead className="text-right font-semibold text-gray-800">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -910,7 +910,7 @@ export default function InvoicingPage() {
                     </div>
                 </div>
                  <div className="mt-12 text-center text-gray-500 text-sm">
-                    <p>Thank you for your business!</p>
+                    <p>Thanks for joining! Let’s make every workout count.</p>
                     <p>If you have any questions, please contact us at {adminProfile?.gymEmail || 'support@gymtrack.pro'}.</p>
                 </div>
               </div>
