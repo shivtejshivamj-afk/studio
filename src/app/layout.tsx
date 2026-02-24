@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   title: 'GymTrack Pro',
   description: 'The ultimate solution for managing your gym.',
   icons: {
-    icon: '/icon.svg',
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
   },
 };
 
