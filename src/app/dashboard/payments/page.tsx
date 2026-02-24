@@ -410,96 +410,113 @@ export default function InvoicingPage() {
 
     const doc = new jsPDF();
     
-    const currencyPrefix = '₹';
+    // Using 'INR' is more reliable for PDF generation than the '₹' symbol, which can cause font rendering issues.
+    const currencyPrefix = 'INR ';
+
+    // --- Document Margins & Page Info ---
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
 
     // --- Header ---
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', 14, 22);
+    doc.text('INVOICE', margin, 22);
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     let rightColY = 22;
     if (adminProfile?.gymName) {
-      doc.text(adminProfile.gymName, 196, rightColY, { align: 'right' });
-      rightColY += 6;
+      const nameLines = doc.splitTextToSize(adminProfile.gymName, 70);
+      doc.text(nameLines, pageWidth - margin, rightColY, { align: 'right' });
+      rightColY += (nameLines.length * 5);
     }
     if (adminProfile?.gymAddress) {
-      doc.text(adminProfile.gymAddress, 196, rightColY, { align: 'right' });
-      rightColY += 6;
+       const addressLines = doc.splitTextToSize(adminProfile.gymAddress, 70);
+      doc.text(addressLines, pageWidth - margin, rightColY, { align: 'right' });
+      rightColY += (addressLines.length * 5);
     }
     if (adminProfile?.gymEmail) {
-      doc.text(adminProfile.gymEmail, 196, rightColY, { align: 'right' });
-      rightColY += 6;
+      doc.text(adminProfile.gymEmail, pageWidth - margin, rightColY, { align: 'right' });
+      rightColY += 5;
     }
     if (adminProfile?.gymContactNumber) {
-      doc.text(adminProfile.gymContactNumber, 196, rightColY, { align: 'right' });
+      doc.text(adminProfile.gymContactNumber, pageWidth - margin, rightColY, { align: 'right' });
     }
 
     // --- Line Separator ---
+    const headerBottomY = Math.max(rightColY, 30) + 10;
     doc.setLineWidth(0.5);
-    doc.line(14, 48, 196, 48);
+    doc.line(margin, headerBottomY, pageWidth - margin, headerBottomY);
 
     // --- Bill To & Invoice Details ---
-    let detailsY = 58;
+    let detailsY = headerBottomY + 10;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('BILL TO', 14, detailsY);
+    doc.text('BILL TO', margin, detailsY);
     doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.memberName || 'N/A', 14, detailsY + 6);
-    doc.text(invoiceToDownload.memberEmail || 'N/A', 14, detailsY + 12);
+    const memberNameLines = doc.splitTextToSize(invoiceToDownload.memberName || 'N/A', 80);
+    doc.text(memberNameLines, margin, detailsY + 6);
+    let memberDetailsY = detailsY + 6 + (memberNameLines.length * 5);
+    
+    doc.text(invoiceToDownload.memberEmail || 'N/A', margin, memberDetailsY);
+    memberDetailsY += 5;
     if (invoiceToDownload.memberPhone) {
-      doc.text(invoiceToDownload.memberPhone, 14, detailsY + 18);
+      doc.text(invoiceToDownload.memberPhone, margin, memberDetailsY);
     }
     
-    const detailsX = 130;
+    const detailsX = pageWidth / 2 + 20;
     doc.setFont('helvetica', 'bold');
     doc.text('Invoice Number:', detailsX, detailsY);
     doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.invoiceNumber, 196, detailsY, { align: 'right' });
+    doc.text(invoiceToDownload.invoiceNumber, pageWidth - margin, detailsY, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.text('Issue Date:', detailsX, detailsY + 6);
     doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.issueDate, 196, detailsY + 6, { align: 'right' });
+    doc.text(invoiceToDownload.issueDate, pageWidth - margin, detailsY + 6, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.text('Due Date:', detailsX, detailsY + 12);
     doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.dueDate, 196, detailsY + 12, { align: 'right' });
+    doc.text(invoiceToDownload.dueDate, pageWidth - margin, detailsY + 12, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.text('Status:', detailsX, detailsY + 18);
     doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.status, 196, detailsY + 18, { align: 'right' });
+    doc.text(invoiceToDownload.status, pageWidth - margin, detailsY + 18, { align: 'right' });
 
     // --- Table ---
+    const tableStartY = Math.max(memberDetailsY, detailsY + 18) + 15;
     autoTable(doc, {
-      startY: detailsY + 30,
+      startY: tableStartY,
       head: [['Description', 'Amount']],
       body: [
         [`${invoiceToDownload.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`],
       ],
       theme: 'grid',
-      headStyles: { fillColor: [241, 245, 249], textColor: [20, 20, 20], fontStyle: 'bold' },
+      headStyles: { fillColor: [35, 45, 55], textColor: [255, 255, 255], fontStyle: 'bold' },
+      bodyStyles: { fillColor: [44, 58, 71] },
+      alternateRowStyles: { fillColor: [35, 45, 55] },
       didDrawPage: (data) => {
         // --- Totals Section ---
         const finalY = (data.cursor?.y || 0) + 10;
-        doc.setFontSize(10);
+        const totalX = pageWidth - margin;
         
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Subtotal', 150, finalY, { align: 'right' });
-        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, 196, finalY, { align: 'right' });
+        doc.text('Subtotal', totalX - 25, finalY, { align: 'right' });
+        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY, { align: 'right' });
         
         doc.setFont('helvetica', 'bold');
-        doc.text('Total', 150, finalY + 7, { align: 'right' });
-        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, 196, finalY + 7, { align: 'right' });
+        doc.setFontSize(11);
+        doc.text('Total', totalX - 25, finalY + 8, { align: 'right' });
+        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY + 8, { align: 'right' });
         
         // --- Footer ---
-        const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
-        doc.setTextColor(100);
-        doc.text('Thanks for joining! Let’s make every workout count.', 105, pageHeight - 15, { align: 'center' });
+        doc.setTextColor(150);
+        doc.text('Thanks for joining! Let’s make every workout count.', pageWidth / 2, pageHeight - 15, { align: 'center' });
       },
     });
 
@@ -787,7 +804,7 @@ export default function InvoicingPage() {
         open={activeDialog === 'view'}
         onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
-        <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90dvh]">
+        <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90vh] bg-card text-card-foreground">
           <DialogHeader>
             <DialogTitle>Invoice Details</DialogTitle>
             <DialogDescription>
@@ -804,7 +821,7 @@ export default function InvoicingPage() {
                   </div>
                   <div className="text-left sm:text-right w-full sm:w-auto">
                     <h2 className="text-2xl font-semibold text-foreground break-words max-w-full">{adminProfile?.gymName}</h2>
-                    {adminProfile?.gymAddress && <p className="text-muted-foreground break-words max-w-full">{adminProfile.gymAddress}</p>}
+                    {adminProfile?.gymAddress && <p className="text-muted-foreground break-words max-w-xs">{adminProfile.gymAddress}</p>}
                     {adminProfile?.gymEmail && <p className="text-muted-foreground break-words max-w-full">{adminProfile.gymEmail}</p>}
                     {adminProfile?.gymContactNumber && <p className="text-muted-foreground">{adminProfile.gymContactNumber}</p>}
                   </div>
