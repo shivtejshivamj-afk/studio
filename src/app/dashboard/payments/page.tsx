@@ -409,27 +409,33 @@ export default function InvoicingPage() {
     }
 
     const doc = new jsPDF();
-    
-    // Using 'INR' is more reliable for PDF generation than the '₹' symbol, which can cause font rendering issues.
     const currencyPrefix = 'INR ';
 
-    // --- Document Margins & Page Info ---
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 14;
+    const margin = 15;
+    const primaryColor = [48, 213, 118]; // The green from your theme
+    const lightGrayColor = [240, 240, 240];
+    const darkGrayColor = [50, 50, 50];
+    const grayColor = [128, 128, 128];
 
     // --- Header ---
-    doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', margin, 22);
+    doc.setFontSize(28);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('INVOICE', margin, 25);
 
-    doc.setFontSize(10);
+    // --- Gym Details ---
     doc.setFont('helvetica', 'normal');
-    let rightColY = 22;
+    doc.setFontSize(10);
+    doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
+    let rightColY = 20;
     if (adminProfile?.gymName) {
+      doc.setFont('helvetica', 'bold');
       const nameLines = doc.splitTextToSize(adminProfile.gymName, 70);
       doc.text(nameLines, pageWidth - margin, rightColY, { align: 'right' });
       rightColY += (nameLines.length * 5);
+      doc.setFont('helvetica', 'normal');
     }
     if (adminProfile?.gymAddress) {
        const addressLines = doc.splitTextToSize(adminProfile.gymAddress, 70);
@@ -445,49 +451,51 @@ export default function InvoicingPage() {
     }
 
     // --- Line Separator ---
-    const headerBottomY = Math.max(rightColY, 30) + 10;
-    doc.setLineWidth(0.5);
+    const headerBottomY = Math.max(rightColY, 30) + 15;
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.8);
     doc.line(margin, headerBottomY, pageWidth - margin, headerBottomY);
 
     // --- Bill To & Invoice Details ---
-    let detailsY = headerBottomY + 10;
+    let detailsY = headerBottomY + 12;
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
     doc.text('BILL TO', margin, detailsY);
-    doc.setFont('helvetica', 'normal');
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
     const memberNameLines = doc.splitTextToSize(invoiceToDownload.memberName || 'N/A', 80);
-    doc.text(memberNameLines, margin, detailsY + 6);
-    let memberDetailsY = detailsY + 6 + (memberNameLines.length * 5);
+    doc.text(memberNameLines, margin, detailsY + 7);
+    let memberDetailsY = detailsY + 7 + (memberNameLines.length * 5);
     
+    doc.setFont('helvetica', 'normal');
     doc.text(invoiceToDownload.memberEmail || 'N/A', margin, memberDetailsY);
     memberDetailsY += 5;
     if (invoiceToDownload.memberPhone) {
       doc.text(invoiceToDownload.memberPhone, margin, memberDetailsY);
     }
     
-    const detailsX = pageWidth / 2 + 20;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Invoice Number:', detailsX, detailsY);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.invoiceNumber, pageWidth - margin, detailsY, { align: 'right' });
+    const detailsRightX = pageWidth - margin;
+    const detailsLeftX = pageWidth / 2;
 
-    doc.setFont('helvetica', 'bold');
-    doc.text('Issue Date:', detailsX, detailsY + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.issueDate, pageWidth - margin, detailsY + 6, { align: 'right' });
+    const drawDetailRow = (y: number, label: string, value: string) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
+        doc.text(label, detailsLeftX, y, { align: 'left' });
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+        doc.text(value, detailsRightX, y, { align: 'right' });
+    };
+    
+    drawDetailRow(detailsY, 'Invoice Number:', invoiceToDownload.invoiceNumber);
+    drawDetailRow(detailsY + 7, 'Issue Date:', invoiceToDownload.issueDate);
+    drawDetailRow(detailsY + 14, 'Due Date:', invoiceToDownload.dueDate);
+    drawDetailRow(detailsY + 21, 'Status:', invoiceToDownload.status);
 
-    doc.setFont('helvetica', 'bold');
-    doc.text('Due Date:', detailsX, detailsY + 12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.dueDate, pageWidth - margin, detailsY + 12, { align: 'right' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Status:', detailsX, detailsY + 18);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoiceToDownload.status, pageWidth - margin, detailsY + 18, { align: 'right' });
 
     // --- Table ---
-    const tableStartY = Math.max(memberDetailsY, detailsY + 18) + 15;
+    const tableStartY = Math.max(memberDetailsY, detailsY + 21) + 20;
     autoTable(doc, {
       startY: tableStartY,
       head: [['Description', 'Amount']],
@@ -495,28 +503,50 @@ export default function InvoicingPage() {
         [`${invoiceToDownload.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`],
       ],
       theme: 'grid',
-      headStyles: { fillColor: [35, 45, 55], textColor: [255, 255, 255], fontStyle: 'bold' },
-      bodyStyles: { fillColor: [44, 58, 71], textColor: [255, 255, 255] },
-      alternateRowStyles: { fillColor: [35, 45, 55], textColor: [255, 255, 255] },
+      styles: {
+          font: 'helvetica',
+          textColor: darkGrayColor,
+          lineColor: [220, 220, 220],
+          lineWidth: 0.1,
+      },
+      headStyles: { 
+          fillColor: lightGrayColor, 
+          textColor: darkGrayColor, 
+          fontStyle: 'bold',
+          fontSize: 10,
+      },
+      bodyStyles: {
+          fillColor: [255, 255, 255],
+          fontSize: 10,
+      },
       didDrawPage: (data) => {
-        // --- Totals Section ---
         const finalY = (data.cursor?.y || 0) + 10;
         const totalX = pageWidth - margin;
         
+        // --- Totals Section ---
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Subtotal', totalX - 25, finalY, { align: 'right' });
-        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY, { align: 'right' });
+        doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+        doc.text('Subtotal', totalX - 40, finalY + 5, { align: 'right' });
+        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY + 5, { align: 'right' });
+        
+        doc.setFillColor(lightGrayColor[0], lightGrayColor[1], lightGrayColor[2]);
+        doc.rect(pageWidth / 2 - 1, finalY + 10, pageWidth / 2 + 1, 12, 'F');
         
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text('Total', totalX - 25, finalY + 8, { align: 'right' });
-        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY + 8, { align: 'right' });
+        doc.setFontSize(12);
+        doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
+        doc.text('Total Due', totalX - 40, finalY + 17.5, { align: 'right' });
+        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY + 17.5, { align: 'right' });
         
         // --- Footer ---
+        const footerY = pageHeight - 20;
+        doc.setDrawColor(lightGrayColor[0], lightGrayColor[1], lightGrayColor[2]);
+        doc.setLineWidth(0.5);
+        doc.line(margin, footerY, pageWidth - margin, footerY);
         doc.setFontSize(9);
-        doc.setTextColor(150);
-        doc.text('Thanks for joining! Let’s make every workout count.', pageWidth / 2, pageHeight - 15, { align: 'center' });
+        doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+        doc.text('Thanks for joining! Let’s make every workout count.', pageWidth / 2, footerY + 8, { align: 'center' });
       },
     });
 
