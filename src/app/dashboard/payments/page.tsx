@@ -477,12 +477,12 @@ export default function InvoicingPage() {
     }
     
     const detailsRightX = pageWidth - margin;
-    const detailsLeftX = pageWidth / 2;
+    const detailsLeftX = pageWidth - 70; // Position for the start of the labels on the right
 
     const drawDetailRow = (y: number, label: string, value: string) => {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
-        doc.text(label, detailsLeftX, y, { align: 'left' });
+        doc.text(label, detailsLeftX, y);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
         doc.text(value, detailsRightX, y, { align: 'right' });
@@ -866,12 +866,12 @@ export default function InvoicingPage() {
                   </div>
                   <div className="space-y-2 text-left sm:text-right">
                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Issue Date:</p>
-                      <p className="text-foreground">{selectedInvoice.issueDate}</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap">Invoice Number:</p>
+                      <p className="text-foreground">{selectedInvoice.invoiceNumber}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Due Date:</p>
-                      <p className="text-foreground">{selectedInvoice.dueDate}</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap">Issue Date:</p>
+                      <p className="text-foreground">{selectedInvoice.issueDate}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
                       <p className="font-semibold text-muted-foreground">Status:</p>
