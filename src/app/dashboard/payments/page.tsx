@@ -500,10 +500,7 @@ export default function InvoicingPage() {
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text('Thanks for joining! Let’s make every workout count.', 105, pageHeight - 20, { align: 'center' });
-        if (adminProfile?.gymEmail) {
-            doc.text(`For any questions, please contact us at ${adminProfile.gymEmail}.`, 105, pageHeight - 15, { align: 'center' });
-        }
+        doc.text('Thanks for joining! Let’s make every workout count.', 105, pageHeight - 15, { align: 'center' });
       },
     });
 
@@ -806,10 +803,10 @@ export default function InvoicingPage() {
                     <h1 className="text-3xl font-bold text-gray-800">INVOICE</h1>
                     <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
                   </div>
-                  <div className="text-right max-w-[50%]">
-                    <h2 className="text-2xl font-semibold text-gray-800 break-words">{adminProfile?.gymName}</h2>
-                    {adminProfile?.gymAddress && <p className="text-gray-500 break-words">{adminProfile.gymAddress}</p>}
-                    {adminProfile?.gymEmail && <p className="text-gray-500 break-words">{adminProfile.gymEmail}</p>}
+                  <div className="text-right">
+                    <h2 className="text-2xl font-semibold text-gray-800 break-words max-w-[250px] sm:max-w-xs">{adminProfile?.gymName}</h2>
+                    {adminProfile?.gymAddress && <p className="text-gray-500 break-words max-w-[250px] sm:max-w-xs">{adminProfile.gymAddress}</p>}
+                    {adminProfile?.gymEmail && <p className="text-gray-500 break-words max-w-[250px] sm:max-w-xs">{adminProfile.gymEmail}</p>}
                     {adminProfile?.gymContactNumber && <p className="text-gray-500">{adminProfile.gymContactNumber}</p>}
                   </div>
                 </div>
@@ -867,7 +864,6 @@ export default function InvoicingPage() {
                 </div>
                  <div className="mt-12 text-center text-gray-500 text-sm">
                     <p>Thanks for joining! Let’s make every workout count.</p>
-                    <p>If you have any questions, please contact us at {adminProfile?.gymEmail || 'support@gymtrack.pro'}.</p>
                 </div>
               </div>
             )}
