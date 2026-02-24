@@ -104,7 +104,6 @@ import {
     getCountFromServer,
     onSnapshot,
     type QueryDocumentSnapshot,
-    type OrderByDirection,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -815,10 +814,10 @@ export default function InvoicingPage() {
                     <h1 className="text-3xl font-bold text-gray-800">INVOICE</h1>
                     <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right max-w-[50%]">
                     <h2 className="text-2xl font-semibold text-gray-800">{adminProfile?.gymName}</h2>
-                    {adminProfile?.gymAddress && <p className="text-gray-500">{adminProfile.gymAddress}</p>}
-                    {adminProfile?.gymEmail && <p className="text-gray-500">{adminProfile.gymEmail}</p>}
+                    {adminProfile?.gymAddress && <p className="text-gray-500 break-words">{adminProfile.gymAddress}</p>}
+                    {adminProfile?.gymEmail && <p className="text-gray-500 break-words">{adminProfile.gymEmail}</p>}
                     {adminProfile?.gymContactNumber && <p className="text-gray-500">{adminProfile.gymContactNumber}</p>}
                   </div>
                 </div>
@@ -827,21 +826,21 @@ export default function InvoicingPage() {
                   <div>
                     <h3 className="font-semibold text-gray-600 mb-2">BILL TO</h3>
                     <p className="font-bold text-gray-800">{selectedInvoice.memberName}</p>
-                    <p className="text-gray-600">{selectedInvoice.memberEmail}</p>
+                    <p className="text-gray-600 break-words">{selectedInvoice.memberEmail}</p>
                     {selectedInvoice.memberPhone && <p className="text-gray-600">{selectedInvoice.memberPhone}</p>}
                   </div>
-                  <div className="text-right">
-                    <div className="grid grid-cols-2">
-                      <p className="font-semibold text-gray-600">Issue Date:</p>
+                  <div className="text-right space-y-2">
+                    <div className="flex justify-between items-center gap-4">
+                      <p className="font-semibold text-gray-600 text-nowrap">Issue Date:</p>
                       <p className="text-gray-800">{selectedInvoice.issueDate}</p>
                     </div>
-                     <div className="grid grid-cols-2">
-                      <p className="font-semibold text-gray-600">Due Date:</p>
+                     <div className="flex justify-between items-center gap-4">
+                      <p className="font-semibold text-gray-600 text-nowrap">Due Date:</p>
                       <p className="text-gray-800">{selectedInvoice.dueDate}</p>
                     </div>
-                     <div className="grid grid-cols-2">
+                     <div className="flex justify-between items-center gap-4">
                       <p className="font-semibold text-gray-600">Status:</p>
-                       <Badge variant={statusVariant[selectedInvoice.status]} className="justify-self-end text-white">
+                       <Badge variant={statusVariant[selectedInvoice.status]} className="text-white">
                         {selectedInvoice.status}
                       </Badge>
                     </div>
