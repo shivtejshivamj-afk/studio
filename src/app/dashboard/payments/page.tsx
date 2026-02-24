@@ -137,7 +137,6 @@ export default function InvoicingPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const invoiceContentRef = useRef<HTMLDivElement>(null);
   
   // Pagination State
   const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
@@ -788,87 +787,87 @@ export default function InvoicingPage() {
         open={activeDialog === 'view'}
         onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90dvh]">
           <DialogHeader>
             <DialogTitle>Invoice Details</DialogTitle>
             <DialogDescription>
               Review the invoice details below.
             </DialogDescription>
           </DialogHeader>
-          <div ref={invoiceContentRef} className="p-8 text-black bg-white rounded-lg">
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 py-2">
             {selectedInvoice && (
-              <div className="prose max-w-none">
-                <div className="flex justify-between items-start mb-8">
+              <div className="space-y-8">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div>
-                    <h1 className="text-3xl font-bold text-gray-800">INVOICE</h1>
-                    <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
+                    <h1 className="text-3xl font-bold text-foreground">INVOICE</h1>
+                    <p className="text-muted-foreground">{selectedInvoice.invoiceNumber}</p>
                   </div>
-                  <div className="text-right">
-                    <h2 className="text-2xl font-semibold text-gray-800 break-words max-w-[250px] sm:max-w-xs">{adminProfile?.gymName}</h2>
-                    {adminProfile?.gymAddress && <p className="text-gray-500 break-words max-w-[250px] sm:max-w-xs">{adminProfile.gymAddress}</p>}
-                    {adminProfile?.gymEmail && <p className="text-gray-500 break-words max-w-[250px] sm:max-w-xs">{adminProfile.gymEmail}</p>}
-                    {adminProfile?.gymContactNumber && <p className="text-gray-500">{adminProfile.gymContactNumber}</p>}
+                  <div className="text-left sm:text-right w-full sm:w-auto">
+                    <h2 className="text-2xl font-semibold text-foreground break-words max-w-full">{adminProfile?.gymName}</h2>
+                    {adminProfile?.gymAddress && <p className="text-muted-foreground break-words max-w-full">{adminProfile.gymAddress}</p>}
+                    {adminProfile?.gymEmail && <p className="text-muted-foreground break-words max-w-full">{adminProfile.gymEmail}</p>}
+                    {adminProfile?.gymContactNumber && <p className="text-muted-foreground">{adminProfile.gymContactNumber}</p>}
                   </div>
                 </div>
-                <Separator className="my-8" />
-                <div className="grid grid-cols-2 gap-8 mb-8">
+                <Separator />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                   <div>
-                    <h3 className="font-semibold text-gray-600 mb-2">BILL TO</h3>
-                    <p className="font-bold text-gray-800">{selectedInvoice.memberName}</p>
-                    <p className="text-gray-600 break-words">{selectedInvoice.memberEmail}</p>
-                    {selectedInvoice.memberPhone && <p className="text-gray-600">{selectedInvoice.memberPhone}</p>}
+                    <h3 className="font-semibold text-muted-foreground mb-2">BILL TO</h3>
+                    <p className="font-bold text-foreground">{selectedInvoice.memberName}</p>
+                    <p className="text-muted-foreground break-words">{selectedInvoice.memberEmail}</p>
+                    {selectedInvoice.memberPhone && <p className="text-muted-foreground">{selectedInvoice.memberPhone}</p>}
                   </div>
-                  <div className="text-right space-y-2">
-                    <div className="flex justify-between items-center gap-4">
-                      <p className="font-semibold text-gray-600 text-nowrap">Issue Date:</p>
-                      <p className="text-gray-800">{selectedInvoice.issueDate}</p>
+                  <div className="space-y-2 text-left sm:text-right">
+                    <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
+                      <p className="font-semibold text-muted-foreground text-nowrap">Issue Date:</p>
+                      <p className="text-foreground">{selectedInvoice.issueDate}</p>
                     </div>
-                     <div className="flex justify-between items-center gap-4">
-                      <p className="font-semibold text-gray-600 text-nowrap">Due Date:</p>
-                      <p className="text-gray-800">{selectedInvoice.dueDate}</p>
+                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
+                      <p className="font-semibold text-muted-foreground text-nowrap">Due Date:</p>
+                      <p className="text-foreground">{selectedInvoice.dueDate}</p>
                     </div>
-                     <div className="flex justify-between items-center gap-4">
-                      <p className="font-semibold text-gray-600">Status:</p>
-                       <Badge variant={statusVariant[selectedInvoice.status]} className="text-white">
+                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
+                      <p className="font-semibold text-muted-foreground">Status:</p>
+                       <Badge variant={statusVariant[selectedInvoice.status]}>
                         {selectedInvoice.status}
                       </Badge>
                     </div>
                   </div>
                 </div>
-                <Table className="mb-8">
+                <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-100">
-                      <TableHead className="font-semibold text-gray-800">Description</TableHead>
-                      <TableHead className="text-right font-semibold text-gray-800">Amount</TableHead>
+                    <TableRow>
+                      <TableHead className="font-semibold">Description</TableHead>
+                      <TableHead className="text-right font-semibold">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     <TableRow>
-                      <TableCell className="font-medium text-gray-700">{selectedInvoice.planName} Membership</TableCell>
-                      <TableCell className="text-right text-gray-700">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell>
+                      <TableCell className="font-medium">{selectedInvoice.planName} Membership</TableCell>
+                      <TableCell className="text-right">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
                 <div className="flex justify-end">
-                    <div className="w-64">
-                        <div className="flex justify-between text-gray-700">
+                    <div className="w-full sm:w-64">
+                        <div className="flex justify-between text-muted-foreground">
                             <p>Subtotal</p>
                             <p>₹{selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
                         <Separator className="my-2"/>
-                         <div className="flex justify-between font-bold text-gray-800 text-lg">
+                         <div className="flex justify-between font-bold text-foreground text-lg">
                             <p>Total</p>
                             <p>₹{selectedInvoice.totalAmount.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
-                 <div className="mt-12 text-center text-gray-500 text-sm">
+                 <div className="pt-8 text-center text-muted-foreground text-sm">
                     <p>Thanks for joining! Let’s make every workout count.</p>
                 </div>
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="pt-4 border-t">
             <Button variant="outline" onClick={closeDialogs}>Close</Button>
             <Button onClick={() => handleDownloadPdf(selectedInvoice!)}>
               <Download className="mr-2 h-4 w-4" /> Download PDF
