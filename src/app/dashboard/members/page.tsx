@@ -34,13 +34,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogDescriptionComponent,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -56,7 +57,7 @@ import * as z from 'zod';
 import {
   Form,
   FormControl,
-  FormDescription,
+  FormDescription as FormDescriptionComponent,
   FormField,
   FormItem,
   FormLabel,
@@ -634,9 +635,9 @@ export default function MembersPage() {
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
                         <FormLabel>Active Membership</FormLabel>
-                        <FormDescription>
+                        <FormDescriptionComponent>
                           Indicates if the member has an active subscription.
-                        </FormDescription>
+                        </FormDescriptionComponent>
                       </div>
                       <FormControl>
                         <Switch
@@ -745,10 +746,10 @@ export default function MembersPage() {
             <AlertDialogTitle>
               Are you sure you want to delete this member?
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescriptionComponent>
               This action cannot be undone. This will permanently delete the
               member "{selectedMember?.firstName} {selectedMember?.lastName}".
-            </AlertDialogDescription>
+            </AlertDialogDescriptionComponent>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -761,3 +762,5 @@ export default function MembersPage() {
     </>
   );
 }
+
+    
