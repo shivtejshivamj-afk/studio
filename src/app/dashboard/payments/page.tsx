@@ -400,8 +400,8 @@ export default function InvoicingPage() {
     });
   };
 
-  const handleDownloadPdf = () => {
-    if (!selectedInvoice) {
+  const handleDownloadPdf = (invoiceToDownload: Invoice) => {
+    if (!invoiceToDownload) {
       toast({
         title: 'Error',
         description: 'No invoice selected to download.',
@@ -412,8 +412,7 @@ export default function InvoicingPage() {
 
     const doc = new jsPDF();
     
-    // Using a unicode-safe prefix for the PDF
-    const currencyPrefix = 'Rs. ';
+    const currencyPrefix = '₹';
 
     // --- Header ---
     doc.setFontSize(20);
@@ -449,39 +448,39 @@ export default function InvoicingPage() {
     doc.setFont('helvetica', 'bold');
     doc.text('BILL TO', 14, detailsY);
     doc.setFont('helvetica', 'normal');
-    doc.text(selectedInvoice.memberName || 'N/A', 14, detailsY + 6);
-    doc.text(selectedInvoice.memberEmail || 'N/A', 14, detailsY + 12);
-    if (selectedInvoice.memberPhone) {
-      doc.text(selectedInvoice.memberPhone, 14, detailsY + 18);
+    doc.text(invoiceToDownload.memberName || 'N/A', 14, detailsY + 6);
+    doc.text(invoiceToDownload.memberEmail || 'N/A', 14, detailsY + 12);
+    if (invoiceToDownload.memberPhone) {
+      doc.text(invoiceToDownload.memberPhone, 14, detailsY + 18);
     }
     
     const detailsX = 130;
     doc.setFont('helvetica', 'bold');
     doc.text('Invoice Number:', detailsX, detailsY);
     doc.setFont('helvetica', 'normal');
-    doc.text(selectedInvoice.invoiceNumber, 196, detailsY, { align: 'right' });
+    doc.text(invoiceToDownload.invoiceNumber, 196, detailsY, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.text('Issue Date:', detailsX, detailsY + 6);
     doc.setFont('helvetica', 'normal');
-    doc.text(selectedInvoice.issueDate, 196, detailsY + 6, { align: 'right' });
+    doc.text(invoiceToDownload.issueDate, 196, detailsY + 6, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.text('Due Date:', detailsX, detailsY + 12);
     doc.setFont('helvetica', 'normal');
-    doc.text(selectedInvoice.dueDate, 196, detailsY + 12, { align: 'right' });
+    doc.text(invoiceToDownload.dueDate, 196, detailsY + 12, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.text('Status:', detailsX, detailsY + 18);
     doc.setFont('helvetica', 'normal');
-    doc.text(selectedInvoice.status, 196, detailsY + 18, { align: 'right' });
+    doc.text(invoiceToDownload.status, 196, detailsY + 18, { align: 'right' });
 
     // --- Table ---
     autoTable(doc, {
       startY: detailsY + 30,
       head: [['Description', 'Amount']],
       body: [
-        [`${selectedInvoice.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`],
+        [`${invoiceToDownload.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`],
       ],
       theme: 'grid',
       headStyles: { fillColor: [241, 245, 249], textColor: [20, 20, 20], fontStyle: 'bold' },
@@ -492,11 +491,11 @@ export default function InvoicingPage() {
         
         doc.setFont('helvetica', 'normal');
         doc.text('Subtotal', 150, finalY, { align: 'right' });
-        doc.text(`${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`, 196, finalY, { align: 'right' });
+        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, 196, finalY, { align: 'right' });
         
         doc.setFont('helvetica', 'bold');
         doc.text('Total', 150, finalY + 7, { align: 'right' });
-        doc.text(`${currencyPrefix}${selectedInvoice.totalAmount.toFixed(2)}`, 196, finalY + 7, { align: 'right' });
+        doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, 196, finalY + 7, { align: 'right' });
         
         // --- Footer ---
         const pageHeight = doc.internal.pageSize.getHeight();
@@ -509,7 +508,7 @@ export default function InvoicingPage() {
       },
     });
 
-    doc.save(`invoice-${selectedInvoice.invoiceNumber}.pdf`);
+    doc.save(`invoice-${invoiceToDownload.invoiceNumber}.pdf`);
   };
 
   const filteredInvoices = useMemo(() => {
@@ -574,7 +573,7 @@ export default function InvoicingPage() {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-36" /></TableCell>
                   </TableRow>
                 ))
               ) : filteredInvoices.length > 0 ? (
@@ -596,6 +595,14 @@ export default function InvoicingPage() {
                   <TableCell className="text-right">
                     {isClient ? (
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownloadPdf(invoice)}
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="sr-only">Download PDF</span>
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -651,7 +658,7 @@ export default function InvoicingPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="h-10 w-28" />
+                      <div className="h-10 w-40" />
                     )}
                   </TableCell>
                 </TableRow>
@@ -876,7 +883,7 @@ export default function InvoicingPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialogs}>Close</Button>
-            <Button onClick={handleDownloadPdf}>
+            <Button onClick={() => handleDownloadPdf(selectedInvoice!)}>
               <Download className="mr-2 h-4 w-4" /> Download PDF
             </Button>
           </DialogFooter>
