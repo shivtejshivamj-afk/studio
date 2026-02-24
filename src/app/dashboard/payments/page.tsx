@@ -496,8 +496,8 @@ export default function InvoicingPage() {
       ],
       theme: 'grid',
       headStyles: { fillColor: [35, 45, 55], textColor: [255, 255, 255], fontStyle: 'bold' },
-      bodyStyles: { fillColor: [44, 58, 71] },
-      alternateRowStyles: { fillColor: [35, 45, 55] },
+      bodyStyles: { fillColor: [44, 58, 71], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [35, 45, 55], textColor: [255, 255, 255] },
       didDrawPage: (data) => {
         // --- Totals Section ---
         const finalY = (data.cursor?.y || 0) + 10;
