@@ -10,7 +10,6 @@ import {
   CalendarCheck,
   Settings,
   BarChart,
-  BookOpenCheck,
   Dumbbell,
 } from 'lucide-react';
 import {
