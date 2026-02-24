@@ -30,6 +30,7 @@ import {
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 import type { PublicMemberProfile } from '@/lib/data';
+import { Dumbbell } from 'lucide-react';
 
 const checkInSchema = z.object({
   gymIdentifier: z.string().min(1, 'Your Gym Identifier is required.'),
@@ -153,7 +154,7 @@ export function CheckInForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="items-center text-center">
-        <div className="h-12 w-12 logo-mask text-primary"></div>
+        <Dumbbell className="h-12 w-12 text-primary" />
         <CardTitle className="text-3xl font-bold">Member Check-in</CardTitle>
         <CardDescription>Enter your Gym Identifier and Member ID to check in.</CardDescription>
       </CardHeader>

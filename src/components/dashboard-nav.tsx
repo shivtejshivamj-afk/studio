@@ -103,7 +103,7 @@ export function DashboardNav() {
       <SidebarHeader>
         <div className="flex w-full items-center justify-between">
             <Link href="/dashboard" className="group flex items-center gap-2 transition-transform hover:scale-105">
-                <div className="h-8 w-8 logo-mask text-primary transition-transform duration-300 group-hover:rotate-12"></div>
+                <Dumbbell className="h-8 w-8 text-primary transition-transform duration-300 group-hover:rotate-12" />
                 <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">GymTrack Pro</h1>
             </Link>
           <SidebarTrigger className="hidden md:flex" />
