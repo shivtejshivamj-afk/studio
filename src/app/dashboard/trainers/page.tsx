@@ -626,9 +626,6 @@ export default function TrainersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Trainer Details</DialogTitle>
-            <DialogDescription>
-              A summary of the trainer's profile and status.
-            </DialogDescription>
           </DialogHeader>
           {selectedTrainer && (
              <div className="grid gap-4 py-4 text-sm">

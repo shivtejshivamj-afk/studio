@@ -34,7 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -675,9 +674,6 @@ export default function MembersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
-            <DialogDescription>
-              Viewing the details for the selected member.
-            </DialogDescription>
           </DialogHeader>
           {selectedMember && (
             <div className="grid gap-4 py-4 text-sm">
