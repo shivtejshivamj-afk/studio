@@ -1,4 +1,3 @@
-import { Dumbbell } from 'lucide-react';
 import Link from 'next/link';
 import { CheckInForm } from '@/components/check-in-form';
 
@@ -9,7 +8,7 @@ export default function CheckInPage() {
         href="/"
         className="absolute top-4 left-4 flex items-center gap-2 text-foreground sm:top-6 sm:left-6"
       >
-        <Dumbbell className="h-8 w-8 text-primary" />
+        <div className="h-8 w-8 logo-mask text-primary"></div>
         <span className="text-xl font-bold tracking-tight">
           GymTrack Pro
         </span>

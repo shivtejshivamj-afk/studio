@@ -1,4 +1,3 @@
-import { Dumbbell } from 'lucide-react';
 import Link from 'next/link';
 import { ForgotPasswordForm } from '@/components/forgot-password-form';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ export default function ForgotPasswordPage() {
       <header className="absolute top-0 left-0 right-0 z-10 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Dumbbell className="h-8 w-8 text-primary" />
+            <div className="h-8 w-8 logo-mask text-primary"></div>
             <span className="text-xl font-bold tracking-tight text-foreground">
               GymTrack Pro
             </span>

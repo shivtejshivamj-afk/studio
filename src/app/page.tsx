@@ -1,4 +1,4 @@
-import { Dumbbell, Users, CreditCard, UserCheck } from 'lucide-react';
+import { Users, CreditCard, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -12,7 +12,7 @@ export default function IntroductionPage() {
       <header className="absolute top-0 left-0 right-0 z-20 p-4 sm:p-6 text-white">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Dumbbell className="h-8 w-8 text-primary" />
+            <div className="h-8 w-8 logo-mask text-primary"></div>
             <span className="text-xl font-bold tracking-tight text-white">
               GymTrack Pro
             </span>
@@ -115,7 +115,7 @@ export default function IntroductionPage() {
        <footer className="py-6 border-t">
         <div className="container mx-auto px-4 flex flex-col sm:flex-row justify-between items-center">
           <div className="flex items-center gap-2">
-            <Dumbbell className="h-6 w-6 text-primary" />
+            <div className="h-6 w-6 logo-mask text-primary"></div>
             <span className="text-lg font-bold tracking-tight">GymTrack Pro</span>
           </div>
           <p className="text-sm text-muted-foreground mt-4 sm:mt-0">

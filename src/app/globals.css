@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .logo-mask {
+    -webkit-mask-image: url('/icon.png');
+    mask-image: url('/icon.png');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    background-color: currentColor;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
