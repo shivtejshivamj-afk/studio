@@ -22,15 +22,12 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import {
-  collection,
   serverTimestamp,
   doc,
   getDoc,
-  query,
-  where,
-  getDocs,
+  setDoc,
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 import type { PublicMemberProfile } from '@/lib/data';
@@ -74,6 +71,7 @@ export function CheckInForm() {
           description: `Member ID "${values.memberId}" not found. Please check your ID and try again.`,
           variant: 'destructive',
         });
+        form.reset();
         return;
       }
       
@@ -86,6 +84,7 @@ export function CheckInForm() {
           description: `This Member ID does not belong to the gym with identifier "${values.gymIdentifier}".`,
           variant: 'destructive',
         });
+        form.reset();
         return;
       }
 
@@ -96,47 +95,57 @@ export function CheckInForm() {
           description: `The membership for ${publicProfile.firstName} ${publicProfile.lastName} is inactive. Please contact the front desk.`,
           variant: 'destructive',
         });
-        return;
-      }
-      
-      // 4. Check if already checked in today
-      const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
-      const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
-      const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
-      const attendanceDocSnap = await getDoc(attendanceDocRef);
-
-      if (attendanceDocSnap.exists()) {
-        toast({
-          title: 'Already Checked In',
-          description: `You have already checked in today, ${publicProfile.firstName}.`,
-          variant: 'destructive',
-        });
         form.reset();
         return;
       }
+      
+      // 4. Attempt to write the check-in document. This will create a new document.
+      // The security rules only allow 'create' for unauthenticated users, not 'update'.
+      // If the document already exists (i.e., user checked in today), setDoc will
+      // attempt an update, which will be denied by the rules, throwing a 'permission-denied' error.
+      const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
+      const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
+      const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
 
-      // 5. Write to the top-level 'attendance' collection. The security rule will validate this.
-      setDocumentNonBlocking(attendanceDocRef, {
+      await setDoc(attendanceDocRef, {
         id: attendanceDocId,
-        memberId: publicProfile.memberDocId, // The real document ID
+        memberId: publicProfile.memberDocId,
         checkInTime: serverTimestamp(),
         gymName: publicProfile.gymName,
         gymIdentifier: publicProfile.gymIdentifier,
-        memberGymId: memberPublicId, // The human-readable ID
-      }, {});
+        memberGymId: memberPublicId,
+      });
 
       toast({
         title: 'Check-in Successful!',
         description: `Welcome to ${publicProfile.gymName}, ${publicProfile.firstName}!`,
       });
 
-    } catch (error) {
-      console.error('Check-in error', error);
-      toast({
-        title: 'Check-in Failed',
-        description: `An error occurred. If this problem persists, please contact support.`,
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+      // 5. Catch any error and interpret it for the user.
+      if (error.code === 'permission-denied') {
+        // We can reasonably assume a permission-denied error at this stage means a duplicate check-in.
+        // We need to re-fetch the profile to get the name for the toast message.
+        const memberProfileSnap = await getDoc(doc(firestore, 'member_profiles_public', values.memberId.toUpperCase()));
+        let memberFirstName = 'there';
+        if (memberProfileSnap.exists()) {
+            memberFirstName = (memberProfileSnap.data() as PublicMemberProfile).firstName;
+        }
+
+        toast({
+          title: 'Already Checked In',
+          description: `You have already checked in today, ${memberFirstName}.`,
+          variant: 'destructive',
+        });
+      } else {
+        // Any other error is unexpected.
+        console.error('Check-in error', error);
+        toast({
+          title: 'Check-in Failed',
+          description: `An error occurred. If this problem persists, please contact support.`,
+          variant: 'destructive',
+        });
+      }
     } finally {
       form.reset();
     }
