@@ -597,14 +597,6 @@ export default function InvoicingPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDownloadPdf(invoice)}
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Download PDF</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
                           onClick={() => handleOpenDialog('view', invoice)}
                         >
                           <Eye className="h-4 w-4" />
@@ -815,7 +807,7 @@ export default function InvoicingPage() {
                     <p className="text-gray-500">{selectedInvoice.invoiceNumber}</p>
                   </div>
                   <div className="text-right max-w-[50%]">
-                    <h2 className="text-2xl font-semibold text-gray-800">{adminProfile?.gymName}</h2>
+                    <h2 className="text-2xl font-semibold text-gray-800 break-words">{adminProfile?.gymName}</h2>
                     {adminProfile?.gymAddress && <p className="text-gray-500 break-words">{adminProfile.gymAddress}</p>}
                     {adminProfile?.gymEmail && <p className="text-gray-500 break-words">{adminProfile.gymEmail}</p>}
                     {adminProfile?.gymContactNumber && <p className="text-gray-500">{adminProfile.gymContactNumber}</p>}
