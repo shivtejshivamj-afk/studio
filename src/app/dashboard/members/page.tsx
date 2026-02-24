@@ -187,7 +187,7 @@ export default function MembersPage() {
     });
 
     return () => unsubscribe();
-}, [firestore, adminProfile, page, pageCursors]);
+}, [firestore, adminProfile, page, pageCursors, toast]);
 
 
   useEffect(() => {
@@ -675,6 +675,9 @@ export default function MembersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
+            <DialogDescription>
+              Viewing the details for the selected member.
+            </DialogDescription>
           </DialogHeader>
           {selectedMember && (
             <div className="grid gap-4 py-4 text-sm">

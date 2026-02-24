@@ -189,7 +189,7 @@ export default function TrainersPage() {
     });
 
     return () => unsubscribe();
-}, [firestore, adminProfile, page, pageCursors]);
+}, [firestore, adminProfile, page, pageCursors, toast]);
 
 
   useEffect(() => {
@@ -626,6 +626,9 @@ export default function TrainersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Trainer Details</DialogTitle>
+            <DialogDescription>
+              A summary of the trainer's profile and status.
+            </DialogDescription>
           </DialogHeader>
           {selectedTrainer && (
              <div className="grid gap-4 py-4 text-sm">

@@ -35,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   useCollection,
@@ -356,6 +357,9 @@ export default function DashboardPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
+            <DialogDescription>
+              A quick overview of the member's profile.
+            </DialogDescription>
           </DialogHeader>
           {selectedMember && (
             <div className="grid gap-4 py-4 text-sm">
