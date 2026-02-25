@@ -549,7 +549,29 @@ export default function SettingsPage() {
               </AccordionContent>
             </AccordionItem>
             
-             <AccordionItem value="item-5">
+            <AccordionItem value="item-reports">
+              <AccordionTrigger className="text-lg font-semibold">
+                Reports
+              </AccordionTrigger>
+              <AccordionContent className="prose prose-invert max-w-none">
+                <p>
+                  The Reports page gives you a high-level financial overview of your gym's performance.
+                </p>
+                <ul>
+                  <li>
+                    <strong>Financial Summary:</strong> See your total revenue and the total number of paid invoices at a glance for a selected time period (All Time or by year).
+                  </li>
+                  <li>
+                    <strong>Monthly Revenue Chart:</strong> Visualize your income on a month-by-month basis to identify trends and track growth.
+                  </li>
+                  <li>
+                    <strong>Paid Invoices Details:</strong> Get a complete, detailed list of all paid invoices for the selected period, helping you with accounting and record-keeping.
+                  </li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5">
               <AccordionTrigger className="text-lg font-semibold">
                 Settings
               </AccordionTrigger>
@@ -707,5 +729,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
