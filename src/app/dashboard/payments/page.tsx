@@ -118,6 +118,7 @@ const invoiceSchema = z.object({
   planId: z.string().min(1, { message: 'Please select a plan.' }),
   status: z.enum(['Paid', 'Pending', 'Overdue']),
   totalAmount: z.coerce.number().positive(),
+  expiryDate: z.string().min(1, 'Expiry date is required.'),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -150,7 +151,7 @@ export default function InvoicingPage() {
     setIsClient(true);
   }, []);
 
-  const { user } = useAuthUser();
+  const { user } = useUser();
   const firestore = useFirestore();
 
   const adminProfileRef = useMemoFirebase(
@@ -220,15 +221,29 @@ export default function InvoicingPage() {
   });
 
   const selectedPlanId = form.watch('planId');
+  const selectedMemberId = form.watch('memberId');
 
   useEffect(() => {
-    if (selectedPlanId && plans) {
+    if (selectedPlanId && plans && members && selectedMemberId) {
       const plan = plans.find(p => p.id === selectedPlanId);
-      if (plan) {
+      const member = members.find(m => m.id === selectedMemberId);
+      
+      if (plan && member) {
         form.setValue('totalAmount', plan.price);
+        
+        // Automatic Expiry Date Calculation
+        let startDate = startOfDay(new Date());
+        if (member.membershipEndDate) {
+          const currentExpiry = parseISO(member.membershipEndDate);
+          if (!isPast(endOfDay(currentExpiry))) {
+            startDate = currentExpiry;
+          }
+        }
+        const newExpiry = format(addDays(startDate, plan.durationInDays), 'yyyy-MM-dd');
+        form.setValue('expiryDate', newExpiry);
       }
     }
-  }, [selectedPlanId, plans, form]);
+  }, [selectedPlanId, selectedMemberId, plans, members, form]);
 
   const totalPages = Math.ceil(totalRecords / INVOICES_PER_PAGE);
 
@@ -248,7 +263,6 @@ export default function InvoicingPage() {
 
   const processedInvoices = useMemo(() => {
     if (!invoicesData || !members || !plans) return [];
-    const today = startOfDay(new Date());
 
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
@@ -279,6 +293,7 @@ export default function InvoicingPage() {
         planId: invoice.membershipId || (invoice as any).planId || '',
         status: invoice.status,
         totalAmount: invoice.totalAmount,
+        expiryDate: invoice.dueDate,
       });
     } else if (dialog === 'add') {
       form.reset({
@@ -286,6 +301,7 @@ export default function InvoicingPage() {
         planId: '',
         status: 'Pending',
         totalAmount: 0,
+        expiryDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'),
       });
     }
   };
@@ -301,7 +317,6 @@ export default function InvoicingPage() {
     let startDate = startOfDay(new Date());
     if (member.membershipEndDate) {
       const currentExpiry = parseISO(member.membershipEndDate);
-      // If the current expiry is in the future, start the new duration from then (renewal)
       if (!isPast(endOfDay(currentExpiry))) {
         startDate = currentExpiry;
       }
@@ -352,7 +367,6 @@ export default function InvoicingPage() {
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
       const issueDate = format(new Date(), 'yyyy-MM-dd');
-      const dueDate = format(addDays(new Date(), 15), 'yyyy-MM-dd');
 
       let membershipId = '';
       if (values.status === 'Paid') {
@@ -366,7 +380,7 @@ export default function InvoicingPage() {
         membershipId: membershipId || plan.id, 
         totalAmount: values.totalAmount,
         issueDate: issueDate,
-        dueDate: dueDate,
+        dueDate: values.expiryDate,
         status: values.status,
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
@@ -382,10 +396,10 @@ export default function InvoicingPage() {
       const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       
       const becomingPaid = values.status === 'Paid' && selectedInvoice.status !== 'Paid';
-      const correctingPaid = values.status === 'Paid' && selectedInvoice.status === 'Paid' && (values.planId !== selectedInvoice.membershipId);
-
+      const planChanged = values.planId !== (selectedInvoice.membershipId || (selectedInvoice as any).planId);
+      
       let membershipId = selectedInvoice.membershipId;
-      if (becomingPaid || correctingPaid) {
+      if (becomingPaid || (selectedInvoice.status === 'Paid' && planChanged)) {
         membershipId = processPaidInvoice(member, plan, selectedInvoice.membershipId) || '';
       }
 
@@ -394,6 +408,7 @@ export default function InvoicingPage() {
         membershipId: membershipId || values.planId,
         status: values.status,
         totalAmount: values.totalAmount,
+        dueDate: values.expiryDate,
       };
 
       updateDocumentNonBlocking(docRef, updatedData);
@@ -523,7 +538,7 @@ export default function InvoicingPage() {
     
     drawDetailRow(detailsY, 'Invoice Number:', invoiceToDownload.invoiceNumber);
     drawDetailRow(detailsY + 7, 'Issue Date:', invoiceToDownload.issueDate);
-    drawDetailRow(detailsY + 14, 'Due Date:', invoiceToDownload.dueDate);
+    drawDetailRow(detailsY + 14, 'Expiry Date:', invoiceToDownload.dueDate);
     drawDetailRow(detailsY + 21, 'Status:', invoiceToDownload.status);
 
     const tableStartY = Math.max(memberDetailsY, detailsY + 21) + 20;
@@ -604,7 +619,7 @@ export default function InvoicingPage() {
                 <TableHead>Invoice ID</TableHead>
                 <TableHead>Member</TableHead>
                 <TableHead>Issue Date</TableHead>
-                <TableHead>Due Date</TableHead>
+                <TableHead>Expiry Date</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -803,19 +818,34 @@ export default function InvoicingPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="totalAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Amount (₹)</FormLabel>
-                      <FormControl>
-                        <Input type="number" readOnly {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total Amount (₹)</FormLabel>
+                        <FormControl>
+                          <Input type="number" readOnly {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="expiryDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Plan Expiry</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                  <FormField
                   control={form.control}
                   name="status"
@@ -890,7 +920,7 @@ export default function InvoicingPage() {
                       <p className="text-foreground">{selectedInvoice.issueDate}</p>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Due Date:</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap">Expiry Date:</p>
                       <p className="text-foreground">{selectedInvoice.dueDate}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
@@ -961,9 +991,4 @@ export default function InvoicingPage() {
       </AlertDialog>
     </>
   );
-}
-
-function useAuthUser() {
-  const { user, isUserLoading, userError } = useUser();
-  return { user, isUserLoading, userError };
 }
