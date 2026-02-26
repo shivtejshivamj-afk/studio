@@ -54,6 +54,7 @@ import {
   limit,
   startAfter,
   getDoc,
+  getDocs,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { type Attendance, type Member, type PublicMemberProfile } from '@/lib/data';
@@ -66,10 +67,13 @@ import {
     Trash2,
 } from 'lucide-react';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import {
   AlertDialog,
@@ -110,10 +114,14 @@ export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  
+  // Range Deletion State
+  const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
+  const [rangeToDelete, setRangeToDelete] = useState<DateRange | undefined>();
+  const [isRangeConfirmOpen, setIsRangeConfirmOpen] = useState(false);
 
   // Pagination State
   const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
@@ -146,22 +154,16 @@ export default function AttendancePage() {
     if (!firestore || !adminProfile?.gymIdentifier) return;
 
     const fetchCount = async () => {
-        let countQuery = query(
+        const countQuery = query(
             collection(firestore, 'attendance'),
             where('gymIdentifier', '==', adminProfile.gymIdentifier)
         );
-        if (dateRange?.from) {
-            countQuery = query(countQuery, where('checkInTime', '>=', startOfDay(dateRange.from)));
-        }
-        if (dateRange?.to) {
-            countQuery = query(countQuery, where('checkInTime', '<=', endOfDay(dateRange.to)));
-        }
         const snapshot = await getCountFromServer(countQuery);
         setTotalRecords(snapshot.data().count);
     };
 
     fetchCount();
-  }, [firestore, adminProfile, dateRange]);
+  }, [firestore, adminProfile]);
 
 
   useEffect(() => {
@@ -203,7 +205,7 @@ export default function AttendancePage() {
     });
 
     return () => unsubscribe();
-  }, [firestore, adminProfile, dateRange, page, pageCursors, toast]);
+  }, [firestore, adminProfile, page, pageCursors, toast]);
 
   const form = useForm<z.infer<typeof checkInSchema>>({
     resolver: zodResolver(checkInSchema),
@@ -275,7 +277,7 @@ export default function AttendancePage() {
       const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
       const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
       const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
-      const attendanceDocSnap = await getDoc(attendanceDocRef);
+      const attendanceDocSnap = await getDoc(attendanceDocId ? attendanceDocRef : doc(firestore, 'attendance', 'placeholder'));
 
       if (attendanceDocSnap.exists()) {
         toast({
@@ -392,6 +394,55 @@ export default function AttendancePage() {
     setIsBulkDeleteDialogOpen(false);
   };
 
+  const handleDeleteByRange = async () => {
+    if (!firestore || !adminProfile?.gymIdentifier || !rangeToDelete?.from) return;
+
+    const fromDate = startOfDay(rangeToDelete.from);
+    const toDate = endOfDay(rangeToDelete.to || rangeToDelete.from);
+
+    const q = query(
+      collection(firestore, 'attendance'),
+      where('gymIdentifier', '==', adminProfile.gymIdentifier),
+      where('checkInTime', '>=', fromDate),
+      where('checkInTime', '<=', toDate)
+    );
+
+    try {
+      const querySnapshot = await getDocs(q);
+      const count = querySnapshot.size;
+      
+      if (count === 0) {
+        toast({
+          title: 'No Records Found',
+          description: 'There are no attendance records within the selected range.',
+        });
+        setIsRangeConfirmOpen(false);
+        return;
+      }
+
+      querySnapshot.forEach((docSnap) => {
+        deleteDocumentNonBlocking(docSnap.ref);
+      });
+
+      toast({
+        title: 'Records Deleted',
+        description: `${count} attendance records between ${format(fromDate, 'PP')} and ${format(toDate, 'PP')} have been deleted.`,
+        variant: 'destructive',
+      });
+
+      setRangeToDelete(undefined);
+      setIsRangeConfirmOpen(false);
+      setIsRangePickerOpen(false);
+    } catch (error) {
+      console.error('Error deleting records by range:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete records in the selected range.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const toggleSelectAll = () => {
     if (selectedRecords.length === filteredAttendanceRecords.length) {
       setSelectedRecords([]);
@@ -447,46 +498,14 @@ export default function AttendancePage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full sm:max-w-xs"
             />
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date"
-                  variant={"outline"}
-                  className={cn(
-                    "w-full sm:w-[260px] justify-start text-left font-normal",
-                    !dateRange && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "LLL dd, y")} -{" "}
-                        {format(dateRange.to, "LLL dd, y")}
-                      </>
-                    ) : (
-                      format(dateRange.from, "LLL dd, y")
-                    )
-                  ) : (
-                    <span>Pick a date range</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                />
-              </PopoverContent>
-            </Popover>
             <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
                     <Download className="h-4 w-4" />
                     Download Page
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive" onClick={() => setIsRangePickerOpen(true)}>
+                    <Trash2 className="h-4 w-4" />
+                    Delete Range
                 </Button>
                 {selectedRecords.length > 0 && (
                   <Button 
@@ -615,6 +634,64 @@ export default function AttendancePage() {
             </div>
         </CardFooter>
       </Card>
+
+      {/* Delete by Range Dialog */}
+      <Dialog open={isRangePickerOpen} onOpenChange={setIsRangePickerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Attendance by Range</DialogTitle>
+            <DialogDescription>
+              Select a date range to wipe all attendance records within that period.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center py-4">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={rangeToDelete?.from}
+              selected={rangeToDelete}
+              onSelect={setRangeToDelete}
+              numberOfMonths={1}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRangePickerOpen(false)}>Cancel</Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => setIsRangeConfirmOpen(true)}
+              disabled={!rangeToDelete?.from}
+            >
+              Wipe Attendance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Range Delete Confirmation */}
+      <AlertDialog open={isRangeConfirmOpen} onOpenChange={setIsRangeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete ALL attendance records between{' '}
+              <span className="font-semibold text-foreground">
+                {rangeToDelete?.from ? format(rangeToDelete.from, 'PP') : ''}
+              </span>{' '}
+              and{' '}
+              <span className="font-semibold text-foreground">
+                {rangeToDelete?.to ? format(rangeToDelete.to, 'PP') : (rangeToDelete?.from ? format(rangeToDelete.from, 'PP') : '')}
+              </span>. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteByRange} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete All in Range
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk Delete Dialog */}
       <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
