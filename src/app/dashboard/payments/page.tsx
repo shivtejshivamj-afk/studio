@@ -300,6 +300,8 @@ export default function InvoicingPage() {
     
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
+      const issueDate = format(new Date(), 'yyyy-MM-dd');
+      const dueDate = format(addDays(new Date(), 15), 'yyyy-MM-dd');
 
       const newInvoiceData: Invoice = {
         id: newDocRef.id,
@@ -307,8 +309,8 @@ export default function InvoicingPage() {
         memberId: member.id,
         membershipId: plan.id,
         totalAmount: plan.price,
-        issueDate: format(new Date(), 'yyyy-MM-dd'),
-        dueDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'), // Automatically set to 15 days from now
+        issueDate: issueDate,
+        dueDate: dueDate,
         status: values.status,
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
@@ -316,6 +318,11 @@ export default function InvoicingPage() {
       
       setDocumentNonBlocking(newDocRef, newInvoiceData, {});
       
+      // If created as Paid, update member immediately
+      if (values.status === 'Paid') {
+        updateMemberExpiry(member, plan);
+      }
+
       toast({
         title: 'Invoice Created',
         description: `New invoice for ${member.firstName} ${member.lastName} has been created.`,
@@ -329,6 +336,11 @@ export default function InvoicingPage() {
         totalAmount: plan.price,
       };
       updateDocumentNonBlocking(docRef, updatedData);
+      
+      if (values.status === 'Paid' && selectedInvoice.status !== 'Paid') {
+        updateMemberExpiry(member, plan);
+      }
+
       toast({
         title: 'Invoice Updated',
         description: `Invoice ${selectedInvoice.invoiceNumber} has been updated.`,
@@ -336,6 +348,30 @@ export default function InvoicingPage() {
     }
 
     closeDialogs();
+  };
+
+  const updateMemberExpiry = (member: Member, plan: MembershipPlan) => {
+    if (!firestore) return;
+    
+    const memberDocRef = doc(firestore, 'members', member.id);
+    let startDate = startOfDay(new Date());
+
+    // If the member has a future expiry date, extend from there (Renewal logic)
+    if (member.membershipEndDate) {
+      const currentExpiry = parseISO(member.membershipEndDate);
+      if (!isPast(currentExpiry)) {
+        startDate = currentExpiry;
+      }
+    }
+
+    const newExpiryDate = addDays(startDate, plan.durationInDays);
+
+    const memberUpdate = {
+      membershipEndDate: format(newExpiryDate, 'yyyy-MM-dd'),
+      activePlanId: plan.id,
+      isActive: true,
+    };
+    updateDocumentNonBlocking(memberDocRef, memberUpdate);
   };
 
   const handleDeleteConfirm = () => {
@@ -360,15 +396,7 @@ export default function InvoicingPage() {
       const member = members.find(m => m.id === invoice.memberId);
       const plan = plans.find(p => p.id === invoice.membershipId);
       if (member && plan) {
-          const memberDocRef = doc(firestore, 'members', member.id);
-          const endDate = addDays(new Date(), plan.durationInDays);
-
-          const memberUpdate = {
-              membershipEndDate: format(endDate, 'yyyy-MM-dd'),
-              activePlanId: plan.id,
-              isActive: true,
-          };
-          updateDocumentNonBlocking(memberDocRef, memberUpdate);
+          updateMemberExpiry(member, plan);
       }
     }
 
