@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -9,7 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { type Member, type PublicMemberProfile } from '@/lib/data';
+import { type Member, type PublicMemberProfile, type MembershipPlan } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -49,7 +50,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -71,6 +72,7 @@ import {
   deleteDocumentNonBlocking,
   useUser,
   useDoc,
+  useCollection,
 } from '@/firebase';
 import { 
   collection, 
@@ -85,7 +87,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { isPast, parseISO } from 'date-fns';
+import { isPast, parseISO, endOfDay } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -132,6 +134,12 @@ export default function MembersPage() {
       [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string; gymIdentifier: string}>(adminProfileRef);
+
+  const plansQuery = useMemoFirebase(
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
+    [firestore, adminProfile]
+  );
+  const { data: plans } = useCollection<MembershipPlan>(plansQuery);
 
   useEffect(() => {
     if (firestore && adminProfile?.gymIdentifier) {
@@ -408,7 +416,9 @@ export default function MembersPage() {
                 ))
               ) : filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => {
-                  const isExpired = member.membershipEndDate ? isPast(parseISO(member.membershipEndDate)) : false;
+                  const isExpired = member.membershipEndDate ? isPast(endOfDay(parseISO(member.membershipEndDate))) : false;
+                  const activePlan = plans?.find(p => p.id === member.activePlanId);
+                  
                   return (
                     <TableRow key={member.id}>
                       <TableCell>
@@ -438,9 +448,20 @@ export default function MembersPage() {
                         {member.phone}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        <span className={isExpired ? "text-destructive font-semibold" : ""}>
-                          {member.membershipEndDate || 'No Active Plan'}
-                        </span>
+                        {member.membershipEndDate ? (
+                          <div className="flex flex-col">
+                            <span className={isExpired ? "text-destructive font-semibold" : ""}>
+                              {member.membershipEndDate}
+                            </span>
+                            {activePlan && (
+                               <span className="text-[10px] text-muted-foreground italic">
+                                 {activePlan.name}
+                               </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">No Active Plan</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge

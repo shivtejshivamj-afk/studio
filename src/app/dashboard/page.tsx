@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -46,7 +47,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where, orderBy, limit } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { differenceInDays, parseISO, startOfDay } from 'date-fns';
+import { differenceInDays, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -114,7 +115,7 @@ export default function DashboardPage() {
         if (!member.membershipEndDate) return false;
         
         try {
-            const endDate = parseISO(member.membershipEndDate);
+            const endDate = endOfDay(parseISO(member.membershipEndDate));
             const diff = differenceInDays(endDate, today);
             // Show if expired (diff < 0) or expiring within 14 days
             return diff <= 14;
@@ -129,12 +130,22 @@ export default function DashboardPage() {
   }, [members]);
 
   const activeMembersCount = useMemo(
-    () => members?.filter((m) => m.isActive).length || 0,
+    () => members?.filter((m) => {
+      if (!m.isActive) return false;
+      if (!m.membershipEndDate) return true; // No end date but isActive true (legacy or manual)
+      return !isPast(endOfDay(parseISO(m.membershipEndDate)));
+    }).length || 0,
     [members]
   );
   
   const inactiveMembersCount = useMemo(
-    () => members?.filter((m) => !m.isActive).length || 0,
+    () => members?.filter((m) => {
+      if (!m.isActive) return true;
+      if (m.membershipEndDate) {
+        return isPast(endOfDay(parseISO(m.membershipEndDate)));
+      }
+      return false;
+    }).length || 0,
     [members]
   );
 
@@ -188,7 +199,7 @@ export default function DashboardPage() {
       loading: isLoading,
     },
     {
-      title: 'Inactive Members',
+      title: 'Inactive/Expired',
       value: inactiveMembersCount,
       icon: UserX,
       loading: isLoading,
@@ -278,7 +289,7 @@ export default function DashboardPage() {
                   ) : expiringSoonMembers.length > 0 ? (
                     expiringSoonMembers.map((member) => {
                       const today = startOfDay(new Date());
-                      const endDate = parseISO(member.membershipEndDate!);
+                      const endDate = endOfDay(parseISO(member.membershipEndDate!));
                       const daysLeft = differenceInDays(endDate, today);
                       const expiresInText = 
                         daysLeft < 0 ? 'Expired' :
@@ -295,7 +306,7 @@ export default function DashboardPage() {
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="text-sm">{member.membershipEndDate}</span>
-                              <Badge variant={daysLeft <= 3 ? 'destructive' : 'secondary'} className="mt-1 w-fit text-[10px]">
+                              <Badge variant={daysLeft < 0 ? 'destructive' : (daysLeft <= 3 ? 'default' : 'secondary')} className="mt-1 w-fit text-[10px]">
                                   {expiresInText}
                               </Badge>
                             </div>

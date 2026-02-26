@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -79,7 +80,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
-import { format, parseISO, addDays, isPast, startOfDay } from 'date-fns';
+import { format, parseISO, addDays, isPast, startOfDay, endOfDay } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -254,7 +255,7 @@ export default function InvoicingPage() {
       const plan = plans.find(p => p.id === inv.membershipId || p.id === (inv as any).planId);
       
       let displayStatus = inv.status;
-      if (inv.status === 'Pending' && inv.dueDate && isPast(parseISO(inv.dueDate)) && parseISO(inv.dueDate) < today) {
+      if (inv.status === 'Pending' && inv.dueDate && isPast(endOfDay(parseISO(inv.dueDate)))) {
         displayStatus = 'Overdue';
       }
 
@@ -300,7 +301,8 @@ export default function InvoicingPage() {
     let startDate = startOfDay(new Date());
     if (member.membershipEndDate) {
       const currentExpiry = parseISO(member.membershipEndDate);
-      if (!isPast(currentExpiry)) {
+      // If the current expiry is in the future, start the new duration from then (renewal)
+      if (!isPast(endOfDay(currentExpiry))) {
         startDate = currentExpiry;
       }
     }
@@ -361,7 +363,7 @@ export default function InvoicingPage() {
         id: newDocRef.id,
         invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
         memberId: member.id,
-        membershipId: membershipId || plan.id, // Prefer Membership ID, fallback to Plan ID
+        membershipId: membershipId || plan.id, 
         totalAmount: values.totalAmount,
         issueDate: issueDate,
         dueDate: dueDate,
