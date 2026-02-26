@@ -111,6 +111,7 @@ export default function DashboardPage() {
         try {
             const endDate = endOfDay(parseISO(member.membershipEndDate));
             const diff = differenceInDays(endDate, clientNow);
+            // Show members who expire in 7 days or less, including those already expired
             return diff <= 7;
         } catch(e) {
             return false;
@@ -259,7 +260,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Expiring or Expired</CardTitle>
               <CardDescription>
-                Members whose subscription has ended or ends soon (7 days).
+                Members whose subscription has ended or ends soon (within 7 days).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -302,7 +303,7 @@ export default function DashboardPage() {
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold">{plan?.name || 'Standard'} Plan</span>
-                              <span className="text-xs text-muted-foreground">Ends: {member.membershipEndDate}</span>
+                              <span className="text-xs text-muted-foreground">Plan Expiry: {member.membershipEndDate}</span>
                               <Badge variant={daysLeft < 0 ? 'destructive' : (daysLeft <= 3 ? 'default' : 'secondary')} className="mt-1 w-fit text-[10px]">
                                   {expiresInText}
                               </Badge>
