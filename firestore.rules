@@ -154,7 +154,8 @@ service cloud.firestore {
     match /attendance/{attendanceId} {
         allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
         allow list: if isAdmin();
-        allow create: if isPublicCheckInValid();
+        // Updated: Allow both public check-in validation and authenticated admin check-ins
+        allow create: if isPublicCheckInValid() || isGymAdmin(request.resource.data.gymIdentifier);
     }
     
     /**

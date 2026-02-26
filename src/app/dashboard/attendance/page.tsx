@@ -39,6 +39,7 @@ import {
   useDoc,
   useCollection,
   deleteDocumentNonBlocking,
+  setDocumentNonBlocking,
 } from '@/firebase';
 import {
   collection,
@@ -284,8 +285,8 @@ export default function AttendancePage() {
         memberGymId: publicProfileSnap.id,
       };
 
-      const { setDoc } = await import('firebase/firestore');
-      await setDoc(attendanceDocRef, attendanceRecord);
+      // Changed: Use non-blocking operation for faster UI and better error handling
+      setDocumentNonBlocking(attendanceDocRef, attendanceRecord, {});
 
       toast({
         title: 'Check-in Successful!',

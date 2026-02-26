@@ -21,12 +21,11 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useFirestore } from '@/firebase';
+import { useFirestore, setDocumentNonBlocking } from '@/firebase';
 import {
   serverTimestamp,
   doc,
   getDoc,
-  setDoc,
 } from 'firebase/firestore';
 import { format } from 'date-fns';
 import type { PublicMemberProfile } from '@/lib/data';
@@ -107,14 +106,15 @@ export function CheckInForm() {
       const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
       const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
 
-      await setDoc(attendanceDocRef, {
+      // Changed: Use non-blocking operation for faster UI and consistent error handling
+      setDocumentNonBlocking(attendanceDocRef, {
         id: attendanceDocId,
         memberId: publicProfile.memberDocId,
         checkInTime: serverTimestamp(),
         gymName: publicProfile.gymName,
         gymIdentifier: publicProfile.gymIdentifier,
         memberGymId: memberPublicId,
-      });
+      }, {});
 
       toast({
         title: 'Check-in Successful!',
@@ -124,8 +124,6 @@ export function CheckInForm() {
     } catch (error: any) {
       // 5. Catch any error and interpret it for the user.
       if (error.code === 'permission-denied') {
-        // We can reasonably assume a permission-denied error at this stage means a duplicate check-in.
-        // We need to re-fetch the profile to get the name for the toast message.
         const memberProfileSnap = await getDoc(doc(firestore, 'member_profiles_public', values.memberId.toUpperCase()));
         let memberFirstName = 'there';
         if (memberProfileSnap.exists()) {
@@ -138,7 +136,6 @@ export function CheckInForm() {
           variant: 'destructive',
         });
       } else {
-        // Any other error is unexpected.
         console.error('Check-in error', error);
         toast({
           title: 'Check-in Failed',

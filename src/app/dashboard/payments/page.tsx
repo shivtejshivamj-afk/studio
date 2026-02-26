@@ -12,6 +12,9 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  Check,
+  ChevronsUpDown,
+  Search,
 } from 'lucide-react';
 import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
 import {
@@ -106,6 +109,13 @@ import {
     type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 const statusVariant = {
   Paid: 'default',
@@ -141,6 +151,10 @@ export default function InvoicingPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
   
+  // Searchable member state
+  const [memberSearch, setMemberSearch] = useState('');
+  const [isMemberPopoverOpen, setIsMemberPopoverOpen] = useState(false);
+
   const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -224,12 +238,24 @@ export default function InvoicingPage() {
   const selectedPlanId = form.watch('planId');
   const selectedMemberId = form.watch('memberId');
 
+  const filteredMembersList = useMemo(() => {
+    if (!members) return [];
+    const q = memberSearch.toLowerCase();
+    return members.filter(m => 
+      `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||
+      m.gymId.toLowerCase().includes(q) ||
+      m.email.toLowerCase().includes(q)
+    );
+  }, [members, memberSearch]);
+
   useEffect(() => {
-    if (activeDialog === 'add' && selectedPlanId && plans && members && selectedMemberId) {
+    if ((activeDialog === 'add' || activeDialog === 'edit') && selectedPlanId && plans && members && selectedMemberId) {
       const plan = plans.find(p => p.id === selectedPlanId);
       const member = members.find(m => m.id === selectedMemberId);
       if (plan && member) {
         form.setValue('totalAmount', plan.price);
+        
+        // Logical expiry calculation
         let startDate = startOfDay(new Date());
         if (member.membershipEndDate) {
           const currentExpiry = parseISO(member.membershipEndDate);
@@ -286,6 +312,7 @@ export default function InvoicingPage() {
   const handleOpenDialog = (dialog: DialogType, invoice?: Invoice) => {
     setSelectedInvoice(invoice || null);
     setActiveDialog(dialog);
+    setMemberSearch('');
     if (dialog === 'edit' && invoice) {
       form.reset({
         memberId: invoice.memberId,
@@ -610,7 +637,188 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={activeDialog === 'add' || activeDialog === 'edit'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}><DialogContent><Form {...form}><form onSubmit={form.handleSubmit(handleSaveInvoice)} className="space-y-4"><DialogHeader><DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle></DialogHeader><div className="grid gap-4"><FormField control={form.control} name="memberId" render={({ field }) => (<FormItem><FormLabel>Member</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger></FormControl><SelectContent>{members?.map((m) => <SelectItem key={m.id} value={m.id}>{m.firstName} {m.lastName} ({m.gymId})</SelectItem>)}</SelectContent></Select></FormItem>)} /><FormField control={form.control} name="planId" render={({ field }) => (<FormItem><FormLabel>Plan</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger></FormControl><SelectContent>{plans?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} - ₹{p.price}</SelectItem>)}</SelectContent></Select></FormItem>)} /><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="totalAmount" render={({ field }) => (<FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="Paid">Paid</SelectItem><SelectItem value="Overdue">Overdue</SelectItem></SelectContent></Select></FormItem>)} /></div><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="issueDate" render={({ field }) => (<FormItem><FormLabel>Issue Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="expiryDate" render={({ field }) => (<FormItem><FormLabel>Plan Expiry</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} /></div></div><DialogFooter><Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button><Button type="submit">Save</Button></DialogFooter></form></Form></DialogContent></Dialog>
+      <Dialog open={activeDialog === 'add' || activeDialog === 'edit'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+        <DialogContent className="sm:max-w-lg">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSaveInvoice)} className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4">
+                <FormField
+                  control={form.control}
+                  name="memberId"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Member</FormLabel>
+                      <Popover open={isMemberPopoverOpen} onOpenChange={setIsMemberPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={isMemberPopoverOpen}
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value
+                                ? members?.find((m) => m.id === field.value)
+                                  ? `${members.find((m) => m.id === field.value)?.firstName} ${members.find((m) => m.id === field.value)?.lastName} (${members.find((m) => m.id === field.value)?.gymId})`
+                                  : "Select member"
+                                : "Select member"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full min-w-[300px] p-0" align="start">
+                          <div className="flex flex-col">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <Input
+                                placeholder="Search member..."
+                                value={memberSearch}
+                                onChange={(e) => setMemberSearch(e.target.value)}
+                                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-none focus-visible:ring-0"
+                              />
+                            </div>
+                            <ScrollArea className="max-h-72 overflow-y-auto">
+                              <div className="p-1">
+                                {filteredMembersList.length > 0 ? (
+                                  filteredMembersList.map((m) => (
+                                    <Button
+                                      key={m.id}
+                                      variant="ghost"
+                                      className="w-full justify-start font-normal h-auto py-2 px-3"
+                                      onClick={() => {
+                                        field.onChange(m.id);
+                                        setIsMemberPopoverOpen(false);
+                                        setMemberSearch('');
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4 shrink-0",
+                                          m.id === field.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex flex-col items-start overflow-hidden">
+                                        <span className="truncate text-sm font-medium">{m.firstName} {m.lastName}</span>
+                                        <span className="text-[10px] text-muted-foreground truncate">{m.gymId} • {m.email}</span>
+                                      </div>
+                                    </Button>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-sm text-muted-foreground">
+                                    No members found.
+                                  </div>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="planId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Plan</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select plan" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {plans?.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} - ₹{p.price}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Paid">Paid</SelectItem>
+                            <SelectItem value="Overdue">Overdue</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="issueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Issue Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="expiryDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Plan Expiry</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button>
+                <Button type="submit">Save</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={activeDialog === 'delete'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
         <AlertDialogContent>
