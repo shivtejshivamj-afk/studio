@@ -314,38 +314,48 @@ export default function InvoicingPage() {
     setSelectedInvoice(null);
   };
 
-  const processPaidInvoice = (member: Member, plan: MembershipPlan, manualExpiryDate?: string, existingMembershipId?: string) => {
-    if (!firestore) return null;
+  /**
+   * Syncs the member profile with invoice details.
+   * This is called whenever an invoice is added, edited, or its status updated.
+   */
+  const syncMemberWithInvoice = (memberId: string, planId: string, expiryDate: string, status: 'Paid' | 'Pending' | 'Overdue', existingMembershipId?: string) => {
+    if (!firestore || !members || !plans) return null;
     
-    // We use the date from the invoice (manualExpiryDate) as the definitive end date.
-    // If not provided, we calculate based on plan duration.
-    const endDate = manualExpiryDate ? parseISO(manualExpiryDate) : addDays(startOfDay(new Date()), plan.durationInDays);
+    const member = members.find(m => m.id === memberId);
+    const plan = plans.find(p => p.id === planId);
+    if (!member || !plan) return null;
+
+    const isPaid = status === 'Paid';
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
-    const membershipData: Membership = {
-      id: membershipId,
-      memberId: member.id,
-      planId: plan.id,
-      startDate: format(new Date(), 'yyyy-MM-dd'),
-      endDate: format(endDate, 'yyyy-MM-dd'),
-      status: 'active',
-      priceAtPurchase: plan.price,
-      autoRenew: false,
-    };
+    // Only update the historical membership record if it's marked as Paid
+    if (isPaid) {
+      const membershipData: Membership = {
+        id: membershipId,
+        memberId: member.id,
+        planId: plan.id,
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        endDate: expiryDate,
+        status: 'active',
+        priceAtPurchase: plan.price,
+        autoRenew: false,
+      };
+      setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
+    }
 
-    setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
-
+    // Always update the member document to reflect the current plan and date from this invoice
     const memberDocRef = doc(firestore, 'members', member.id);
     updateDocumentNonBlocking(memberDocRef, {
-      membershipEndDate: format(endDate, 'yyyy-MM-dd'),
+      membershipEndDate: expiryDate,
       activePlanId: plan.id,
-      isActive: true,
+      isActive: isPaid, // Member is only active if the invoice is paid
     });
     
+    // Update public check-in profile
     const publicProfileRef = doc(firestore, 'member_profiles_public', member.gymId);
     updateDocumentNonBlocking(publicProfileRef, {
-        isActive: true,
+        isActive: isPaid,
     });
 
     return membershipId;
@@ -369,10 +379,8 @@ export default function InvoicingPage() {
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
 
-      let membershipId = '';
-      if (values.status === 'Paid') {
-        membershipId = processPaidInvoice(member, plan, values.expiryDate) || '';
-      }
+      // Sync member profile immediately based on this new invoice
+      const membershipId = syncMemberWithInvoice(member.id, plan.id, values.expiryDate, values.status) || '';
 
       const newInvoiceData: Invoice = {
         id: newDocRef.id,
@@ -392,20 +400,13 @@ export default function InvoicingPage() {
 
       toast({
         title: 'Invoice Created',
-        description: `New invoice for ${member.firstName} ${member.lastName} has been created.`,
+        description: `New invoice for ${member.firstName} ${member.lastName} has been created and profile updated.`,
       });
     } else if (activeDialog === 'edit' && selectedInvoice) {
       const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       
-      const becomingPaid = values.status === 'Paid' && selectedInvoice.status !== 'Paid';
-      const planChanged = values.planId !== selectedInvoice.planId;
-      const dateChanged = values.expiryDate !== selectedInvoice.dueDate;
-      
-      let membershipId = selectedInvoice.membershipId;
-      // If it's already Paid or becoming Paid, and something relevant changed, sync with member profile
-      if (becomingPaid || (values.status === 'Paid' && (planChanged || dateChanged))) {
-        membershipId = processPaidInvoice(member, plan, values.expiryDate, selectedInvoice.membershipId) || '';
-      }
+      // Sync member profile with updated invoice details
+      const membershipId = syncMemberWithInvoice(member.id, plan.id, values.expiryDate, values.status, selectedInvoice.membershipId) || '';
 
       const updatedData: Partial<Invoice> = {
         memberId: values.memberId,
@@ -421,7 +422,7 @@ export default function InvoicingPage() {
 
       toast({
         title: 'Invoice Updated',
-        description: `Invoice ${selectedInvoice.invoiceNumber} has been updated.`,
+        description: `Invoice ${selectedInvoice.invoiceNumber} updated and member profile synchronized.`,
       });
     }
 
@@ -444,23 +445,17 @@ export default function InvoicingPage() {
   const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue') => {
     if (!firestore || !members || !plans) return;
     
-    if (status === 'Paid' && invoice.status !== 'Paid') {
-      const member = members.find(m => m.id === invoice.memberId);
-      const plan = plans.find(p => p.id === invoice.planId);
-      if (member && plan) {
-          const membershipId = processPaidInvoice(member, plan, invoice.dueDate);
-          updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { 
-            status, 
-            membershipId: membershipId || invoice.membershipId 
-          });
-      }
-    } else {
-      updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { status });
-    }
+    // Sync member profile when status changes manually via dropdown
+    const membershipId = syncMemberWithInvoice(invoice.memberId, invoice.planId, invoice.dueDate, status, invoice.membershipId);
+    
+    updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { 
+      status, 
+      membershipId: membershipId || invoice.membershipId 
+    });
 
     toast({
       title: 'Invoice Status Updated',
-      description: `Invoice ${invoice.invoiceNumber} has been marked as ${status}.`,
+      description: `Invoice ${invoice.invoiceNumber} is now ${status}. Member profile updated.`,
     });
   };
 
