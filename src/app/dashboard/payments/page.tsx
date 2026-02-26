@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -245,7 +244,7 @@ export default function InvoicingPage() {
       
       let displayStatus = inv.status;
       // Auto-calculate Overdue status in UI if pending and past due date
-      if (inv.status === 'Pending' && isPast(parseISO(inv.dueDate)) && parseISO(inv.dueDate) < today) {
+      if (inv.status === 'Pending' && inv.dueDate && isPast(parseISO(inv.dueDate)) && parseISO(inv.dueDate) < today) {
         displayStatus = 'Overdue';
       }
 
@@ -271,8 +270,8 @@ export default function InvoicingPage() {
       });
     } else if (dialog === 'add') {
       form.reset({
-        memberId: undefined,
-        planId: undefined,
+        memberId: '',
+        planId: '',
         status: 'Pending',
       });
     }
@@ -301,6 +300,7 @@ export default function InvoicingPage() {
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
       const issueDate = format(new Date(), 'yyyy-MM-dd');
+      // Set due date automatically to 15 days from issue date
       const dueDate = format(addDays(new Date(), 15), 'yyyy-MM-dd');
 
       const newInvoiceData: Invoice = {
@@ -356,7 +356,7 @@ export default function InvoicingPage() {
     const memberDocRef = doc(firestore, 'members', member.id);
     let startDate = startOfDay(new Date());
 
-    // If the member has a future expiry date, extend from there (Renewal logic)
+    // Renewal logic: If the member has a future expiry date, extend from there
     if (member.membershipEndDate) {
       const currentExpiry = parseISO(member.membershipEndDate);
       if (!isPast(currentExpiry)) {
