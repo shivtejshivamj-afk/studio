@@ -231,10 +231,11 @@ export default function InvoicingPage() {
       if (plan && member) {
         form.setValue('totalAmount', plan.price);
         
-        // Automatic Expiry Date Calculation
+        // Automatic Expiry Date Calculation based on Plan Duration
         let startDate = startOfDay(new Date());
         if (member.membershipEndDate) {
           const currentExpiry = parseISO(member.membershipEndDate);
+          // If the plan is still active, extend it. Otherwise, start from today.
           if (!isPast(endOfDay(currentExpiry))) {
             startDate = currentExpiry;
           }
@@ -269,6 +270,7 @@ export default function InvoicingPage() {
       const plan = plans.find(p => p.id === inv.membershipId || p.id === (inv as any).planId);
       
       let displayStatus = inv.status;
+      // Renamed dueDate to expiryDate for logic clarity
       if (inv.status === 'Pending' && inv.dueDate && isPast(endOfDay(parseISO(inv.dueDate)))) {
         displayStatus = 'Overdue';
       }
@@ -301,7 +303,7 @@ export default function InvoicingPage() {
         planId: '',
         status: 'Pending',
         totalAmount: 0,
-        expiryDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'),
+        expiryDate: '', // Will be set automatically when plan is selected
       });
     }
   };
@@ -380,7 +382,7 @@ export default function InvoicingPage() {
         membershipId: membershipId || plan.id, 
         totalAmount: values.totalAmount,
         issueDate: issueDate,
-        dueDate: values.expiryDate,
+        dueDate: values.expiryDate, // This is the calculated expiry date
         status: values.status,
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
@@ -538,7 +540,7 @@ export default function InvoicingPage() {
     
     drawDetailRow(detailsY, 'Invoice Number:', invoiceToDownload.invoiceNumber);
     drawDetailRow(detailsY + 7, 'Issue Date:', invoiceToDownload.issueDate);
-    drawDetailRow(detailsY + 14, 'Expiry Date:', invoiceToDownload.dueDate);
+    drawDetailRow(detailsY + 14, 'Plan Expiry:', invoiceToDownload.dueDate);
     drawDetailRow(detailsY + 21, 'Status:', invoiceToDownload.status);
 
     const tableStartY = Math.max(memberDetailsY, detailsY + 21) + 20;
@@ -619,7 +621,7 @@ export default function InvoicingPage() {
                 <TableHead>Invoice ID</TableHead>
                 <TableHead>Member</TableHead>
                 <TableHead>Issue Date</TableHead>
-                <TableHead>Expiry Date</TableHead>
+                <TableHead>Plan Expiry</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -839,8 +841,9 @@ export default function InvoicingPage() {
                       <FormItem>
                         <FormLabel>Plan Expiry</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input type="date" readOnly {...field} />
                         </FormControl>
+                        <FormDescription>Calculated automatically based on plan duration.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -920,7 +923,7 @@ export default function InvoicingPage() {
                       <p className="text-foreground">{selectedInvoice.issueDate}</p>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Expiry Date:</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap">Plan Expiry:</p>
                       <p className="text-foreground">{selectedInvoice.dueDate}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
