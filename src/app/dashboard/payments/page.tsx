@@ -268,7 +268,8 @@ export default function InvoicingPage() {
 
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
-      const plan = plans.find(p => p.id === inv.membershipId || p.id === (inv as any).planId);
+      // Use inv.planId for a robust lookup
+      const plan = plans.find(p => p.id === inv.planId);
       
       let displayStatus = inv.status;
       if (inv.status === 'Pending' && inv.dueDate && isPast(endOfDay(parseISO(inv.dueDate)))) {
@@ -292,7 +293,7 @@ export default function InvoicingPage() {
     if (dialog === 'edit' && invoice) {
       form.reset({
         memberId: invoice.memberId,
-        planId: invoice.membershipId || (invoice as any).planId || '',
+        planId: invoice.planId || '',
         status: invoice.status,
         totalAmount: invoice.totalAmount,
         expiryDate: invoice.dueDate,
@@ -379,7 +380,8 @@ export default function InvoicingPage() {
         id: newDocRef.id,
         invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
         memberId: member.id,
-        membershipId: membershipId || plan.id, 
+        planId: plan.id,
+        membershipId: membershipId, 
         totalAmount: values.totalAmount,
         issueDate: issueDate,
         dueDate: values.expiryDate, 
@@ -398,7 +400,7 @@ export default function InvoicingPage() {
       const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       
       const becomingPaid = values.status === 'Paid' && selectedInvoice.status !== 'Paid';
-      const planChanged = values.planId !== (selectedInvoice.membershipId || (selectedInvoice as any).planId);
+      const planChanged = values.planId !== selectedInvoice.planId;
       
       let membershipId = selectedInvoice.membershipId;
       if (becomingPaid || (selectedInvoice.status === 'Paid' && planChanged)) {
@@ -407,7 +409,8 @@ export default function InvoicingPage() {
 
       const updatedData: Partial<Invoice> = {
         memberId: values.memberId,
-        membershipId: membershipId || values.planId,
+        planId: values.planId,
+        membershipId: membershipId,
         status: values.status,
         totalAmount: values.totalAmount,
         dueDate: values.expiryDate,
@@ -442,7 +445,7 @@ export default function InvoicingPage() {
     
     if (status === 'Paid' && invoice.status !== 'Paid') {
       const member = members.find(m => m.id === invoice.memberId);
-      const plan = plans.find(p => p.id === invoice.membershipId || p.id === (invoice as any).planId);
+      const plan = plans.find(p => p.id === invoice.planId);
       if (member && plan) {
           const membershipId = processPaidInvoice(member, plan);
           updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { 

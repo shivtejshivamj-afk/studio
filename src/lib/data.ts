@@ -57,10 +57,22 @@ export type Attendance = {
   memberGymId: string; // The public member check-in ID
 };
 
+export type Membership = {
+  id: string;
+  memberId: string;
+  planId: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  priceAtPurchase: number;
+  autoRenew: boolean;
+};
+
 export type Invoice = {
   id: string; // Firestore document ID
   memberId: string; // Member document ID
-  membershipId: string;
+  membershipId: string; // Reference to the Membership document (if Paid)
+  planId: string; // Reference to the MembershipPlan
   invoiceNumber: string;
   issueDate: string;
   dueDate: string;
