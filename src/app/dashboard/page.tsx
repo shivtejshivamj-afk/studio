@@ -44,7 +44,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { differenceInDays, parseISO, startOfDay, endOfDay, isPast } from 'date-fns';
+import { differenceInDays, parseISO, startOfDay, endOfDay, isPast, isValid } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -53,8 +53,7 @@ const statusVariant = {
 
 export default function DashboardPage() {
   const { toast } = useToast();
-  type DialogType = 'view' | null;
-  const [activeDialog, setActiveDialog] = useState<DialogType>(null);
+  const [activeDialog, setActiveDialog] = useState<'view' | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [clientNow, setClientNow] = useState<Date | null>(null);
@@ -107,7 +106,10 @@ export default function DashboardPage() {
         if (!member.membershipEndDate) return false;
         
         try {
-            const endDate = endOfDay(parseISO(member.membershipEndDate));
+            const end = parseISO(member.membershipEndDate);
+            if (!isValid(end)) return false;
+
+            const endDate = endOfDay(end);
             const diff = differenceInDays(endDate, clientNow);
             // Show members who expire in 7 days or less, including those already expired
             return diff <= 7;
@@ -125,7 +127,8 @@ export default function DashboardPage() {
     () => members?.filter((m) => {
       if (!m.isActive) return false;
       if (!m.membershipEndDate) return true;
-      return !isPast(endOfDay(parseISO(m.membershipEndDate)));
+      const end = parseISO(m.membershipEndDate);
+      return isValid(end) && !isPast(endOfDay(end));
     }).length || 0,
     [members]
   );
@@ -134,14 +137,15 @@ export default function DashboardPage() {
     () => members?.filter((m) => {
       if (!m.isActive) return true;
       if (m.membershipEndDate) {
-        return isPast(endOfDay(parseISO(m.membershipEndDate)));
+        const end = parseISO(m.membershipEndDate);
+        return isValid(end) && isPast(endOfDay(end));
       }
       return false;
     }).length || 0,
     [members]
   );
 
-  const handleOpenDialog = (dialog: DialogType, member?: Member) => {
+  const handleOpenDialog = (dialog: 'view', member?: Member) => {
     setSelectedMember(member || null);
     setActiveDialog(dialog);
   };
@@ -275,7 +279,8 @@ export default function DashboardPage() {
                   ) : expiringSoonMembers.length > 0 ? (
                     expiringSoonMembers.map((member) => {
                       const today = clientNow || startOfDay(new Date());
-                      const endDate = endOfDay(parseISO(member.membershipEndDate!));
+                      const end = parseISO(member.membershipEndDate!);
+                      const endDate = endOfDay(end);
                       const daysLeft = differenceInDays(endDate, today);
                       
                       const expiresInText = 
@@ -338,11 +343,7 @@ export default function DashboardPage() {
 
       <Dialog
         open={activeDialog === 'view'}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            closeDialogs();
-          }
-        }}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
         <DialogContent>
           <DialogHeader>
