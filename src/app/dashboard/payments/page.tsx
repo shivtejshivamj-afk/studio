@@ -119,6 +119,7 @@ const invoiceSchema = z.object({
   planId: z.string().min(1, { message: 'Please select a plan.' }),
   status: z.enum(['Paid', 'Pending', 'Overdue']),
   totalAmount: z.coerce.number().positive(),
+  issueDate: z.string().min(1, 'Issue date is required.'),
   expiryDate: z.string().min(1, 'Expiry date is required.'),
 });
 
@@ -225,6 +226,8 @@ export default function InvoicingPage() {
   const selectedMemberId = form.watch('memberId');
 
   useEffect(() => {
+    // Only auto-calculate when plan or member changes and it's a NEW invoice
+    // OR when plan changes in edit mode.
     if (selectedPlanId && plans && members && selectedMemberId) {
       const plan = plans.find(p => p.id === selectedPlanId);
       const member = members.find(m => m.id === selectedMemberId);
@@ -268,7 +271,6 @@ export default function InvoicingPage() {
 
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
-      // Use inv.planId for a robust lookup
       const plan = plans.find(p => p.id === inv.planId);
       
       let displayStatus = inv.status;
@@ -296,6 +298,7 @@ export default function InvoicingPage() {
         planId: invoice.planId || '',
         status: invoice.status,
         totalAmount: invoice.totalAmount,
+        issueDate: invoice.issueDate,
         expiryDate: invoice.dueDate,
       });
     } else if (dialog === 'add') {
@@ -304,6 +307,7 @@ export default function InvoicingPage() {
         planId: '',
         status: 'Pending',
         totalAmount: 0,
+        issueDate: format(new Date(), 'yyyy-MM-dd'),
         expiryDate: '', 
       });
     }
@@ -314,7 +318,7 @@ export default function InvoicingPage() {
     setSelectedInvoice(null);
   };
 
-  const processPaidInvoice = (member: Member, plan: MembershipPlan, existingMembershipId?: string) => {
+  const processPaidInvoice = (member: Member, plan: MembershipPlan, manualExpiryDate?: string, existingMembershipId?: string) => {
     if (!firestore) return null;
     
     let startDate = startOfDay(new Date());
@@ -325,7 +329,8 @@ export default function InvoicingPage() {
       }
     }
 
-    const endDate = addDays(startDate, plan.durationInDays);
+    // Use manualExpiryDate if provided, otherwise calculate based on plan duration
+    const endDate = manualExpiryDate ? parseISO(manualExpiryDate) : addDays(startDate, plan.durationInDays);
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
@@ -369,11 +374,10 @@ export default function InvoicingPage() {
     
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
-      const issueDate = format(new Date(), 'yyyy-MM-dd');
 
       let membershipId = '';
       if (values.status === 'Paid') {
-        membershipId = processPaidInvoice(member, plan) || '';
+        membershipId = processPaidInvoice(member, plan, values.expiryDate) || '';
       }
 
       const newInvoiceData: Invoice = {
@@ -383,7 +387,7 @@ export default function InvoicingPage() {
         planId: plan.id,
         membershipId: membershipId, 
         totalAmount: values.totalAmount,
-        issueDate: issueDate,
+        issueDate: values.issueDate,
         dueDate: values.expiryDate, 
         status: values.status,
         gymName: adminProfile.gymName,
@@ -401,10 +405,11 @@ export default function InvoicingPage() {
       
       const becomingPaid = values.status === 'Paid' && selectedInvoice.status !== 'Paid';
       const planChanged = values.planId !== selectedInvoice.planId;
+      const dateChanged = values.expiryDate !== selectedInvoice.dueDate;
       
       let membershipId = selectedInvoice.membershipId;
-      if (becomingPaid || (selectedInvoice.status === 'Paid' && planChanged)) {
-        membershipId = processPaidInvoice(member, plan, selectedInvoice.membershipId) || '';
+      if (becomingPaid || (selectedInvoice.status === 'Paid' && (planChanged || dateChanged))) {
+        membershipId = processPaidInvoice(member, plan, values.expiryDate, selectedInvoice.membershipId) || '';
       }
 
       const updatedData: Partial<Invoice> = {
@@ -413,6 +418,7 @@ export default function InvoicingPage() {
         membershipId: membershipId,
         status: values.status,
         totalAmount: values.totalAmount,
+        issueDate: values.issueDate,
         dueDate: values.expiryDate,
       };
 
@@ -447,7 +453,7 @@ export default function InvoicingPage() {
       const member = members.find(m => m.id === invoice.memberId);
       const plan = plans.find(p => p.id === invoice.planId);
       if (member && plan) {
-          const membershipId = processPaidInvoice(member, plan);
+          const membershipId = processPaidInvoice(member, plan, invoice.dueDate);
           updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { 
             status, 
             membershipId: membershipId || invoice.membershipId 
@@ -781,7 +787,7 @@ export default function InvoicingPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Member</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a member" />
@@ -805,7 +811,7 @@ export default function InvoicingPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Plan</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a plan" />
@@ -831,7 +837,44 @@ export default function InvoicingPage() {
                       <FormItem>
                         <FormLabel>Total Amount (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" readOnly {...field} />
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Paid">Paid</SelectItem>
+                            <SelectItem value="Overdue">Overdue</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="issueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Issue Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -844,36 +887,14 @@ export default function InvoicingPage() {
                       <FormItem>
                         <FormLabel>Plan Expiry</FormLabel>
                         <FormControl>
-                          <Input type="date" readOnly {...field} />
+                          <Input type="date" {...field} />
                         </FormControl>
-                        <FormDescription>Calculated automatically based on plan duration.</FormDescription>
+                        <FormDescription>Calculated automatically but can be overridden.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                 <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Pending">Pending</SelectItem>
-                          <SelectItem value="Paid">Paid</SelectItem>
-                          <SelectItem value="Overdue">Overdue</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button>
