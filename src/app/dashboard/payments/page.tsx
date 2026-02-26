@@ -74,6 +74,7 @@ import * as z from 'zod';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -270,7 +271,6 @@ export default function InvoicingPage() {
       const plan = plans.find(p => p.id === inv.membershipId || p.id === (inv as any).planId);
       
       let displayStatus = inv.status;
-      // Renamed dueDate to expiryDate for logic clarity
       if (inv.status === 'Pending' && inv.dueDate && isPast(endOfDay(parseISO(inv.dueDate)))) {
         displayStatus = 'Overdue';
       }
@@ -303,7 +303,7 @@ export default function InvoicingPage() {
         planId: '',
         status: 'Pending',
         totalAmount: 0,
-        expiryDate: '', // Will be set automatically when plan is selected
+        expiryDate: '', 
       });
     }
   };
@@ -382,7 +382,7 @@ export default function InvoicingPage() {
         membershipId: membershipId || plan.id, 
         totalAmount: values.totalAmount,
         issueDate: issueDate,
-        dueDate: values.expiryDate, // This is the calculated expiry date
+        dueDate: values.expiryDate, 
         status: values.status,
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
