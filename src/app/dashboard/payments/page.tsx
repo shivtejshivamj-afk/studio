@@ -277,6 +277,7 @@ export default function InvoicingPage() {
         memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
         memberEmail: member?.email,
         memberPhone: member?.phone,
+        memberGymId: member?.gymId,
         planName: plan?.name || 'Standard',
       };
     });
@@ -320,16 +321,28 @@ export default function InvoicingPage() {
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
-    if (status === 'Paid') {
-      const membershipData: Membership = {
-        id: membershipId, memberId: member.id, planId: plan.id, startDate: format(new Date(), 'yyyy-MM-dd'),
-        endDate: expiryDate, status: 'active', priceAtPurchase: plan.price, autoRenew: false,
-      };
-      setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
-    }
+    // Sync membership details immediately regardless of status
+    const membershipData: Membership = {
+      id: membershipId, 
+      memberId: member.id, 
+      planId: plan.id, 
+      startDate: format(new Date(), 'yyyy-MM-dd'),
+      endDate: expiryDate, 
+      status: status === 'Paid' ? 'active' : 'pending', 
+      priceAtPurchase: plan.price, 
+      autoRenew: false,
+    };
+    setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
 
+    // Sync member profile
     const memberDocRef = doc(firestore, 'members', member.id);
-    updateDocumentNonBlocking(memberDocRef, { membershipEndDate: expiryDate, activePlanId: plan.id, isActive: status === 'Paid' });
+    updateDocumentNonBlocking(memberDocRef, { 
+      membershipEndDate: expiryDate, 
+      activePlanId: plan.id, 
+      isActive: status === 'Paid' 
+    });
+
+    // Sync public profile
     const publicProfileRef = doc(firestore, 'member_profiles_public', member.gymId);
     updateDocumentNonBlocking(publicProfileRef, { isActive: status === 'Paid' });
 
@@ -346,10 +359,17 @@ export default function InvoicingPage() {
       const newDocRef = doc(collection(firestore, 'invoices'));
       const membershipId = syncMemberWithInvoice(member.id, plan.id, values.expiryDate, values.status) || '';
       const newInvoiceData: Invoice = {
-        id: newDocRef.id, invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
-        memberId: member.id, planId: plan.id, membershipId: membershipId, totalAmount: values.totalAmount,
-        issueDate: values.issueDate, dueDate: values.expiryDate, status: values.status,
-        gymName: adminProfile.gymName, gymIdentifier: adminProfile.gymIdentifier,
+        id: newDocRef.id, 
+        invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
+        memberId: member.id, 
+        planId: plan.id, 
+        membershipId: membershipId, 
+        totalAmount: values.totalAmount,
+        issueDate: values.issueDate, 
+        dueDate: values.expiryDate, 
+        status: values.status,
+        gymName: adminProfile.gymName, 
+        gymIdentifier: adminProfile.gymIdentifier,
       };
       setDocumentNonBlocking(newDocRef, newInvoiceData, {});
       toast({ title: 'Invoice Created' });
@@ -377,10 +397,89 @@ export default function InvoicingPage() {
     toast({ title: `Status updated to ${status}` });
   };
 
-  const handleDownloadPdf = (invoice: Invoice) => {
+  const handleDownloadPdf = (invoice: any) => {
     const doc = new jsPDF();
-    doc.text(`INVOICE: ${invoice.invoiceNumber}`, 14, 20);
-    autoTable(doc, { startY: 30, head: [['Description', 'Amount']], body: [[`${invoice.planName} Membership`, `₹${invoice.totalAmount.toFixed(2)}`]] });
+    const primaryColor = [16, 185, 129]; // #10b981
+    
+    // Header
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(30);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', 14, 25);
+    
+    // Gym Details
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(adminProfile?.gymName || 'SJ fit', 196, 15, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(adminProfile?.gymAddress || 'Ghansoli', 196, 20, { align: 'right' });
+    doc.text(adminProfile?.gymEmail || 'warlucifer87@gmail.com', 196, 25, { align: 'right' });
+    doc.text(adminProfile?.gymContactNumber || '1234567890', 196, 30, { align: 'right' });
+    
+    // Separator line
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(1);
+    doc.line(14, 35, 196, 35);
+    
+    // Bill To & Metadata
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text('BILL TO', 14, 45);
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(invoice.memberName || 'Member', 14, 52);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoice.memberEmail || '', 14, 57);
+    doc.text(invoice.memberPhone || '', 14, 62);
+    
+    // Metadata block
+    let metaX = 130;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Number:', metaX, 45);
+    doc.text('Issue Date:', metaX, 50);
+    doc.text('Plan Expiry:', metaX, 55);
+    doc.text('Status:', metaX, 60);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoice.invoiceNumber, 196, 45, { align: 'right' });
+    doc.text(invoice.issueDate, 196, 50, { align: 'right' });
+    doc.text(invoice.dueDate, 196, 55, { align: 'right' });
+    doc.text(invoice.status, 196, 60, { align: 'right' });
+    
+    // Table
+    autoTable(doc, {
+      startY: 70,
+      head: [['Description', 'Amount']],
+      body: [[`${invoice.planName} Membership`, `INR ${invoice.totalAmount.toFixed(2)}` ]],
+      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+      bodyStyles: { textColor: [0, 0, 0] },
+      alternateRowStyles: { fillColor: [255, 255, 255] },
+      columnStyles: { 1: { halign: 'right' } }
+    });
+    
+    // Totals
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.text('Subtotal', 150, finalY);
+    doc.text(`INR ${invoice.totalAmount.toFixed(2)}`, 196, finalY, { align: 'right' });
+    
+    doc.setFillColor(240, 240, 240);
+    doc.rect(130, finalY + 5, 66, 12, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Due', 135, finalY + 13);
+    doc.text(`INR ${invoice.totalAmount.toFixed(2)}`, 196, finalY + 13, { align: 'right' });
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(128, 128, 128);
+    doc.text("Thanks for joining! Let's make every workout count.", 105, 285, { align: 'center' });
+    doc.line(14, 280, 196, 280);
+    
     doc.save(`invoice-${invoice.invoiceNumber}.pdf`);
   };
 
@@ -438,22 +537,78 @@ export default function InvoicingPage() {
       </Card>
 
       <Dialog open={activeDialog === 'view'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader><DialogTitle>Invoice Details</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-2xl bg-white text-black p-0 overflow-hidden border-none">
           {selectedInvoice && (
-            <div className="space-y-6 pt-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><h1 className="text-3xl font-bold tracking-tighter text-primary">INVOICE</h1><p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">#{selectedInvoice.invoiceNumber}</p></div>
-                <div className="text-left sm:text-right"><h2 className="text-lg font-bold">{adminProfile?.gymName}</h2><p className="text-xs text-muted-foreground">{adminProfile?.gymAddress || 'SJ fit'}</p></div>
+            <div className="p-10 space-y-8 font-sans">
+              <div className="flex justify-between items-start">
+                <h1 className="text-4xl font-bold text-[#10b981]">INVOICE</h1>
+                <div className="text-right text-sm space-y-0.5">
+                  <p className="font-bold">{adminProfile?.gymName || 'SJ fit'}</p>
+                  <p>{adminProfile?.gymAddress || 'Ghansoli'}</p>
+                  <p>{adminProfile?.gymEmail || 'warlucifer87@gmail.com'}</p>
+                  <p>{adminProfile?.gymContactNumber || '1234567890'}</p>
+                </div>
               </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-1"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bill To</p><p className="text-sm font-bold">{selectedInvoice.memberName}</p><p className="text-xs text-muted-foreground">{selectedInvoice.memberEmail}</p></div>
-                <div className="space-y-1 text-right"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Plan Details</p><p className="text-sm font-bold">{selectedInvoice.planName}</p><p className="text-xs text-muted-foreground italic">Expiry: {selectedInvoice.dueDate}</p></div>
+
+              <div className="h-0.5 bg-[#10b981] w-full" />
+
+              <div className="flex justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">BILL TO</p>
+                  <p className="font-bold text-lg">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberName}</p>
+                  <p className="text-sm">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberEmail}</p>
+                  <p className="text-sm">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberPhone}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  <p className="font-bold">Invoice Number:</p>
+                  <p className="text-right">{selectedInvoice.invoiceNumber}</p>
+                  <p className="font-bold">Issue Date:</p>
+                  <p className="text-right">{selectedInvoice.issueDate}</p>
+                  <p className="font-bold">Plan Expiry:</p>
+                  <p className="text-right">{selectedInvoice.dueDate}</p>
+                  <p className="font-bold">Status:</p>
+                  <p className="text-right">{selectedInvoice.status}</p>
+                </div>
               </div>
-              <div className="rounded-lg border"><Table><TableHeader className="bg-muted/50"><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell className="font-medium">{selectedInvoice.planName} Membership</TableCell><TableCell className="text-right font-bold">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell></TableRow></TableBody></Table></div>
-              <div className="flex flex-col items-end gap-1"><p className="text-xs text-muted-foreground">Total Amount</p><p className="text-2xl font-bold text-primary">₹{selectedInvoice.totalAmount.toFixed(2)}</p></div>
-              <div className="flex justify-end gap-2 border-t pt-4"><Button variant="outline" onClick={closeDialogs}>Close</Button><Button onClick={() => handleDownloadPdf(selectedInvoice)}><Download className="mr-2 h-4 w-4" /> PDF</Button></div>
+
+              <div className="border rounded-sm overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-gray-100">
+                    <TableRow className="hover:bg-transparent border-b">
+                      <TableHead className="text-black font-bold py-2">Description</TableHead>
+                      <TableHead className="text-black font-bold text-right py-2">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow className="hover:bg-transparent border-none">
+                      <TableCell className="py-4 text-black">{processedInvoices.find(i => i.id === selectedInvoice.id)?.planName} Membership</TableCell>
+                      <TableCell className="text-right py-4 font-medium text-black">INR {selectedInvoice.totalAmount.toFixed(2)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex flex-col items-end space-y-2">
+                <div className="flex justify-between w-48 text-sm">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span>INR {selectedInvoice.totalAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between w-full bg-gray-100 p-3 mt-4">
+                  <span className="font-bold">Total Due</span>
+                  <span className="font-bold">INR {selectedInvoice.totalAmount.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="pt-20 text-center border-t border-gray-100">
+                <p className="text-xs text-gray-500 italic">Thanks for joining! Let's make every workout count.</p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 no-print bg-white p-4 border-t sticky bottom-0">
+                <Button variant="outline" onClick={closeDialogs} className="text-black border-gray-200">Close</Button>
+                <Button onClick={() => handleDownloadPdf(processedInvoices.find(i => i.id === selectedInvoice.id))} className="bg-[#10b981] hover:bg-[#059669] text-white">
+                  <Download className="mr-2 h-4 w-4" /> PDF
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
