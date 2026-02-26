@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { type Member, type Invoice, type MembershipPlan, type Membership, type PublicMemberProfile } from '@/lib/data';
+import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -317,15 +317,9 @@ export default function InvoicingPage() {
   const processPaidInvoice = (member: Member, plan: MembershipPlan, manualExpiryDate?: string, existingMembershipId?: string) => {
     if (!firestore) return null;
     
-    let startDate = startOfDay(new Date());
-    if (member.membershipEndDate) {
-      const currentExpiry = parseISO(member.membershipEndDate);
-      if (!isPast(endOfDay(currentExpiry))) {
-        startDate = currentExpiry;
-      }
-    }
-
-    const endDate = manualExpiryDate ? parseISO(manualExpiryDate) : addDays(startDate, plan.durationInDays);
+    // We use the date from the invoice (manualExpiryDate) as the definitive end date.
+    // If not provided, we calculate based on plan duration.
+    const endDate = manualExpiryDate ? parseISO(manualExpiryDate) : addDays(startOfDay(new Date()), plan.durationInDays);
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
@@ -333,7 +327,7 @@ export default function InvoicingPage() {
       id: membershipId,
       memberId: member.id,
       planId: plan.id,
-      startDate: format(startDate, 'yyyy-MM-dd'),
+      startDate: format(new Date(), 'yyyy-MM-dd'),
       endDate: format(endDate, 'yyyy-MM-dd'),
       status: 'active',
       priceAtPurchase: plan.price,
@@ -408,7 +402,8 @@ export default function InvoicingPage() {
       const dateChanged = values.expiryDate !== selectedInvoice.dueDate;
       
       let membershipId = selectedInvoice.membershipId;
-      if (becomingPaid || (selectedInvoice.status === 'Paid' && (planChanged || dateChanged))) {
+      // If it's already Paid or becoming Paid, and something relevant changed, sync with member profile
+      if (becomingPaid || (values.status === 'Paid' && (planChanged || dateChanged))) {
         membershipId = processPaidInvoice(member, plan, values.expiryDate, selectedInvoice.membershipId) || '';
       }
 
