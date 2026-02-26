@@ -526,12 +526,13 @@ export default function InvoicingPage() {
       </Card>
 
       <Dialog open={activeDialog === 'view'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-        <DialogContent className="sm:max-w-2xl bg-white text-black p-0 overflow-hidden border-none">
+        <DialogContent className="sm:max-w-2xl bg-white text-black p-0 overflow-hidden border-none flex flex-col max-h-[95vh]">
           <DialogHeader className="sr-only">
             <DialogTitle>Invoice Details</DialogTitle>
           </DialogHeader>
+          
           {selectedInvoice && (
-            <div className="p-10 space-y-8 font-sans">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-8 font-sans">
               <div className="flex justify-between items-start">
                 <h1 className="text-4xl font-bold text-[#10b981]">INVOICE</h1>
                 <div className="text-right text-sm space-y-0.5">
@@ -544,7 +545,7 @@ export default function InvoicingPage() {
 
               <div className="h-0.5 bg-[#10b981] w-full" />
 
-              <div className="flex justify-between">
+              <div className="flex flex-col sm:flex-row justify-between gap-6">
                 <div className="space-y-1">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">BILL TO</p>
                   <p className="font-bold text-lg">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberName}</p>
@@ -559,13 +560,15 @@ export default function InvoicingPage() {
                   <p className="font-bold">Plan Expiry:</p>
                   <p className="text-right">{selectedInvoice.dueDate}</p>
                   <p className="font-bold">Status:</p>
-                  <p className="text-right">{selectedInvoice.status}</p>
+                  <p className="text-right font-bold" style={{ color: selectedInvoice.status === 'Paid' ? '#10b981' : selectedInvoice.status === 'Overdue' ? '#ef4444' : '#f59e0b' }}>
+                    {selectedInvoice.status}
+                  </p>
                 </div>
               </div>
 
               <div className="border rounded-sm overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-gray-100">
+                  <TableHeader className="bg-gray-100 hover:bg-gray-100">
                     <TableRow className="hover:bg-transparent border-b">
                       <TableHead className="text-black font-bold py-2">Description</TableHead>
                       <TableHead className="text-black font-bold text-right py-2">Amount</TableHead>
@@ -591,18 +594,18 @@ export default function InvoicingPage() {
                 </div>
               </div>
 
-              <div className="pt-20 text-center border-t border-gray-100">
+              <div className="pt-10 text-center border-t border-gray-100">
                 <p className="text-xs text-gray-500 italic">Thanks for joining! Let's make every workout count.</p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 no-print bg-white p-4 border-t sticky bottom-0">
-                <Button variant="outline" onClick={closeDialogs} className="text-black border-gray-200">Close</Button>
-                <Button onClick={() => handleDownloadPdf(processedInvoices.find(i => i.id === selectedInvoice.id))} className="bg-[#10b981] hover:bg-[#059669] text-white">
-                  <Download className="mr-2 h-4 w-4" /> PDF
-                </Button>
               </div>
             </div>
           )}
+          
+          <div className="flex justify-end gap-2 p-4 no-print bg-white border-t mt-auto">
+            <Button variant="outline" onClick={closeDialogs} className="text-black border-gray-200">Close</Button>
+            <Button onClick={() => handleDownloadPdf(processedInvoices.find(i => i.id === selectedInvoice.id))} className="bg-[#10b981] hover:bg-[#059669] text-white">
+              <Download className="mr-2 h-4 w-4" /> PDF
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -610,3 +613,4 @@ export default function InvoicingPage() {
     </>
   );
 }
+
