@@ -80,7 +80,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { format, parseISO, addDays } from 'date-fns';
+import { format, parseISO, addDays, isPast, startOfDay } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -118,6 +118,7 @@ const invoiceSchema = z.object({
   memberId: z.string().min(1, { message: 'Please select a member.' }),
   planId: z.string().min(1, { message: 'Please select a plan.' }),
   status: z.enum(['Paid', 'Pending', 'Overdue']),
+  dueDate: z.string().min(1, { message: 'Due date is required.' }),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -139,14 +140,12 @@ export default function InvoicingPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
   
-  // Pagination State
   const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [totalRecords, setTotalRecords] = useState(0);
-
 
   useEffect(() => {
     setIsClient(true);
@@ -209,21 +208,11 @@ export default function InvoicingPage() {
       setIsLoading(false);
     }, (error) => {
       console.error('Failed to fetch invoices:', error);
-      if (error.code === 'failed-precondition') {
-          toast({
-            title: "Database Index Required",
-            description: "The query for invoices needs a database index. Please check the developer console for a direct link to create it in Firebase. This is needed for sorting.",
-            variant: "destructive",
-            duration: 15000,
-          });
-      } else {
-        toast({ title: "Error", description: `Could not fetch invoices. ${error.message}`, variant: "destructive" });
-      }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [firestore, adminProfile, page, pageCursors, toast]);
+  }, [firestore, adminProfile, page, pageCursors]);
 
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
 
@@ -247,18 +236,17 @@ export default function InvoicingPage() {
     }
   };
 
-
   const processedInvoices = useMemo(() => {
     if (!invoicesData || !members || !plans) return [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+    const today = startOfDay(new Date());
 
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
       const plan = plans.find(p => p.id === inv.membershipId);
       
       let displayStatus = inv.status;
-      if (inv.status === 'Pending' && parseISO(inv.dueDate) < today) {
+      // Auto-calculate Overdue status in UI if pending and past due date
+      if (inv.status === 'Pending' && isPast(parseISO(inv.dueDate)) && parseISO(inv.dueDate) < today) {
         displayStatus = 'Overdue';
       }
 
@@ -281,12 +269,14 @@ export default function InvoicingPage() {
         memberId: invoice.memberId,
         planId: invoice.membershipId,
         status: invoice.status,
+        dueDate: invoice.dueDate,
       });
     } else if (dialog === 'add') {
       form.reset({
         memberId: undefined,
         planId: undefined,
         status: 'Pending',
+        dueDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'),
       });
     }
   };
@@ -300,7 +290,7 @@ export default function InvoicingPage() {
     if (!firestore || !members || !adminProfile?.gymName || !adminProfile.gymIdentifier || !plans) {
         toast({
             title: 'Cannot Create Invoice',
-            description: "Could not determine your gym. Please ensure you have signed up correctly.",
+            description: "Could not determine your gym.",
             variant: 'destructive',
         });
         return;
@@ -309,14 +299,7 @@ export default function InvoicingPage() {
     const member = members.find((m) => m.id === values.memberId);
     const plan = plans.find((p) => p.id === values.planId);
 
-    if (!member || !plan) {
-      toast({
-        title: 'Error',
-        description: 'Selected member or plan not found.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!member || !plan) return;
     
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
@@ -328,7 +311,7 @@ export default function InvoicingPage() {
         membershipId: plan.id,
         totalAmount: plan.price,
         issueDate: format(new Date(), 'yyyy-MM-dd'),
-        dueDate: format(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+        dueDate: values.dueDate,
         status: values.status,
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
@@ -346,6 +329,7 @@ export default function InvoicingPage() {
         memberId: values.memberId,
         membershipId: values.planId,
         status: values.status,
+        dueDate: values.dueDate,
         totalAmount: plan.price,
       };
       updateDocumentNonBlocking(docRef, updatedData);
@@ -362,7 +346,6 @@ export default function InvoicingPage() {
     if (selectedInvoice && firestore) {
       const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       deleteDocumentNonBlocking(docRef);
-
       toast({
         title: 'Invoice Deleted',
         description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,
@@ -400,33 +383,23 @@ export default function InvoicingPage() {
   };
 
   const handleDownloadPdf = (invoiceToDownload: Invoice) => {
-    if (!invoiceToDownload) {
-      toast({
-        title: 'Error',
-        description: 'No invoice selected to download.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!invoiceToDownload) return;
 
     const doc = new jsPDF();
     const currencyPrefix = 'INR ';
-
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
-    const primaryColor = [48, 213, 118]; // The green from your theme
+    const primaryColor = [48, 213, 118];
     const lightGrayColor = [240, 240, 240];
     const darkGrayColor = [50, 50, 50];
     const grayColor = [128, 128, 128];
 
-    // --- Header ---
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(28);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('INVOICE', margin, 25);
 
-    // --- Gym Details ---
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
@@ -451,13 +424,11 @@ export default function InvoicingPage() {
       doc.text(adminProfile.gymContactNumber, pageWidth - margin, rightColY, { align: 'right' });
     }
 
-    // --- Line Separator ---
     const headerBottomY = Math.max(rightColY, 30) + 15;
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setLineWidth(0.8);
     doc.line(margin, headerBottomY, pageWidth - margin, headerBottomY);
 
-    // --- Bill To & Invoice Details ---
     let detailsY = headerBottomY + 12;
     doc.setFontSize(10);
     doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
@@ -478,7 +449,7 @@ export default function InvoicingPage() {
     }
     
     const detailsRightX = pageWidth - margin;
-    const detailsLeftX = pageWidth - 70; // Position for the start of the labels on the right
+    const detailsLeftX = pageWidth - 70;
 
     const drawDetailRow = (y: number, label: string, value: string) => {
         doc.setFont('helvetica', 'bold');
@@ -494,8 +465,6 @@ export default function InvoicingPage() {
     drawDetailRow(detailsY + 14, 'Due Date:', invoiceToDownload.dueDate);
     drawDetailRow(detailsY + 21, 'Status:', invoiceToDownload.status);
 
-
-    // --- Table ---
     const tableStartY = Math.max(memberDetailsY, detailsY + 21) + 20;
     autoTable(doc, {
       startY: tableStartY,
@@ -504,49 +473,23 @@ export default function InvoicingPage() {
         [`${invoiceToDownload.planName || 'Unknown Plan'} Membership`, `${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`],
       ],
       theme: 'grid',
-      styles: {
-          font: 'helvetica',
-          textColor: darkGrayColor,
-          lineColor: [220, 220, 220],
-          lineWidth: 0.1,
-      },
-      headStyles: { 
-          fillColor: lightGrayColor, 
-          textColor: darkGrayColor, 
-          fontStyle: 'bold',
-          fontSize: 10,
-      },
-      bodyStyles: {
-          fillColor: [255, 255, 255],
-          fontSize: 10,
-      },
+      styles: { font: 'helvetica', textColor: darkGrayColor, lineColor: [220, 220, 220], lineWidth: 0.1 },
+      headStyles: { fillColor: lightGrayColor, textColor: darkGrayColor, fontStyle: 'bold', fontSize: 10 },
       didDrawPage: (data) => {
         const finalY = (data.cursor?.y || 0) + 10;
         const totalX = pageWidth - margin;
-        
-        // --- Totals Section ---
         doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
         doc.text('Subtotal', totalX - 40, finalY + 5, { align: 'right' });
         doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY + 5, { align: 'right' });
-        
         doc.setFillColor(lightGrayColor[0], lightGrayColor[1], lightGrayColor[2]);
         doc.rect(pageWidth / 2 - 1, finalY + 10, pageWidth / 2 + 1, 12, 'F');
-        
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(darkGrayColor[0], darkGrayColor[1], darkGrayColor[2]);
         doc.text('Total Due', totalX - 40, finalY + 17.5, { align: 'right' });
         doc.text(`${currencyPrefix}${invoiceToDownload.totalAmount.toFixed(2)}`, totalX, finalY + 17.5, { align: 'right' });
-        
-        // --- Footer ---
         const footerY = pageHeight - 20;
         doc.setDrawColor(lightGrayColor[0], lightGrayColor[1], lightGrayColor[2]);
-        doc.setLineWidth(0.5);
         doc.line(margin, footerY, pageWidth - margin, footerY);
         doc.setFontSize(9);
-        doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
         doc.text('Thanks for joining! Let’s make every workout count.', pageWidth / 2, footerY + 8, { align: 'center' });
       },
     });
@@ -801,6 +744,19 @@ export default function InvoicingPage() {
                 />
                  <FormField
                   control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Due Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
                   name="status"
                   render={({ field }) => (
                     <FormItem>
@@ -838,9 +794,7 @@ export default function InvoicingPage() {
         <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90vh] bg-card text-card-foreground">
           <DialogHeader>
             <DialogTitle>Invoice Details</DialogTitle>
-            <DialogDescription>
-              Review the invoice details below.
-            </DialogDescription>
+            <DialogDescription>Review the invoice details below.</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6 py-2">
             {selectedInvoice && (
@@ -873,6 +827,10 @@ export default function InvoicingPage() {
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
                       <p className="font-semibold text-muted-foreground text-nowrap">Issue Date:</p>
                       <p className="text-foreground">{selectedInvoice.issueDate}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
+                      <p className="font-semibold text-muted-foreground text-nowrap">Due Date:</p>
+                      <p className="text-foreground">{selectedInvoice.dueDate}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
                       <p className="font-semibold text-muted-foreground">Status:</p>
@@ -909,9 +867,6 @@ export default function InvoicingPage() {
                         </div>
                     </div>
                 </div>
-                 <div className="pt-8 text-center text-muted-foreground text-sm">
-                    <p>Thanks for joining! Let’s make every workout count.</p>
-                </div>
               </div>
             )}
           </div>
@@ -939,9 +894,7 @@ export default function InvoicingPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
