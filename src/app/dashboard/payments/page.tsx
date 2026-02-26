@@ -228,10 +228,8 @@ export default function InvoicingPage() {
     if (activeDialog === 'add' && selectedPlanId && plans && members && selectedMemberId) {
       const plan = plans.find(p => p.id === selectedPlanId);
       const member = members.find(m => m.id === selectedMemberId);
-      
       if (plan && member) {
         form.setValue('totalAmount', plan.price);
-        
         let startDate = startOfDay(new Date());
         if (member.membershipEndDate) {
           const currentExpiry = parseISO(member.membershipEndDate);
@@ -263,11 +261,9 @@ export default function InvoicingPage() {
 
   const processedInvoices = useMemo(() => {
     if (!invoicesData || !members || !plans) return [];
-
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
       const plan = plans.find(p => p.id === inv.planId);
-      
       let displayStatus = inv.status;
       if (inv.status === 'Pending' && inv.dueDate) {
         const due = parseISO(inv.dueDate);
@@ -275,14 +271,13 @@ export default function InvoicingPage() {
           displayStatus = 'Overdue';
         }
       }
-
       return {
         ...inv,
         status: displayStatus as 'Paid' | 'Pending' | 'Overdue',
         memberName: member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
         memberEmail: member?.email,
         memberPhone: member?.phone,
-        planName: plan?.name || 'Unknown Plan',
+        planName: plan?.name || 'Standard',
       };
     });
   }, [invoicesData, members, plans]);
@@ -318,111 +313,59 @@ export default function InvoicingPage() {
 
   const syncMemberWithInvoice = (memberId: string, planId: string, expiryDate: string, status: 'Paid' | 'Pending' | 'Overdue', existingMembershipId?: string) => {
     if (!firestore || !members || !plans) return null;
-    
     const member = members.find(m => m.id === memberId);
     const plan = plans.find(p => p.id === planId);
     if (!member || !plan) return null;
 
-    const isPaid = status === 'Paid';
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
-    if (isPaid) {
+    if (status === 'Paid') {
       const membershipData: Membership = {
-        id: membershipId,
-        memberId: member.id,
-        planId: plan.id,
-        startDate: format(new Date(), 'yyyy-MM-dd'),
-        endDate: expiryDate,
-        status: 'active',
-        priceAtPurchase: plan.price,
-        autoRenew: false,
+        id: membershipId, memberId: member.id, planId: plan.id, startDate: format(new Date(), 'yyyy-MM-dd'),
+        endDate: expiryDate, status: 'active', priceAtPurchase: plan.price, autoRenew: false,
       };
       setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
     }
 
     const memberDocRef = doc(firestore, 'members', member.id);
-    updateDocumentNonBlocking(memberDocRef, {
-      membershipEndDate: expiryDate,
-      activePlanId: plan.id,
-      isActive: isPaid,
-    });
-    
+    updateDocumentNonBlocking(memberDocRef, { membershipEndDate: expiryDate, activePlanId: plan.id, isActive: status === 'Paid' });
     const publicProfileRef = doc(firestore, 'member_profiles_public', member.gymId);
-    updateDocumentNonBlocking(publicProfileRef, {
-        isActive: isPaid,
-        firstName: member.firstName,
-        lastName: member.lastName
-    });
+    updateDocumentNonBlocking(publicProfileRef, { isActive: status === 'Paid' });
 
     return membershipId;
   };
 
   const handleSaveInvoice = (values: InvoiceFormValues) => {
-    if (!firestore || !members || !adminProfile?.gymName || !adminProfile.gymIdentifier || !plans) {
-        toast({
-            title: 'Cannot Create Invoice',
-            description: "Could not determine your gym.",
-            variant: 'destructive',
-        });
-        return;
-    }
-    
+    if (!firestore || !members || !adminProfile?.gymName || !adminProfile.gymIdentifier || !plans) return;
     const member = members.find((m) => m.id === values.memberId);
     const plan = plans.find((p) => p.id === values.planId);
-
     if (!member || !plan) return;
     
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
       const membershipId = syncMemberWithInvoice(member.id, plan.id, values.expiryDate, values.status) || '';
-
       const newInvoiceData: Invoice = {
-        id: newDocRef.id,
-        invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
-        memberId: member.id,
-        planId: plan.id,
-        membershipId: membershipId, 
-        totalAmount: values.totalAmount,
-        issueDate: values.issueDate,
-        dueDate: values.expiryDate, 
-        status: values.status,
-        gymName: adminProfile.gymName,
-        gymIdentifier: adminProfile.gymIdentifier,
+        id: newDocRef.id, invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
+        memberId: member.id, planId: plan.id, membershipId: membershipId, totalAmount: values.totalAmount,
+        issueDate: values.issueDate, dueDate: values.expiryDate, status: values.status,
+        gymName: adminProfile.gymName, gymIdentifier: adminProfile.gymIdentifier,
       };
-      
       setDocumentNonBlocking(newDocRef, newInvoiceData, {});
-      toast({ title: 'Invoice Created', description: `Invoice for ${member.firstName} created.` });
+      toast({ title: 'Invoice Created' });
     } else if (activeDialog === 'edit' && selectedInvoice) {
       const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       const membershipId = syncMemberWithInvoice(member.id, plan.id, values.expiryDate, values.status, selectedInvoice.membershipId) || '';
-
-      const updatedData: Partial<Invoice> = {
-        memberId: values.memberId,
-        planId: values.planId,
-        membershipId: membershipId,
-        status: values.status,
-        totalAmount: values.totalAmount,
-        issueDate: values.issueDate,
-        dueDate: values.expiryDate,
-      };
-
-      updateDocumentNonBlocking(docRef, updatedData);
-      toast({ title: 'Invoice Updated', description: `Invoice ${selectedInvoice.invoiceNumber} updated.` });
+      updateDocumentNonBlocking(docRef, { ...values, dueDate: values.expiryDate, membershipId });
+      toast({ title: 'Invoice Updated' });
     }
-
     closeDialogs();
   };
 
   const handleDeleteConfirm = () => {
     if (selectedInvoice && firestore) {
-      const docRef = doc(firestore, 'invoices', selectedInvoice.id);
-      deleteDocumentNonBlocking(docRef);
-      toast({
-        title: 'Invoice Deleted',
-        description: `Invoice ${selectedInvoice.invoiceNumber} deleted.`,
-        variant: 'destructive',
-      });
+      deleteDocumentNonBlocking(doc(firestore, 'invoices', selectedInvoice.id));
+      toast({ title: 'Invoice Deleted', variant: 'destructive' });
       closeDialogs();
     }
   };
@@ -430,32 +373,21 @@ export default function InvoicingPage() {
   const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue') => {
     if (!firestore || !members || !plans) return;
     const membershipId = syncMemberWithInvoice(invoice.memberId, invoice.planId, invoice.dueDate, status, invoice.membershipId);
-    updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { 
-      status, 
-      membershipId: membershipId || invoice.membershipId 
-    });
-    toast({ title: 'Status Updated', description: `Invoice ${invoice.invoiceNumber} is now ${status}.` });
+    updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { status, membershipId: membershipId || invoice.membershipId });
+    toast({ title: `Status updated to ${status}` });
   };
 
-  const handleDownloadPdf = (invoiceToDownload: Invoice) => {
-    if (!invoiceToDownload) return;
+  const handleDownloadPdf = (invoice: Invoice) => {
     const doc = new jsPDF();
-    autoTable(doc, {
-      startY: 20,
-      head: [['Description', 'Amount']],
-      body: [[`${invoiceToDownload.planName || 'Plan'} Membership`, `₹${invoiceToDownload.totalAmount.toFixed(2)}`]],
-    });
-    doc.save(`invoice-${invoiceToDownload.invoiceNumber}.pdf`);
+    doc.text(`INVOICE: ${invoice.invoiceNumber}`, 14, 20);
+    autoTable(doc, { startY: 30, head: [['Description', 'Amount']], body: [[`${invoice.planName} Membership`, `₹${invoice.totalAmount.toFixed(2)}`]] });
+    doc.save(`invoice-${invoice.invoiceNumber}.pdf`);
   };
 
   const filteredInvoices = useMemo(() => {
     if (!searchQuery) return processedInvoices;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return processedInvoices.filter(
-      (invoice) =>
-        invoice.memberName?.toLowerCase().includes(lowercasedQuery) ||
-        invoice.invoiceNumber.toLowerCase().includes(lowercasedQuery)
-    );
+    const q = searchQuery.toLowerCase();
+    return processedInvoices.filter(i => i.memberName?.toLowerCase().includes(q) || i.invoiceNumber.toLowerCase().includes(q));
   }, [processedInvoices, searchQuery]);
 
   return (
@@ -463,224 +395,71 @@ export default function InvoicingPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Invoicing</CardTitle>
-              <CardDescription>Manage your member invoices and billing.</CardDescription>
-            </div>
+            <div><CardTitle>Invoicing</CardTitle><CardDescription>Manage billing and plans.</CardDescription></div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
-              <Input
-                placeholder="Search by name or invoice ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:max-w-xs"
-              />
-              <Button size="sm" className="gap-1" onClick={() => handleOpenDialog('add')}>
-                <PlusCircle className="h-4 w-4" />
-                Create Invoice
-              </Button>
+              <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full sm:max-w-xs" />
+              <Button size="sm" className="gap-1" onClick={() => handleOpenDialog('add')}><PlusCircle className="h-4 w-4" /> Create</Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice ID</TableHead>
-                <TableHead>Member</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Plan Expiry</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Member</TableHead><TableHead>Expiry</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isDataLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-36" /></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredInvoices.length > 0 ? (
-                filteredInvoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-medium text-xs">{invoice.invoiceNumber}</TableCell>
-                  <TableCell>
-                    <div className="font-medium">{invoice.memberName}</div>
-                    {invoice.memberPhone && <div className="text-xs text-muted-foreground">{invoice.memberPhone}</div>}
-                  </TableCell>
-                  <TableCell className="text-xs">{invoice.issueDate}</TableCell>
-                  <TableCell className="text-xs font-medium">{invoice.dueDate}</TableCell>
-                  <TableCell className="font-semibold">₹{invoice.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant[invoice.status]}>
-                      {invoice.status}
-                    </Badge>
-                  </TableCell>
+              {isDataLoading ? Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+              )) : filteredInvoices.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell className="font-medium text-xs">{inv.invoiceNumber}</TableCell>
+                  <TableCell><div><p className="font-bold">{inv.memberName}</p><p className="text-[10px] text-muted-foreground">{inv.planName}</p></div></TableCell>
+                  <TableCell className="text-xs">{inv.dueDate}</TableCell>
+                  <TableCell className="font-semibold">₹{inv.totalAmount}</TableCell>
+                  <TableCell><Badge variant={statusVariant[inv.status]}>{inv.status}</Badge></TableCell>
                   <TableCell className="text-right">
-                    {isClient ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('view', invoice)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('edit', invoice)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(invoice, 'Paid')}>
-                              <CheckCircle className="mr-2 h-4 w-4" /> Mark Paid
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(invoice, 'Pending')}>
-                              <Clock className="mr-2 h-4 w-4" /> Mark Pending
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(invoice, 'Overdue')}>
-                              <AlertCircle className="mr-2 h-4 w-4" /> Mark Overdue
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('delete', invoice)} className="text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="h-10 w-40" />
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('view', inv)}><Eye className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('edit', inv)}><Pencil className="h-4 w-4" /></Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(inv, 'Paid')}><CheckCircle className="mr-2 h-4 w-4" /> Paid</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(inv, 'Pending')}><Clock className="mr-2 h-4 w-4" /> Pending</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(inv, 'Overdue')}><AlertCircle className="mr-2 h-4 w-4" /> Overdue</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">No invoices found.</TableCell>
-                </TableRow>
-              )}
+              ))}
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter>
-            <div className="flex items-center justify-between w-full">
-                <div className="text-xs text-muted-foreground">Page {page} of {totalPages || 1}</div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={page <= 1}>Previous</Button>
-                    <Button variant="outline" size="sm" onClick={goToNextPage} disabled={page >= totalPages}>Next</Button>
-                </div>
-            </div>
-        </CardFooter>
+        <CardFooter><div className="flex items-center justify-between w-full text-xs text-muted-foreground">Page {page} of {totalPages || 1}<div className="flex gap-2"><Button variant="outline" size="sm" onClick={goToPrevPage} disabled={page <= 1}>Prev</Button><Button variant="outline" size="sm" onClick={goToNextPage} disabled={page >= totalPages}>Next</Button></div></div></CardFooter>
       </Card>
 
-      <Dialog open={activeDialog === 'add' || activeDialog === 'edit'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-        <DialogContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSaveInvoice)}>
-              <DialogHeader>
-                <DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <FormField control={form.control} name="memberId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Member</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {members?.map((m) => <SelectItem key={m.id} value={m.id}>{m.firstName} {m.lastName}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="planId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plan</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {plans?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} - ₹{p.price}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="totalAmount" render={({ field }) => (
-                    <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="status" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="Pending">Pending</SelectItem>
-                          <SelectItem value="Paid">Paid</SelectItem>
-                          <SelectItem value="Overdue">Overdue</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="issueDate" render={({ field }) => (
-                    <FormItem><FormLabel>Issue Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="expiryDate" render={({ field }) => (
-                    <FormItem><FormLabel>Plan Expiry</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button>
-                <Button type="submit">Save</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-      
       <Dialog open={activeDialog === 'view'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader><DialogTitle>Invoice Details</DialogTitle></DialogHeader>
           {selectedInvoice && (
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <div><h1 className="text-xl font-bold">INVOICE</h1><p className="text-sm">{selectedInvoice.invoiceNumber}</p></div>
-                <div className="text-right"><strong>{adminProfile?.gymName}</strong></div>
+            <div className="space-y-6 pt-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div><h1 className="text-3xl font-bold tracking-tighter text-primary">INVOICE</h1><p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">#{selectedInvoice.invoiceNumber}</p></div>
+                <div className="text-left sm:text-right"><h2 className="text-lg font-bold">{adminProfile?.gymName}</h2><p className="text-xs text-muted-foreground">{adminProfile?.gymAddress || 'SJ fit'}</p></div>
               </div>
               <Separator />
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-xs uppercase text-muted-foreground">Bill To</p><p className="font-bold">{selectedInvoice.memberName}</p></div>
-                <div className="text-right"><p className="text-xs uppercase text-muted-foreground">Plan Expiry</p><p className="font-bold">{selectedInvoice.dueDate}</p></div>
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-1"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Bill To</p><p className="text-sm font-bold">{selectedInvoice.memberName}</p><p className="text-xs text-muted-foreground">{selectedInvoice.memberEmail}</p></div>
+                <div className="space-y-1 text-right"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Plan Details</p><p className="text-sm font-bold">{selectedInvoice.planName}</p><p className="text-xs text-muted-foreground italic">Expiry: {selectedInvoice.dueDate}</p></div>
               </div>
-              <Table>
-                <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                <TableBody><TableRow><TableCell>{selectedInvoice.planName} Membership</TableCell><TableCell className="text-right">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell></TableRow></TableBody>
-              </Table>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={closeDialogs}>Close</Button>
-                <Button onClick={() => handleDownloadPdf(selectedInvoice)}><Download className="mr-2 h-4 w-4" /> PDF</Button>
-              </div>
+              <div className="rounded-lg border"><Table><TableHeader className="bg-muted/50"><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell className="font-medium">{selectedInvoice.planName} Membership</TableCell><TableCell className="text-right font-bold">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell></TableRow></TableBody></Table></div>
+              <div className="flex flex-col items-end gap-1"><p className="text-xs text-muted-foreground">Total Amount</p><p className="text-2xl font-bold text-primary">₹{selectedInvoice.totalAmount.toFixed(2)}</p></div>
+              <div className="flex justify-end gap-2 border-t pt-4"><Button variant="outline" onClick={closeDialogs}>Close</Button><Button onClick={() => handleDownloadPdf(selectedInvoice)}><Download className="mr-2 h-4 w-4" /> PDF</Button></div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-      
-      <AlertDialog open={activeDialog === 'delete'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Delete invoice {selectedInvoice?.invoiceNumber}?</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+      <Dialog open={activeDialog === 'add' || activeDialog === 'edit'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}><DialogContent><Form {...form}><form onSubmit={form.handleSubmit(handleSaveInvoice)} className="space-y-4"><DialogHeader><DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle></DialogHeader><div className="grid gap-4"><FormField control={form.control} name="memberId" render={({ field }) => (<FormItem><FormLabel>Member</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger></FormControl><SelectContent>{members?.map((m) => <SelectItem key={m.id} value={m.id}>{m.firstName} {m.lastName} ({m.gymId})</SelectItem>)}</SelectContent></Select></FormItem>)} /><FormField control={form.control} name="planId" render={({ field }) => (<FormItem><FormLabel>Plan</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger></FormControl><SelectContent>{plans?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} - ₹{p.price}</SelectItem>)}</SelectContent></Select></FormItem>)} /><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="totalAmount" render={({ field }) => (<FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="Paid">Paid</SelectItem><SelectItem value="Overdue">Overdue</SelectItem></SelectContent></Select></FormItem>)} /></div><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="issueDate" render={({ field }) => (<FormItem><FormLabel>Issue Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="expiryDate" render={({ field }) => (<FormItem><FormLabel>Plan Expiry</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} /></div></div><DialogFooter><Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button><Button type="submit">Save</Button></DialogFooter></form></Form></DialogContent></Dialog>
     </>
   );
 }
