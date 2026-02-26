@@ -81,7 +81,7 @@ import {
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO, addDays, isPast, startOfDay, endOfDay, isValid } from 'date-fns';
-import jsPDF from 'jsPDF';
+import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
   useFirestore,
@@ -321,7 +321,6 @@ export default function InvoicingPage() {
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
-    // Sync membership details immediately regardless of status
     const membershipData: Membership = {
       id: membershipId, 
       memberId: member.id, 
@@ -334,7 +333,6 @@ export default function InvoicingPage() {
     };
     setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
 
-    // Sync member profile
     const memberDocRef = doc(firestore, 'members', member.id);
     updateDocumentNonBlocking(memberDocRef, { 
       membershipEndDate: expiryDate, 
@@ -342,7 +340,6 @@ export default function InvoicingPage() {
       isActive: status === 'Paid' 
     });
 
-    // Sync public profile
     const publicProfileRef = doc(firestore, 'member_profiles_public', member.gymId);
     updateDocumentNonBlocking(publicProfileRef, { isActive: status === 'Paid' });
 
@@ -401,13 +398,11 @@ export default function InvoicingPage() {
     const doc = new jsPDF();
     const primaryColor = [16, 185, 129]; // #10b981
     
-    // Header
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFontSize(30);
     doc.setFont('helvetica', 'bold');
     doc.text('INVOICE', 14, 25);
     
-    // Gym Details
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -417,12 +412,10 @@ export default function InvoicingPage() {
     doc.text(adminProfile?.gymEmail || 'warlucifer87@gmail.com', 196, 25, { align: 'right' });
     doc.text(adminProfile?.gymContactNumber || '1234567890', 196, 30, { align: 'right' });
     
-    // Separator line
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setLineWidth(1);
     doc.line(14, 35, 196, 35);
     
-    // Bill To & Metadata
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
     doc.text('BILL TO', 14, 45);
@@ -436,7 +429,6 @@ export default function InvoicingPage() {
     doc.text(invoice.memberEmail || '', 14, 57);
     doc.text(invoice.memberPhone || '', 14, 62);
     
-    // Metadata block
     let metaX = 130;
     doc.setFont('helvetica', 'bold');
     doc.text('Invoice Number:', metaX, 45);
@@ -450,7 +442,6 @@ export default function InvoicingPage() {
     doc.text(invoice.dueDate, 196, 55, { align: 'right' });
     doc.text(invoice.status, 196, 60, { align: 'right' });
     
-    // Table
     autoTable(doc, {
       startY: 70,
       head: [['Description', 'Amount']],
@@ -461,7 +452,6 @@ export default function InvoicingPage() {
       columnStyles: { 1: { halign: 'right' } }
     });
     
-    // Totals
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(10);
     doc.text('Subtotal', 150, finalY);
@@ -473,7 +463,6 @@ export default function InvoicingPage() {
     doc.text('Total Due', 135, finalY + 13);
     doc.text(`INR ${invoice.totalAmount.toFixed(2)}`, 196, finalY + 13, { align: 'right' });
     
-    // Footer
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(128, 128, 128);
