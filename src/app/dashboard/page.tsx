@@ -8,8 +8,9 @@ import {
   Mail,
   Copy,
   Building,
+  CheckCircle2,
 } from 'lucide-react';
-import { type Member } from '@/lib/data';
+import { type Member, type Invoice } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -42,11 +43,10 @@ import {
   useMemoFirebase,
   useUser,
   useDoc,
-  updateDocumentNonBlocking,
 } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, parseISO, startOfDay } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -83,7 +83,23 @@ export default function DashboardPage() {
   const { data: members, isLoading: isLoadingMembers } =
     useCollection<Member>(membersQuery);
 
-  const isLoading = isLoadingAdminProfile || isLoadingMembers;
+  const recentPaidInvoicesQuery = useMemoFirebase(
+    () =>
+      firestore && adminProfile?.gymIdentifier
+        ? query(
+            collection(firestore, 'invoices'),
+            where('gymIdentifier', '==', adminProfile.gymIdentifier),
+            where('status', '==', 'Paid'),
+            orderBy('issueDate', 'desc'),
+            limit(5)
+          )
+        : null,
+    [firestore, adminProfile]
+  );
+  const { data: recentInvoices, isLoading: isLoadingInvoices } = 
+    useCollection<Invoice>(recentPaidInvoicesQuery);
+
+  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices;
 
   useEffect(() => {
     setIsClient(true);
@@ -92,8 +108,7 @@ export default function DashboardPage() {
   const expiringSoonMembers = useMemo(() => {
     if (!members) return [];
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
 
     return members.filter(member => {
         if (!member.membershipEndDate) return false;
@@ -101,11 +116,15 @@ export default function DashboardPage() {
         try {
             const endDate = parseISO(member.membershipEndDate);
             const diff = differenceInDays(endDate, today);
-            return diff >= 0 && diff <= 7;
+            // Show if expired (diff < 0) or expiring within 14 days
+            return diff <= 14;
         } catch(e) {
-            console.error("Invalid date format for membershipEndDate", member.membershipEndDate);
             return false;
         }
+    }).sort((a, b) => {
+        const dateA = parseISO(a.membershipEndDate!).getTime();
+        const dateB = parseISO(b.membershipEndDate!).getTime();
+        return dateA - dateB;
     });
   }, [members]);
 
@@ -152,11 +171,6 @@ export default function DashboardPage() {
       });
     }).catch(err => {
       console.error('Failed to copy: ', err);
-      toast({
-        title: 'Copy Failed',
-        description: 'Could not copy to clipboard due to browser permissions. Please copy manually.',
-        variant: 'destructive',
-      });
     });
   };
 
@@ -183,7 +197,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 animate-fade-in">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -234,12 +248,13 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
-          <Card>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Expiring Soon Table */}
+          <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle>Memberships Expiring Soon</CardTitle>
+              <CardTitle>Expiring or Expired</CardTitle>
               <CardDescription>
-                Members whose subscription will expire in the next 7 days.
+                Members whose subscription has ended or ends soon (14 days).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -247,8 +262,7 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead>Member ID</TableHead>
-                    <TableHead>Expiry Date</TableHead>
+                    <TableHead>Expiry</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -257,14 +271,13 @@ export default function DashboardPage() {
                      Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-28" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                       </TableRow>
                     ))
                   ) : expiringSoonMembers.length > 0 ? (
                     expiringSoonMembers.map((member) => {
-                      const today = new Date();
+                      const today = startOfDay(new Date());
                       const endDate = parseISO(member.membershipEndDate!);
                       const daysLeft = differenceInDays(endDate, today);
                       const expiresInText = 
@@ -277,27 +290,12 @@ export default function DashboardPage() {
                         <TableRow key={member.id}>
                           <TableCell>
                             <div className="font-medium">{`${member.firstName} ${member.lastName}`}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {member.gymId}
-                              {isClient && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => handleCopy(member.gymId)}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                  <span className="sr-only">Copy Member ID</span>
-                                </Button>
-                              )}
-                            </div>
+                            <div className="text-xs text-muted-foreground">{member.gymId}</div>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span>{member.membershipEndDate}</span>
-                              <Badge variant={daysLeft <= 3 ? 'destructive' : 'secondary'} className="mt-1 w-fit">
+                              <span className="text-sm">{member.membershipEndDate}</span>
+                              <Badge variant={daysLeft <= 3 ? 'destructive' : 'secondary'} className="mt-1 w-fit text-[10px]">
                                   {expiresInText}
                               </Badge>
                             </div>
@@ -308,22 +306,20 @@ export default function DashboardPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  title="Send Reminder"
                                   onClick={() => handleSendReminder(member)}
                                 >
-                                  <Mail className="mr-2 h-4 w-4" />
-                                  <span className="sr-only">
-                                    Send Reminder
-                                  </span>
+                                  <Mail className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  title="View Profile"
                                   onClick={() =>
                                     handleOpenDialog('view', member)
                                   }
                                 >
                                   <Eye className="h-4 w-4" />
-                                  <span className="sr-only">View</span>
                                 </Button>
                               </div>
                             ) : (
@@ -335,7 +331,70 @@ export default function DashboardPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">No members with expiring memberships.</TableCell>
+                      <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                        No critical memberships found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity Table */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Recent Paid Invoices</CardTitle>
+              <CardDescription>
+                The last 5 payments processed for your gym.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Member</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                     Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-5 w-16" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : recentInvoices && recentInvoices.length > 0 ? (
+                    recentInvoices.map((invoice) => {
+                      const member = members?.find(m => m.id === invoice.memberId);
+                      return (
+                        <TableRow key={invoice.id}>
+                          <TableCell>
+                            <div className="font-medium">{invoice.invoiceNumber}</div>
+                            <div className="text-xs text-muted-foreground">{invoice.issueDate}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {member ? `${member.firstName} ${member.lastName}` : 'N/A'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1 text-primary">
+                              <CheckCircle2 className="h-3 w-3" />
+                              <span className="font-semibold">₹{invoice.totalAmount.toFixed(2)}</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                        No recent payments recorded.
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -377,17 +436,6 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-1">
                     <span className="font-semibold">Member ID:</span>
                     {selectedMember.gymId}
-                    {isClient && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleCopy(selectedMember.gymId)}
-                      >
-                        <Copy className="h-4 w-4" />
-                        <span className="sr-only">Copy Member ID</span>
-                      </Button>
-                    )}
                   </div>
                 </div>
                 <div>
