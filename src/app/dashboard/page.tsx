@@ -47,7 +47,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where, orderBy, limit } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { differenceInDays, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { differenceInDays, parseISO, startOfDay, endOfDay, isPast } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -132,7 +132,7 @@ export default function DashboardPage() {
   const activeMembersCount = useMemo(
     () => members?.filter((m) => {
       if (!m.isActive) return false;
-      if (!m.membershipEndDate) return true; // No end date but isActive true (legacy or manual)
+      if (!m.membershipEndDate) return true;
       return !isPast(endOfDay(parseISO(m.membershipEndDate)));
     }).length || 0,
     [members]
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead>Expiry</TableHead>
+                    <TableHead>Plan Expiry</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

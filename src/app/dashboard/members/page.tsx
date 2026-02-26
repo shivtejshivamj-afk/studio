@@ -394,7 +394,7 @@ export default function MembersPage() {
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden md:table-cell">Expiry Date</TableHead>
+                <TableHead className="hidden md:table-cell">Plan Expiry</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -632,7 +632,7 @@ export default function MembersPage() {
                     name="membershipEndDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Expiry Date</FormLabel>
+                        <FormLabel>Plan Expiry</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
@@ -714,7 +714,7 @@ export default function MembersPage() {
                   <span className="font-semibold">Join Date:</span> {selectedMember.joinDate}
                 </div>
                  <div>
-                  <span className="font-semibold">Expiry Date:</span> {selectedMember.membershipEndDate || 'N/A'}
+                  <span className="font-semibold">Plan Expiry:</span> {selectedMember.membershipEndDate || 'N/A'}
                 </div>
               </div>
             </div>
