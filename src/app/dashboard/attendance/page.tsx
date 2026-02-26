@@ -31,7 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import {
   useFirestore,
   useMemoFirebase,
@@ -39,7 +39,6 @@ import {
   useDoc,
   useCollection,
   setDocumentNonBlocking,
-  deleteDocumentNonBlocking,
 } from '@/firebase';
 import {
   collection,
@@ -54,40 +53,15 @@ import {
   limit,
   startAfter,
   getDoc,
-  getDocs,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { type Attendance, type Member, type PublicMemberProfile } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-    CalendarIcon, 
     Download, 
     ChevronLeft,
     ChevronRight,
-    Trash2,
 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { type DateRange } from 'react-day-picker';
-import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -114,14 +88,6 @@ export default function AttendancePage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
-  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
-  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
-  
-  // Range Deletion State
-  const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
-  const [rangeToDelete, setRangeToDelete] = useState<DateRange | undefined>();
-  const [isRangeConfirmOpen, setIsRangeConfirmOpen] = useState(false);
 
   // Pagination State
   const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
@@ -191,21 +157,11 @@ export default function AttendancePage() {
       setIsLoading(false);
     }, (error) => {
       console.error('Failed to fetch attendance data:', error);
-      if (error.code === 'failed-precondition') {
-          toast({
-            title: "Database Index Required",
-            description: "The query for attendance records needs a database index.",
-            variant: "destructive",
-            duration: 15000,
-          });
-      } else {
-        toast({ title: "Error", description: `Could not fetch attendance records. ${error.message}`, variant: "destructive"});
-      }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [firestore, adminProfile, page, pageCursors, toast]);
+  }, [firestore, adminProfile, page, pageCursors]);
 
   const form = useForm<z.infer<typeof checkInSchema>>({
     resolver: zodResolver(checkInSchema),
@@ -256,19 +212,10 @@ export default function AttendancePage() {
 
       const publicProfile = publicProfileSnap.data() as PublicMemberProfile;
       
-      if (publicProfile.gymIdentifier !== adminProfile.gymIdentifier) {
-          toast({
-              title: 'Check-in Failed',
-              description: `This member does not belong to your gym.`,
-              variant: 'destructive',
-          });
-          return;
-      }
-      
       if (!publicProfile.isActive) {
         toast({
           title: 'Check-in Failed',
-          description: `Membership for ${publicProfile.firstName} ${publicProfile.lastName} is inactive.`,
+          description: `Membership for ${publicProfile.firstName} is inactive.`,
           variant: 'destructive',
         });
         return;
@@ -277,16 +224,6 @@ export default function AttendancePage() {
       const checkInDateStr = format(new Date(), 'yyyy-MM-dd');
       const attendanceDocId = `${publicProfile.memberDocId}_${checkInDateStr}`;
       const attendanceDocRef = doc(firestore, 'attendance', attendanceDocId);
-      const attendanceDocSnap = await getDoc(attendanceDocId ? attendanceDocRef : doc(firestore, 'attendance', 'placeholder'));
-
-      if (attendanceDocSnap.exists()) {
-        toast({
-          title: 'Already Checked In',
-          description: `${publicProfile.firstName} ${publicProfile.lastName} has already checked in today.`,
-        });
-        form.reset();
-        return;
-      }
 
       setDocumentNonBlocking(attendanceDocRef, {
         id: attendanceDocId,
@@ -299,10 +236,9 @@ export default function AttendancePage() {
 
       toast({
         title: 'Check-in Successful!',
-        description: `Welcome, ${publicProfile.firstName} ${publicProfile.lastName}!`,
+        description: `Welcome, ${publicProfile.firstName}!`,
       });
     } catch (error) {
-      console.error('Error checking in:', error);
       toast({
         title: 'Check-in Error',
         description: 'An error occurred while checking in.',
@@ -345,392 +281,134 @@ export default function AttendancePage() {
   }, [attendanceRecords, searchQuery]);
 
   const handleDownloadPdf = () => {
-    if (filteredAttendanceRecords.length === 0) {
-      toast({
-        title: 'No Data',
-        description: 'There are no attendance records to download.',
-      });
-      return;
-    }
-
     const doc = new jsPDF();
-    doc.text(`Attendance Report - ${adminProfile?.gymName || 'GymTrack Pro'}`, 14, 16);
-    
+    doc.text(`Attendance Report`, 14, 16);
     autoTable(doc, {
       startY: 20,
       head: [['Member Name', 'Member ID', 'Check-in Time', 'Status']],
       body: filteredAttendanceRecords.map(rec => [rec.memberName, rec.memberId, rec.checkIn, rec.status]),
     });
-
-    doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
-  };
-
-  const handleDeleteRecord = (id: string) => {
-    if (!firestore) return;
-    const docRef = doc(firestore, 'attendance', id);
-    deleteDocumentNonBlocking(docRef);
-    toast({
-      title: 'Record Deleted',
-      description: 'The attendance record has been deleted.',
-      variant: 'destructive',
-    });
-    setRecordToDelete(null);
-  };
-
-  const handleBulkDelete = () => {
-    if (!firestore || selectedRecords.length === 0) return;
-    
-    selectedRecords.forEach(id => {
-      const docRef = doc(firestore, 'attendance', id);
-      deleteDocumentNonBlocking(docRef);
-    });
-
-    toast({
-      title: 'Records Deleted',
-      description: `${selectedRecords.length} attendance records have been deleted.`,
-      variant: 'destructive',
-    });
-    setSelectedRecords([]);
-    setIsBulkDeleteDialogOpen(false);
-  };
-
-  const handleDeleteByRange = async () => {
-    if (!firestore || !adminProfile?.gymIdentifier || !rangeToDelete?.from) return;
-
-    const fromDate = startOfDay(rangeToDelete.from);
-    const toDate = endOfDay(rangeToDelete.to || rangeToDelete.from);
-
-    const q = query(
-      collection(firestore, 'attendance'),
-      where('gymIdentifier', '==', adminProfile.gymIdentifier),
-      where('checkInTime', '>=', fromDate),
-      where('checkInTime', '<=', toDate)
-    );
-
-    try {
-      const querySnapshot = await getDocs(q);
-      const count = querySnapshot.size;
-      
-      if (count === 0) {
-        toast({
-          title: 'No Records Found',
-          description: 'There are no attendance records within the selected range.',
-        });
-        setIsRangeConfirmOpen(false);
-        return;
-      }
-
-      querySnapshot.forEach((docSnap) => {
-        deleteDocumentNonBlocking(docSnap.ref);
-      });
-
-      toast({
-        title: 'Records Deleted',
-        description: `${count} attendance records between ${format(fromDate, 'PP')} and ${format(toDate, 'PP')} have been deleted.`,
-        variant: 'destructive',
-      });
-
-      setRangeToDelete(undefined);
-      setIsRangeConfirmOpen(false);
-      setIsRangePickerOpen(false);
-    } catch (error) {
-      console.error('Error deleting records by range:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete records in the selected range.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedRecords.length === filteredAttendanceRecords.length) {
-      setSelectedRecords([]);
-    } else {
-      setSelectedRecords(filteredAttendanceRecords.map(r => r.id));
-    }
-  };
-
-  const toggleSelectRecord = (id: string) => {
-    setSelectedRecords(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+    doc.save(`attendance.pdf`);
   };
 
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers;
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Attendance</CardTitle>
-              <CardDescription>
-                View and manage member attendance records for {adminProfile?.gymName || 'your gym'}.
-              </CardDescription>
-            </div>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(handleCheckIn)}
-                className="flex w-full max-w-sm items-start gap-2"
-              >
-                <FormField
-                  control={form.control}
-                  name="memberId"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormControl>
-                        <Input placeholder="Enter Member ID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={isDataLoading}>Check In</Button>
-              </form>
-            </Form>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Attendance</CardTitle>
+            <CardDescription>
+              View and manage member attendance records for {adminProfile?.gymName || 'your gym'}.
+            </CardDescription>
           </div>
-          <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:gap-4">
-            <Input
-              placeholder="Search by name or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full sm:max-w-xs"
-            />
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
-                    <Download className="h-4 w-4" />
-                    Download Page
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive" onClick={() => setIsRangePickerOpen(true)}>
-                    <Trash2 className="h-4 w-4" />
-                    Delete Range
-                </Button>
-                {selectedRecords.length > 0 && (
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="gap-1"
-                    onClick={() => setIsBulkDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Selected ({selectedRecords.length})
-                  </Button>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(handleCheckIn)}
+              className="flex w-full max-w-sm items-start gap-2"
+            >
+              <FormField
+                control={form.control}
+                name="memberId"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input placeholder="Enter Member ID" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox 
-                    checked={selectedRecords.length > 0 && selectedRecords.length === filteredAttendanceRecords.length}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>Member</TableHead>
-                <TableHead>Member ID</TableHead>
-                <TableHead>Check-in Time</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isDataLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-20" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-20 rounded-full" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8 ml-auto rounded-md" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : filteredAttendanceRecords.length > 0 ? (
-                filteredAttendanceRecords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedRecords.includes(record.id)}
-                        onCheckedChange={() => toggleSelectRecord(record.id)}
-                        aria-label={`Select ${record.memberName}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{record.memberName}</div>
-                    </TableCell>
-                    <TableCell>{record.memberId}</TableCell>
-                    <TableCell>
-                      {record.checkIn}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant[record.status]}>
-                        {record.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setRecordToDelete(record.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    No attendance records found.
+              />
+              <Button type="submit" disabled={isDataLoading}>Check In</Button>
+            </form>
+          </Form>
+        </div>
+        <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:gap-4">
+          <Input
+            placeholder="Search by name or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full sm:max-w-xs"
+          />
+          <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
+              <Download className="h-4 w-4" />
+              Download Page
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Member</TableHead>
+              <TableHead>Member ID</TableHead>
+              <TableHead>Check-in Time</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isDataLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredAttendanceRecords.length > 0 ? (
+              filteredAttendanceRecords.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>
+                    <div className="font-medium">{record.memberName}</div>
+                  </TableCell>
+                  <TableCell>{record.memberId}</TableCell>
+                  <TableCell>{record.checkIn}</TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant[record.status]}>
+                      {record.status}
+                    </Badge>
                   </TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <CardFooter>
-            <div className="flex items-center justify-between w-full">
-                <div className="text-xs text-muted-foreground">
-                    Page {page} of {totalPages > 0 ? totalPages : 1}
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToPrevPage}
-                        disabled={page <= 1}
-                    >
-                        <ChevronLeft className="h-4 w-4 mr-1" />
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToNextPage}
-                        disabled={page >= totalPages}
-                    >
-                        Next
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                </div>
-            </div>
-        </CardFooter>
-      </Card>
-
-      {/* Delete by Range Dialog */}
-      <Dialog open={isRangePickerOpen} onOpenChange={setIsRangePickerOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Attendance by Range</DialogTitle>
-            <DialogDescription>
-              Select a date range to wipe all attendance records within that period.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center py-4">
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={rangeToDelete?.from}
-              selected={rangeToDelete}
-              onSelect={setRangeToDelete}
-              numberOfMonths={1}
-            />
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={4} className="h-24 text-center">
+                  No attendance records found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+      <CardFooter>
+          <div className="flex items-center justify-between w-full">
+              <div className="text-xs text-muted-foreground">
+                  Page {page} of {totalPages > 0 ? totalPages : 1}
+              </div>
+              <div className="flex items-center gap-2">
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPrevPage}
+                      disabled={page <= 1}
+                  >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                  </Button>
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={page >= totalPages}
+                  >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+              </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRangePickerOpen(false)}>Cancel</Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => setIsRangeConfirmOpen(true)}
-              disabled={!rangeToDelete?.from}
-            >
-              Wipe Attendance
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Range Delete Confirmation */}
-      <AlertDialog open={isRangeConfirmOpen} onOpenChange={setIsRangeConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete ALL attendance records between{' '}
-              <span className="font-semibold text-foreground">
-                {rangeToDelete?.from ? format(rangeToDelete.from, 'PP') : ''}
-              </span>{' '}
-              and{' '}
-              <span className="font-semibold text-foreground">
-                {rangeToDelete?.to ? format(rangeToDelete.to, 'PP') : (rangeToDelete?.from ? format(rangeToDelete.from, 'PP') : '')}
-              </span>. 
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteByRange} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete All in Range
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Bulk Delete Dialog */}
-      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. You are about to delete {selectedRecords.length} attendance records permanently.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete All
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Single Delete Dialog */}
-      <AlertDialog open={!!recordToDelete} onOpenChange={(open) => !open && setRecordToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Attendance Record?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently remove this check-in record. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => recordToDelete && handleDeleteRecord(recordToDelete)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      </CardFooter>
+    </Card>
   );
 }
