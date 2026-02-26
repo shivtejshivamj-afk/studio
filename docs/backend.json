@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "AdminProfile": {
@@ -188,9 +189,9 @@
           "type": "number",
           "description": "The monetary cost of the membership plan."
         },
-        "durationInMonths": {
+        "durationInDays": {
           "type": "number",
-          "description": "The duration of the membership plan in months."
+          "description": "The duration of the membership plan in days."
         },
         "benefits": {
           "type": "array",
@@ -213,7 +214,7 @@
         "name",
         "description",
         "price",
-        "durationInMonths",
+        "durationInDays",
         "isAvailable",
         "gymIdentifier"
       ]
@@ -558,5 +559,3 @@
     }
   }
 }
-
-    

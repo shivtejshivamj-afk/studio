@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -97,10 +98,10 @@ const planFormSchema = z.object({
   price: z.coerce
     .number()
     .positive({ message: 'Price must be a positive number.' }),
-  durationInMonths: z.coerce
+  durationInDays: z.coerce
     .number()
     .int()
-    .positive({ message: 'Duration must be a positive number of months.' }),
+    .positive({ message: 'Duration must be a positive number of days.' }),
   isAvailable: z.boolean().default(true),
 });
 type PlanFormValues = z.infer<typeof planFormSchema>;
@@ -162,7 +163,7 @@ export default function SettingsPage() {
         name: plan.name,
         description: plan.description,
         price: plan.price,
-        durationInMonths: plan.durationInMonths,
+        durationInDays: plan.durationInDays,
         isAvailable: plan.isAvailable,
       });
     } else if (dialogType === 'add') {
@@ -170,7 +171,7 @@ export default function SettingsPage() {
         name: '',
         description: '',
         price: 0,
-        durationInMonths: 1,
+        durationInDays: 30,
         isAvailable: true,
       });
     }
@@ -385,7 +386,7 @@ export default function SettingsPage() {
                     <TableRow key={plan.id}>
                       <TableCell className="font-medium">{plan.name}</TableCell>
                       <TableCell>₹{plan.price.toFixed(2)}</TableCell>
-                      <TableCell>{plan.durationInMonths} months</TableCell>
+                      <TableCell>{plan.durationInDays} days</TableCell>
                       <TableCell>
                         <Badge variant={plan.isAvailable ? 'default' : 'secondary'}>
                           {plan.isAvailable ? 'Available' : 'Unavailable'}
@@ -538,7 +539,7 @@ export default function SettingsPage() {
                     status to "Paid," "Pending," or "Overdue." When an invoice
                     is marked as "Paid," the system automatically updates the
                     corresponding member's profile to "Active" and sets their
-                    membership end date based on the plan's duration.
+                    membership end date based on the plan's duration in days.
                   </li>
                   <li>
                     <strong>Downloading PDFs:</strong> You can view and download
@@ -660,10 +661,10 @@ export default function SettingsPage() {
                   />
                   <FormField
                     control={planForm.control}
-                    name="durationInMonths"
+                    name="durationInDays"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Duration (months)</FormLabel>
+                        <FormLabel>Duration (days)</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>

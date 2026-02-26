@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -79,7 +80,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { format, parseISO, addMonths } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -381,7 +382,7 @@ export default function InvoicingPage() {
       const plan = plans.find(p => p.id === invoice.membershipId);
       if (member && plan) {
           const memberDocRef = doc(firestore, 'members', member.id);
-          const endDate = addMonths(new Date(), plan.durationInMonths);
+          const endDate = addDays(new Date(), plan.durationInDays);
 
           const memberUpdate = {
               membershipEndDate: format(endDate, 'yyyy-MM-dd'),

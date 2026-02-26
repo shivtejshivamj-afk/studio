@@ -1,3 +1,4 @@
+
 export type Member = {
   id: string; // Firestore document ID
   firstName: string;
@@ -27,7 +28,7 @@ export type MembershipPlan = {
   name: string;
   description: string;
   price: number;
-  durationInMonths: number;
+  durationInDays: number;
   isAvailable: boolean;
   gymIdentifier: string;
 };
@@ -74,5 +75,3 @@ export type Invoice = {
   memberPhone?: string;
   planName?: string;
 };
-
-    
