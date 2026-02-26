@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [clientNow, setClientNow] = useState<Date | null>(null);
 
   const { user } = useUser();
   const firestore = useFirestore();
@@ -96,24 +97,21 @@ export default function DashboardPage() {
   const { data: plans, isLoading: isLoadingPlans } =
     useCollection<MembershipPlan>(plansQuery);
 
-  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
-
   useEffect(() => {
     setIsClient(true);
+    setClientNow(startOfDay(new Date()));
   }, []);
 
   const expiringSoonMembers = useMemo(() => {
-    if (!members) return [];
-
-    const today = startOfDay(new Date());
+    if (!members || !clientNow) return [];
 
     return members.filter(member => {
         if (!member.membershipEndDate) return false;
         
         try {
             const endDate = endOfDay(parseISO(member.membershipEndDate));
-            const diff = differenceInDays(endDate, today);
-            // Show if expired (diff < 0) or expiring within 7 days
+            const diff = differenceInDays(endDate, clientNow);
+            // Show if already expired (diff < 0) or expiring within 7 days (diff <= 7)
             return diff <= 7;
         } catch(e) {
             return false;
@@ -123,7 +121,7 @@ export default function DashboardPage() {
         const dateB = parseISO(b.membershipEndDate!).getTime();
         return dateA - dateB;
     });
-  }, [members]);
+  }, [members, clientNow]);
 
   const activeMembersCount = useMemo(
     () => members?.filter((m) => {
@@ -180,6 +178,8 @@ export default function DashboardPage() {
       console.error('Failed to copy: ', err);
     });
   };
+
+  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingPlans || !isClient;
 
   const statCards = [
     {
@@ -268,7 +268,7 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Plan Details</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -283,7 +283,7 @@ export default function DashboardPage() {
                     ))
                   ) : expiringSoonMembers.length > 0 ? (
                     expiringSoonMembers.map((member) => {
-                      const today = startOfDay(new Date());
+                      const today = clientNow || startOfDay(new Date());
                       const endDate = endOfDay(parseISO(member.membershipEndDate!));
                       const daysLeft = differenceInDays(endDate, today);
                       const expiresInText = 
@@ -303,7 +303,7 @@ export default function DashboardPage() {
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold">{plan?.name || 'Standard'} Plan</span>
-                              <span className="text-xs text-muted-foreground">Expires: {member.membershipEndDate}</span>
+                              <span className="text-xs text-muted-foreground">Ends: {member.membershipEndDate}</span>
                               <Badge variant={daysLeft < 0 ? 'destructive' : (daysLeft <= 3 ? 'default' : 'secondary')} className="mt-1 w-fit text-[10px]">
                                   {expiresInText}
                               </Badge>
