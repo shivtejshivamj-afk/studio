@@ -29,28 +29,18 @@ service cloud.firestore {
      * Checks if the authenticated user has administrative privileges by verifying
      * their UID exists as a document in the `/roles_admin` collection and that
      * the critical 'gymIdentifier' field has been written.
-     * This adds an extra layer of consistency check against post-signup race conditions.
      */
     function isAdmin() {
-      if (!isSignedIn()) {
-        return false;
-      }
-      let adminDoc = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      // This is the key change: ensure the doc exists AND the identifier has been written.
-      return adminDoc != null && 'gymIdentifier' in adminDoc.data;
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) &&
+             'gymIdentifier' in get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data;
     }
     
     /**
      * Checks if the user is an admin for a specific gym.
-     * This is a more robust check that ensures the gymIdentifier property exists before comparison.
      */
     function isGymAdmin(gymIdentifier) {
-      if (!isAdmin()) {
-        return false;
-      }
-      let adminDocData = get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data;
-      // isAdmin() already confirmed adminDocData is not null and has gymIdentifier.
-      return adminDocData.gymIdentifier == gymIdentifier;
+      return isAdmin() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymIdentifier == gymIdentifier;
     }
     
     /**
@@ -69,15 +59,13 @@ service cloud.firestore {
 
     /**
      * Ensures the incoming 'memberId' field matches the parent document's ID in the path.
-     * This enforces relational integrity when creating a new document in a subcollection.
      */
     function hasCorrectMemberIdOnCreate(memberId) {
       return request.resource.data.memberId == memberId;
     }
 
     /**
-     * Ensures the 'memberId' field is immutable on updates. This prevents an existing
-     * subcollection document from being reassigned to a different member.
+     * Ensures the 'memberId' field is immutable on updates.
      */
     function isMemberIdImmutable() {
       return request.resource.data.memberId == resource.data.memberId;
@@ -85,8 +73,7 @@ service cloud.firestore {
 
     /**
      * Validates a public check-in request by cross-referencing it with the trusted,
-     * publicly readable `member_profiles_public` document. This can be used for
-     * both public check-ins and admin-initiated check-ins to ensure consistency.
+     * publicly readable `member_profiles_public` document.
      */
     function isPublicCheckInValid() {
       let incomingData = request.resource.data;
@@ -111,26 +98,20 @@ service cloud.firestore {
 
     /**
      * @description Protects admin roles. Any signed-in user can read an admin profile (for context),
-     *              but only existing admins can list all other admins. An admin can update their own
-     *              document, but critical fields are immutable to prevent data access issues.
-     * @path        /roles_admin/{adminId}
+     *              but only existing admins can list all other admins.
      */
     match /roles_admin/{adminId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if request.auth.uid == adminId;
       allow update: if request.auth.uid == adminId &&
-                 // gymIdentifier can be written once if it does not exist...
                  (!('gymIdentifier' in resource.data) || 
-                  // ...or if it exists, it cannot be changed.
                   request.resource.data.gymIdentifier == resource.data.gymIdentifier);
       allow delete: if false;
     }
 
     /**
-     * @description Secures the main collection of gym member profiles. Access is strictly scoped to the
-     *              admin of the corresponding gym. List is allowed for any admin, but client queries must filter.
-     * @path        /members/{memberId}
+     * @description Secures the main collection of gym member profiles.
      */
     match /members/{memberId} {
       allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
@@ -140,22 +121,17 @@ service cloud.firestore {
 
     /**
      * @description Secures the public-facing member profiles used for check-in.
-     *              These documents are publicly readable for the check-in process.
-     *              Write operations are restricted to admins of the corresponding gym.
-     * @path        /member_profiles_public/{memberPubId}
      */
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
         allow list: if isAdmin();
         allow create: if isGymAdmin(request.resource.data.gymIdentifier);
-        // For updates and deletes, we cross-reference the main member document
-        // to ensure the gymIdentifier is authoritative, making the rule more robust.
-        allow update, delete: if isGymAdmin(get(/databases/$(database)/documents/members/$(resource.data.memberDocId)).data.gymIdentifier);
+        // Fix: Use the document's own gymIdentifier to avoid dependency on the member document during deletion.
+        allow update, delete: if isGymAdmin(resource.data.gymIdentifier);
     }
 
     /**
-     * @description Secures membership subscriptions. Access is scoped to the admin of the parent member's gym.
-     * @path        /members/{memberId}/memberships/{membershipId}
+     * @description Secures membership subscriptions.
      */
     match /members/{memberId}/memberships/{membershipId} {
       allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier();
@@ -164,8 +140,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures payment records. Access is scoped to the admin of the parent member's gym.
-     * @path        /members/{memberId}/payments/{paymentId}
+     * @description Secures payment records.
      */
     match /members/{memberId}/payments/{paymentId} {
       allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminGymIdentifier();
@@ -174,21 +149,16 @@ service cloud.firestore {
     }
     
     /**
-     * @description Secures the attendance collection. Admins can read records for their gym.
-     *              Public users (and admins acting on their behalf) can ONLY create
-     *              new records if the request is validated by `isPublicCheckInValid`.
-     * @path        /attendance/{attendanceId}
+     * @description Secures the attendance collection.
      */
     match /attendance/{attendanceId} {
         allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
         allow list: if isAdmin();
-        // This rule now securely handles both public and admin check-ins.
         allow create: if isPublicCheckInValid();
     }
     
     /**
-     * @description Secures the top-level invoices collection. Access is scoped to the gym admin.
-     * @path        /invoices/{invoiceId}
+     * @description Secures the top-level invoices collection.
      */
     match /invoices/{invoiceId} {
         allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
@@ -197,8 +167,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures membership plans. Access is scoped to the gym admin.
-     * @path        /membership_plans/{planId}
+     * @description Secures membership plans.
      */
     match /membership_plans/{planId} {
       allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
@@ -207,8 +176,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures trainer profiles. Access is scoped to the gym admin.
-     * @path        /trainers/{trainerId}
+     * @description Secures trainer profiles.
      */
     match /trainers/{trainerId} {
       allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
