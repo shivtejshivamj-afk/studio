@@ -13,7 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { type Member, type Invoice, type MembershipPlan } from '@/lib/data';
+import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -78,14 +78,13 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO, addDays, isPast, startOfDay } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
   useFirestore,
   useMemoFirebase,
-  addDocumentNonBlocking,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
   useUser,
@@ -117,6 +116,7 @@ const invoiceSchema = z.object({
   memberId: z.string().min(1, { message: 'Please select a member.' }),
   planId: z.string().min(1, { message: 'Please select a plan.' }),
   status: z.enum(['Paid', 'Pending', 'Overdue']),
+  totalAmount: z.coerce.number().positive(),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -149,7 +149,7 @@ export default function InvoicingPage() {
     setIsClient(true);
   }, []);
 
-  const { user } = useUser();
+  const { user } = useAuthUser();
   const firestore = useFirestore();
 
   const adminProfileRef = useMemoFirebase(
@@ -218,6 +218,17 @@ export default function InvoicingPage() {
     resolver: zodResolver(invoiceSchema),
   });
 
+  const selectedPlanId = form.watch('planId');
+
+  useEffect(() => {
+    if (selectedPlanId && plans) {
+      const plan = plans.find(p => p.id === selectedPlanId);
+      if (plan) {
+        form.setValue('totalAmount', plan.price);
+      }
+    }
+  }, [selectedPlanId, plans, form]);
+
   const totalPages = Math.ceil(totalRecords / INVOICES_PER_PAGE);
 
   const goToNextPage = () => {
@@ -240,10 +251,9 @@ export default function InvoicingPage() {
 
     return invoicesData.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
-      const plan = plans.find(p => p.id === inv.membershipId);
+      const plan = plans.find(p => p.id === inv.membershipId || p.id === (inv as any).planId);
       
       let displayStatus = inv.status;
-      // Auto-calculate Overdue status in UI if pending and past due date
       if (inv.status === 'Pending' && inv.dueDate && isPast(parseISO(inv.dueDate)) && parseISO(inv.dueDate) < today) {
         displayStatus = 'Overdue';
       }
@@ -265,14 +275,16 @@ export default function InvoicingPage() {
     if (dialog === 'edit' && invoice) {
       form.reset({
         memberId: invoice.memberId,
-        planId: invoice.membershipId,
+        planId: invoice.membershipId || (invoice as any).planId || '',
         status: invoice.status,
+        totalAmount: invoice.totalAmount,
       });
     } else if (dialog === 'add') {
       form.reset({
         memberId: '',
         planId: '',
         status: 'Pending',
+        totalAmount: 0,
       });
     }
   };
@@ -282,13 +294,10 @@ export default function InvoicingPage() {
     setSelectedInvoice(null);
   };
 
-  const updateMemberExpiry = (member: Member, plan: MembershipPlan) => {
-    if (!firestore) return;
+  const processPaidInvoice = (member: Member, plan: MembershipPlan, existingMembershipId?: string) => {
+    if (!firestore) return null;
     
-    const memberDocRef = doc(firestore, 'members', member.id);
     let startDate = startOfDay(new Date());
-
-    // Renewal logic: If the member has a future expiry date, extend from there
     if (member.membershipEndDate) {
       const currentExpiry = parseISO(member.membershipEndDate);
       if (!isPast(currentExpiry)) {
@@ -296,14 +305,31 @@ export default function InvoicingPage() {
       }
     }
 
-    const newExpiryDate = addDays(startDate, plan.durationInDays);
+    const endDate = addDays(startDate, plan.durationInDays);
+    const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
+    const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
 
-    const memberUpdate = {
-      membershipEndDate: format(newExpiryDate, 'yyyy-MM-dd'),
+    const membershipData: Membership = {
+      id: membershipId,
+      memberId: member.id,
+      planId: plan.id,
+      startDate: format(startDate, 'yyyy-MM-dd'),
+      endDate: format(endDate, 'yyyy-MM-dd'),
+      status: 'active',
+      priceAtPurchase: plan.price,
+      autoRenew: false,
+    };
+
+    setDocumentNonBlocking(membershipRef, membershipData, { merge: true });
+
+    const memberDocRef = doc(firestore, 'members', member.id);
+    updateDocumentNonBlocking(memberDocRef, {
+      membershipEndDate: format(endDate, 'yyyy-MM-dd'),
       activePlanId: plan.id,
       isActive: true,
-    };
-    updateDocumentNonBlocking(memberDocRef, memberUpdate);
+    });
+
+    return membershipId;
   };
 
   const handleSaveInvoice = (values: InvoiceFormValues) => {
@@ -324,15 +350,19 @@ export default function InvoicingPage() {
     if (activeDialog === 'add') {
       const newDocRef = doc(collection(firestore, 'invoices'));
       const issueDate = format(new Date(), 'yyyy-MM-dd');
-      // Set due date automatically to 15 days from issue date
       const dueDate = format(addDays(new Date(), 15), 'yyyy-MM-dd');
+
+      let membershipId = '';
+      if (values.status === 'Paid') {
+        membershipId = processPaidInvoice(member, plan) || '';
+      }
 
       const newInvoiceData: Invoice = {
         id: newDocRef.id,
         invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
         memberId: member.id,
-        membershipId: plan.id,
-        totalAmount: plan.price,
+        membershipId: membershipId || plan.id, // Prefer Membership ID, fallback to Plan ID
+        totalAmount: values.totalAmount,
         issueDate: issueDate,
         dueDate: dueDate,
         status: values.status,
@@ -341,11 +371,6 @@ export default function InvoicingPage() {
       };
       
       setDocumentNonBlocking(newDocRef, newInvoiceData, {});
-      
-      // If created as Paid, update member immediately
-      if (values.status === 'Paid') {
-        updateMemberExpiry(member, plan);
-      }
 
       toast({
         title: 'Invoice Created',
@@ -354,25 +379,20 @@ export default function InvoicingPage() {
     } else if (activeDialog === 'edit' && selectedInvoice) {
       const docRef = doc(firestore, 'invoices', selectedInvoice.id);
       
-      const isPaidNow = values.status === 'Paid';
-      const wasPaidBefore = selectedInvoice.status === 'Paid';
-      const planChanged = values.planId !== selectedInvoice.membershipId;
+      const becomingPaid = values.status === 'Paid' && selectedInvoice.status !== 'Paid';
+      const correctingPaid = values.status === 'Paid' && selectedInvoice.status === 'Paid' && (values.planId !== selectedInvoice.membershipId);
 
-      // Ensure totalAmount and dueDate are recalculated if the plan changed
+      let membershipId = selectedInvoice.membershipId;
+      if (becomingPaid || correctingPaid) {
+        membershipId = processPaidInvoice(member, plan, selectedInvoice.membershipId) || '';
+      }
+
       const updatedData: Partial<Invoice> = {
         memberId: values.memberId,
-        membershipId: values.planId,
+        membershipId: membershipId || values.planId,
         status: values.status,
-        totalAmount: plan.price,
+        totalAmount: values.totalAmount,
       };
-
-      // If correcting a plan or marking as paid, update the member's expiry
-      if ((isPaidNow && !wasPaidBefore) || (isPaidNow && wasPaidBefore && planChanged)) {
-          // If we are changing the plan on a Paid invoice, we are essentially "correcting" the extension.
-          // Note: In a production app, we would ideally revert the old extension first, 
-          // but for this MVP, we re-apply the logic to ensure the member is active.
-          updateMemberExpiry(member, plan);
-      }
 
       updateDocumentNonBlocking(docRef, updatedData);
 
@@ -400,15 +420,19 @@ export default function InvoicingPage() {
   
   const handleUpdateStatus = (invoice: Invoice, status: 'Paid' | 'Pending' | 'Overdue') => {
     if (!firestore || !members || !plans) return;
-    const docRef = doc(firestore, 'invoices', invoice.id);
-    updateDocumentNonBlocking(docRef, { status });
-
-    if (status === 'Paid') {
+    
+    if (status === 'Paid' && invoice.status !== 'Paid') {
       const member = members.find(m => m.id === invoice.memberId);
-      const plan = plans.find(p => p.id === invoice.membershipId);
+      const plan = plans.find(p => p.id === invoice.membershipId || p.id === (invoice as any).planId);
       if (member && plan) {
-          updateMemberExpiry(member, plan);
+          const membershipId = processPaidInvoice(member, plan);
+          updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { 
+            status, 
+            membershipId: membershipId || invoice.membershipId 
+          });
       }
+    } else {
+      updateDocumentNonBlocking(doc(firestore, 'invoices', invoice.id), { status });
     }
 
     toast({
@@ -777,6 +801,19 @@ export default function InvoicingPage() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="totalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Amount (₹)</FormLabel>
+                      <FormControl>
+                        <Input type="number" readOnly {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                  <FormField
                   control={form.control}
                   name="status"
@@ -922,4 +959,9 @@ export default function InvoicingPage() {
       </AlertDialog>
     </>
   );
+}
+
+function useAuthUser() {
+  const { user, isUserLoading, userError } = useUser();
+  return { user, isUserLoading, userError };
 }
