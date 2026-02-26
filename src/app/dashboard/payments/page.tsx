@@ -118,7 +118,6 @@ const invoiceSchema = z.object({
   memberId: z.string().min(1, { message: 'Please select a member.' }),
   planId: z.string().min(1, { message: 'Please select a plan.' }),
   status: z.enum(['Paid', 'Pending', 'Overdue']),
-  dueDate: z.string().min(1, { message: 'Due date is required.' }),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -269,14 +268,12 @@ export default function InvoicingPage() {
         memberId: invoice.memberId,
         planId: invoice.membershipId,
         status: invoice.status,
-        dueDate: invoice.dueDate,
       });
     } else if (dialog === 'add') {
       form.reset({
         memberId: undefined,
         planId: undefined,
         status: 'Pending',
-        dueDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'),
       });
     }
   };
@@ -311,7 +308,7 @@ export default function InvoicingPage() {
         membershipId: plan.id,
         totalAmount: plan.price,
         issueDate: format(new Date(), 'yyyy-MM-dd'),
-        dueDate: values.dueDate,
+        dueDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'), // Automatically set to 15 days from now
         status: values.status,
         gymName: adminProfile.gymName,
         gymIdentifier: adminProfile.gymIdentifier,
@@ -329,7 +326,6 @@ export default function InvoicingPage() {
         memberId: values.memberId,
         membershipId: values.planId,
         status: values.status,
-        dueDate: values.dueDate,
         totalAmount: plan.price,
       };
       updateDocumentNonBlocking(docRef, updatedData);
@@ -738,19 +734,6 @@ export default function InvoicingPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Due Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
