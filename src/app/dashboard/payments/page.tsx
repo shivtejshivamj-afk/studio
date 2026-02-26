@@ -533,26 +533,26 @@ export default function InvoicingPage() {
           
           {selectedInvoice && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-8 font-sans">
-              <div className="flex justify-between items-start">
-                <h1 className="text-4xl font-bold text-[#10b981]">INVOICE</h1>
-                <div className="text-right text-sm space-y-0.5">
-                  <p className="font-bold">{adminProfile?.gymName || 'SJ fit'}</p>
-                  <p>{adminProfile?.gymAddress || 'Ghansoli'}</p>
-                  <p>{adminProfile?.gymEmail || 'warlucifer87@gmail.com'}</p>
-                  <p>{adminProfile?.gymContactNumber || '1234567890'}</p>
+              <div className="flex justify-between items-start gap-4">
+                <h1 className="text-4xl font-bold text-[#10b981] shrink-0">INVOICE</h1>
+                <div className="text-right text-sm space-y-0.5 max-w-[50%] ml-auto">
+                  <p className="font-bold break-words">{adminProfile?.gymName || 'SJ fit'}</p>
+                  <p className="break-words">{adminProfile?.gymAddress || 'Ghansoli'}</p>
+                  <p className="break-words text-xs text-gray-500">{adminProfile?.gymEmail || 'warlucifer87@gmail.com'}</p>
+                  <p className="break-words text-xs text-gray-500">{adminProfile?.gymContactNumber || '1234567890'}</p>
                 </div>
               </div>
 
               <div className="h-0.5 bg-[#10b981] w-full" />
 
               <div className="flex flex-col sm:flex-row justify-between gap-6">
-                <div className="space-y-1">
+                <div className="space-y-1 max-w-[50%]">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">BILL TO</p>
-                  <p className="font-bold text-lg">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberName}</p>
-                  <p className="text-sm">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberEmail}</p>
-                  <p className="text-sm">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberPhone}</p>
+                  <p className="font-bold text-lg break-words">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberName}</p>
+                  <p className="text-sm break-words">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberEmail}</p>
+                  <p className="text-sm break-words">{processedInvoices.find(i => i.id === selectedInvoice.id)?.memberPhone}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm shrink-0">
                   <p className="font-bold">Invoice Number:</p>
                   <p className="text-right">{selectedInvoice.invoiceNumber}</p>
                   <p className="font-bold">Issue Date:</p>
@@ -613,4 +613,3 @@ export default function InvoicingPage() {
     </>
   );
 }
-
