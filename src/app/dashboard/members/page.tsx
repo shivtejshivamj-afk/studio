@@ -104,7 +104,6 @@ const memberFormSchema = z.object({
     .regex(/^\d+$/, 'Phone number must only contain digits.'),
   joinDate: z.string().min(1, 'Join date is required.'),
   isActive: z.boolean().default(false),
-  membershipEndDate: z.string().optional(),
 });
 
 type MemberFormValues = z.infer<typeof memberFormSchema>;
@@ -225,7 +224,6 @@ export default function MembersPage() {
         phone: member.phone,
         joinDate: member.joinDate,
         isActive: member.isActive,
-        membershipEndDate: member.membershipEndDate || '',
       });
     } else if (dialog === 'add') {
       form.reset({
@@ -235,7 +233,6 @@ export default function MembersPage() {
         phone: '',
         joinDate: new Date().toISOString().split('T')[0],
         isActive: false,
-        membershipEndDate: '',
       });
     }
   };
@@ -613,7 +610,7 @@ export default function MembersPage() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
                     name="joinDate"
@@ -623,20 +620,6 @@ export default function MembersPage() {
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <FormField
-                    control={form.control}
-                    name="membershipEndDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Plan Expiry</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormDescriptionComponent>Manual override</FormDescriptionComponent>
                         <FormMessage />
                       </FormItem>
                     )}
