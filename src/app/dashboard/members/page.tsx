@@ -134,12 +134,6 @@ export default function MembersPage() {
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string; gymIdentifier: string}>(adminProfileRef);
 
-  const plansQuery = useMemoFirebase(
-    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
-    [firestore, adminProfile]
-  );
-  const { data: plans } = useCollection<MembershipPlan>(plansQuery);
-
   useEffect(() => {
     if (firestore && adminProfile?.gymIdentifier) {
       const getCount = async () => {
@@ -391,7 +385,6 @@ export default function MembersPage() {
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden md:table-cell">Plan Expiry</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -406,7 +399,6 @@ export default function MembersPage() {
                     </TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
                   </TableRow>
@@ -414,7 +406,6 @@ export default function MembersPage() {
               ) : filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => {
                   const isExpired = member.membershipEndDate ? isPast(endOfDay(parseISO(member.membershipEndDate))) : false;
-                  const activePlan = plans?.find(p => p.id === member.activePlanId);
                   
                   return (
                     <TableRow key={member.id}>
@@ -443,22 +434,6 @@ export default function MembersPage() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {member.phone}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {member.membershipEndDate ? (
-                          <div className="flex flex-col">
-                            <span className={isExpired ? "text-destructive font-semibold" : ""}>
-                              {member.membershipEndDate}
-                            </span>
-                            {activePlan && (
-                               <span className="text-[10px] text-muted-foreground italic">
-                                 {activePlan.name}
-                               </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">No Active Plan</span>
-                        )}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -502,7 +477,7 @@ export default function MembersPage() {
                 })
               ) : (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">No members found.</TableCell>
+                    <TableCell colSpan={5} className="text-center h-24">No members found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
