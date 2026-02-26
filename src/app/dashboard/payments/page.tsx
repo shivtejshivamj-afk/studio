@@ -507,6 +507,7 @@ export default function InvoicingPage() {
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('view', inv)}><Eye className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('edit', inv)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleOpenDialog('delete', inv)}><Trash2 className="h-4 w-4" /></Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -610,6 +611,23 @@ export default function InvoicingPage() {
       </Dialog>
 
       <Dialog open={activeDialog === 'add' || activeDialog === 'edit'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}><DialogContent><Form {...form}><form onSubmit={form.handleSubmit(handleSaveInvoice)} className="space-y-4"><DialogHeader><DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle></DialogHeader><div className="grid gap-4"><FormField control={form.control} name="memberId" render={({ field }) => (<FormItem><FormLabel>Member</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger></FormControl><SelectContent>{members?.map((m) => <SelectItem key={m.id} value={m.id}>{m.firstName} {m.lastName} ({m.gymId})</SelectItem>)}</SelectContent></Select></FormItem>)} /><FormField control={form.control} name="planId" render={({ field }) => (<FormItem><FormLabel>Plan</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger></FormControl><SelectContent>{plans?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} - ₹{p.price}</SelectItem>)}</SelectContent></Select></FormItem>)} /><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="totalAmount" render={({ field }) => (<FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="Paid">Paid</SelectItem><SelectItem value="Overdue">Overdue</SelectItem></SelectContent></Select></FormItem>)} /></div><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="issueDate" render={({ field }) => (<FormItem><FormLabel>Issue Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="expiryDate" render={({ field }) => (<FormItem><FormLabel>Plan Expiry</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} /></div></div><DialogFooter><Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button><Button type="submit">Save</Button></DialogFooter></form></Form></DialogContent></Dialog>
+
+      <AlertDialog open={activeDialog === 'delete'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete invoice <strong>{selectedInvoice?.invoiceNumber}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
