@@ -10,7 +10,7 @@ import {
   Copy,
   Building,
 } from 'lucide-react';
-import { type Member } from '@/lib/data';
+import { type Member, type MembershipPlan } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -83,7 +83,20 @@ export default function DashboardPage() {
   const { data: members, isLoading: isLoadingMembers } =
     useCollection<Member>(membersQuery);
 
-  const isLoading = isLoadingAdminProfile || isLoadingMembers;
+  const plansQuery = useMemoFirebase(
+    () =>
+      firestore && adminProfile?.gymIdentifier
+        ? query(
+            collection(firestore, 'membership_plans'),
+            where('gymIdentifier', '==', adminProfile.gymIdentifier)
+          )
+        : null,
+    [firestore, adminProfile]
+  );
+  const { data: plans, isLoading: isLoadingPlans } =
+    useCollection<MembershipPlan>(plansQuery);
+
+  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
 
   useEffect(() => {
     setIsClient(true);
@@ -243,7 +256,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6">
-          {/* Expiring Soon Table */}
           <Card>
             <CardHeader>
               <CardTitle>Expiring or Expired</CardTitle>
@@ -280,6 +292,8 @@ export default function DashboardPage() {
                         daysLeft === 1 ? 'Expires tomorrow' :
                         `Expires in ${daysLeft} days`;
 
+                      const plan = plans?.find(p => p.id === member.activePlanId);
+
                       return (
                         <TableRow key={member.id}>
                           <TableCell>
@@ -288,7 +302,8 @@ export default function DashboardPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="text-sm">{member.membershipEndDate}</span>
+                              <span className="text-sm font-semibold">{plan?.name || 'Standard'} Plan</span>
+                              <span className="text-xs text-muted-foreground">Expires: {member.membershipEndDate}</span>
                               <Badge variant={daysLeft < 0 ? 'destructive' : (daysLeft <= 3 ? 'default' : 'secondary')} className="mt-1 w-fit text-[10px]">
                                   {expiresInText}
                               </Badge>
