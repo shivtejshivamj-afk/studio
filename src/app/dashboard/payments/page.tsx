@@ -240,6 +240,7 @@ export default function InvoicingPage() {
 
   const filteredMembersList = useMemo(() => {
     if (!members) return [];
+    if (!memberSearch) return members;
     const q = memberSearch.toLowerCase();
     return members.filter(m => 
       `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||

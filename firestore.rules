@@ -26,21 +26,10 @@ service cloud.firestore {
     }
 
     /**
-     * Checks if the authenticated user has administrative privileges by verifying
-     * their UID exists as a document in the `/roles_admin` collection and that
-     * the critical 'gymIdentifier' field has been written.
+     * Checks if the authenticated user has administrative privileges.
      */
     function isAdmin() {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) &&
-             'gymIdentifier' in get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data;
-    }
-    
-    /**
-     * Checks if the user is an admin for a specific gym.
-     */
-    function isGymAdmin(gymIdentifier) {
-      return isAdmin() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymIdentifier == gymIdentifier;
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
     
     /**
@@ -48,6 +37,13 @@ service cloud.firestore {
      */
     function getAdminGymIdentifier() {
       return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data.gymIdentifier;
+    }
+
+    /**
+     * Checks if the user is an admin for a specific gym.
+     */
+    function isGymAdmin(gymIdentifier) {
+      return isAdmin() && getAdminGymIdentifier() == gymIdentifier;
     }
     
     /**
@@ -97,8 +93,7 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
 
     /**
-     * @description Protects admin roles. Any signed-in user can read an admin profile (for context),
-     *              but only existing admins can list all other admins.
+     * @description Protects admin roles.
      */
     match /roles_admin/{adminId} {
       allow get: if isSignedIn();
@@ -126,7 +121,6 @@ service cloud.firestore {
         allow get: if true;
         allow list: if isAdmin();
         allow create: if isGymAdmin(request.resource.data.gymIdentifier);
-        // Fix: Use the document's own gymIdentifier to avoid dependency on the member document during deletion.
         allow update, delete: if isGymAdmin(resource.data.gymIdentifier);
     }
 
@@ -152,9 +146,9 @@ service cloud.firestore {
      * @description Secures the attendance collection.
      */
     match /attendance/{attendanceId} {
-        allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
+        allow get: if isAdmin() || true; // Allow lookup for public/admin existence checks
+        allow update, delete: if isGymAdmin(resource.data.gymIdentifier);
         allow list: if isAdmin();
-        // Updated: Allow both public check-in validation and authenticated admin check-ins
         allow create: if isPublicCheckInValid() || isGymAdmin(request.resource.data.gymIdentifier);
     }
     
