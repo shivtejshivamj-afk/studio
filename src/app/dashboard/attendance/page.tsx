@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -36,6 +37,7 @@ import {
   useFirestore,
   useMemoFirebase,
   setDocumentNonBlocking,
+  deleteDocumentNonBlocking,
   useUser,
   useDoc,
   useCollection,
@@ -47,8 +49,6 @@ import {
   serverTimestamp,
   Timestamp,
   doc,
-  writeBatch,
-  getDoc,
   getCountFromServer,
   onSnapshot,
   orderBy,
@@ -110,7 +110,9 @@ export default function AttendancePage() {
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  const [isSelectionDeleteDialogOpen, setIsSelectionDeleteDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Pagination State
   const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
@@ -147,7 +149,6 @@ export default function AttendancePage() {
             collection(firestore, 'attendance'),
             where('gymIdentifier', '==', adminProfile.gymIdentifier)
         );
-        // Apply date range filter to count query as well
         if (dateRange?.from) {
             countQuery = query(countQuery, where('checkInTime', '>=', startOfDay(dateRange.from)));
         }
@@ -197,7 +198,7 @@ export default function AttendancePage() {
       if (error.code === 'failed-precondition') {
           toast({
             title: "Database Index Required",
-            description: "The query for attendance records needs a database index. Please check the developer console for a direct link to create it in Firebase.",
+            description: "The query for attendance records needs a database index.",
             variant: "destructive",
             duration: 15000,
           });
@@ -223,6 +224,7 @@ export default function AttendancePage() {
     if (page < totalPages) {
       setPageCursors(prev => [...prev, lastDoc]);
       setPage(prev => prev + 1);
+      setSelectedIds(new Set());
     }
   };
 
@@ -230,6 +232,7 @@ export default function AttendancePage() {
     if (page > 1) {
       setPageCursors(prev => prev.slice(0, -1));
       setPage(prev => prev - 1);
+      setSelectedIds(new Set());
     }
   };
 
@@ -237,7 +240,7 @@ export default function AttendancePage() {
     if (!firestore || !adminProfile?.gymName || !adminProfile?.gymIdentifier) {
       toast({
         title: 'Check-in Error',
-        description: 'Could not determine your gym. Please sign in again.',
+        description: 'Could not determine your gym.',
         variant: 'destructive',
       });
       return;
@@ -251,7 +254,7 @@ export default function AttendancePage() {
       if (!publicProfileSnap.exists()) {
         toast({
           title: 'Check-in Failed',
-          description: `Member ID "${values.memberId}" not found. Please try again.`,
+          description: `Member ID "${values.memberId}" not found.`,
           variant: 'destructive',
         });
         return;
@@ -271,7 +274,7 @@ export default function AttendancePage() {
       if (!publicProfile.isActive) {
         toast({
           title: 'Check-in Failed',
-          description: `The membership for ${publicProfile.firstName} ${publicProfile.lastName} is inactive. Please contact the front desk.`,
+          description: `Membership for ${publicProfile.firstName} ${publicProfile.lastName} is inactive.`,
           variant: 'destructive',
         });
         return;
@@ -302,14 +305,13 @@ export default function AttendancePage() {
 
       toast({
         title: 'Check-in Successful!',
-        description: `Welcome back, ${publicProfile.firstName} ${publicProfile.lastName}!`,
+        description: `Welcome, ${publicProfile.firstName} ${publicProfile.lastName}!`,
       });
     } catch (error) {
       console.error('Error checking in:', error);
       toast({
         title: 'Check-in Error',
-        description:
-          'An error occurred while checking in the member. Please try again.',
+        description: 'An error occurred while checking in.',
         variant: 'destructive',
       });
     }
@@ -349,11 +351,10 @@ export default function AttendancePage() {
   }, [attendanceRecords, searchQuery]);
 
   const handleDownloadPdf = () => {
-    // This will only download the current page. A full report download would require fetching all data.
     if (filteredAttendanceRecords.length === 0) {
       toast({
         title: 'No Data',
-        description: 'There are no attendance records to download on the current page.',
+        description: 'There are no attendance records to download.',
       });
       return;
     }
@@ -370,25 +371,39 @@ export default function AttendancePage() {
     doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  const handleDeleteByDateRange = async () => {
-    if (!firestore || !adminProfile?.gymName || !dateRange?.from || !dateRange?.to) {
-      toast({
-        title: 'Deletion Error',
-        description: 'Please select a valid date range to delete records.',
-        variant: 'destructive',
-      });
-      return;
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(filteredAttendanceRecords.map(rec => rec.id));
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds(new Set());
     }
+  };
 
-    // Logic to delete documents in a range requires a backend function for safety and scale.
-    // The current client-side implementation can timeout or fail on large datasets.
-    // For now, we are warning the user.
-    toast({
-        title: "Deletion Not Implemented",
-        description: "Bulk deletion from the client is disabled for security and performance reasons. Please contact support for bulk data operations.",
-        variant: "destructive",
+  const toggleSelectId = (id: string, checked: boolean) => {
+    const nextIds = new Set(selectedIds);
+    if (checked) {
+      nextIds.add(id);
+    } else {
+      nextIds.delete(id);
+    }
+    setSelectedIds(nextIds);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!firestore) return;
+
+    selectedIds.forEach(id => {
+      const docRef = doc(firestore, 'attendance', id);
+      deleteDocumentNonBlocking(docRef);
     });
-    setIsDeleteDialogOpen(false);
+
+    toast({
+      title: 'Records Deleted',
+      description: `${selectedIds.size} attendance records have been deleted.`,
+    });
+    setSelectedIds(new Set());
+    setIsSelectionDeleteDialogOpen(false);
   };
 
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers;
@@ -468,20 +483,36 @@ export default function AttendancePage() {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
-              <Download className="h-4 w-4" />
-              Download Page
-            </Button>
-            <Button variant="destructive" size="sm" className="gap-1" onClick={() => setIsDeleteDialogOpen(true)} disabled={!dateRange?.from || !dateRange?.to}>
-              <Trash2 className="h-4 w-4" />
-              Delete Range
-            </Button>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
+                    <Download className="h-4 w-4" />
+                    Download Page
+                </Button>
+                {selectedIds.size > 0 && (
+                    <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="gap-1 animate-in fade-in zoom-in duration-300" 
+                        onClick={() => setIsSelectionDeleteDialogOpen(true)}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Delete ({selectedIds.size})
+                    </Button>
+                )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox 
+                    checked={filteredAttendanceRecords.length > 0 && selectedIds.size === filteredAttendanceRecords.length}
+                    onCheckedChange={(checked) => toggleSelectAll(!!checked)}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
                 <TableHead>Check-in Time</TableHead>
@@ -492,6 +523,7 @@ export default function AttendancePage() {
               {isDataLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                     <TableCell>
                       <Skeleton className="h-5 w-24" />
                     </TableCell>
@@ -510,6 +542,13 @@ export default function AttendancePage() {
                 filteredAttendanceRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
+                      <Checkbox 
+                        checked={selectedIds.has(record.id)}
+                        onCheckedChange={(checked) => toggleSelectId(record.id, !!checked)}
+                        aria-label={`Select ${record.memberName}`}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <div className="font-medium">{record.memberName}</div>
                     </TableCell>
                     <TableCell>{record.memberId}</TableCell>
@@ -525,7 +564,7 @@ export default function AttendancePage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No attendance records found.
                   </TableCell>
                 </TableRow>
@@ -562,7 +601,26 @@ export default function AttendancePage() {
         </CardFooter>
       </Card>
       
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {/* Delete Selection Confirmation */}
+      <AlertDialog open={isSelectionDeleteDialogOpen} onOpenChange={setIsSelectionDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Records?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected attendance record(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Legacy Bulk Delete Dialog */}
+      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -572,7 +630,7 @@ export default function AttendancePage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setIsDeleteDialogOpen(false)}>
+            <AlertDialogAction onClick={() => setIsBulkDeleteDialogOpen(false)}>
               Understood
             </AlertDialogAction>
           </AlertDialogFooter>
