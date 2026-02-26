@@ -111,7 +111,6 @@ export default function DashboardPage() {
         try {
             const endDate = endOfDay(parseISO(member.membershipEndDate));
             const diff = differenceInDays(endDate, clientNow);
-            // Show if already expired (diff < 0) or expiring within 7 days (diff <= 7)
             return diff <= 7;
         } catch(e) {
             return false;
@@ -379,23 +378,45 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
+              <div className="grid grid-cols-2 gap-4 mt-4 border-t pt-4">
                 <div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold">Member ID:</span>
-                    {selectedMember.gymId}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Member ID</span>
+                    <span className="text-base">{selectedMember.gymId}</span>
                   </div>
                 </div>
                 <div>
-                  <span className="font-semibold">Status:</span>{' '}
-                  <Badge variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>
-                    {selectedMember.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Status</span>
+                    <Badge className="w-fit mt-1" variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>
+                        {selectedMember.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
                 </div>
                 <div>
-                  <span className="font-semibold">Join Date:</span>{' '}
-                  {selectedMember.joinDate}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Join Date</span>
+                    <span className="text-base">{selectedMember.joinDate}</span>
+                  </div>
                 </div>
+                <div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Plan Expiry</span>
+                    <span className={`text-base font-medium ${selectedMember.membershipEndDate && isPast(endOfDay(parseISO(selectedMember.membershipEndDate))) ? 'text-destructive' : ''}`}>
+                      {selectedMember.membershipEndDate || 'No Active Plan'}
+                    </span>
+                  </div>
+                </div>
+                {selectedMember.activePlanId && (
+                  <div className="col-span-2">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-muted-foreground text-xs uppercase">Current Plan</span>
+                      <span className="text-base font-semibold text-primary">
+                        {plans?.find(p => p.id === selectedMember.activePlanId)?.name || 'Loading plan details...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

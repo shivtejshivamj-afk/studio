@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
+import { type Member, type Invoice, type MembershipPlan, type Membership, type PublicMemberProfile } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -226,20 +226,16 @@ export default function InvoicingPage() {
   const selectedMemberId = form.watch('memberId');
 
   useEffect(() => {
-    // Only auto-calculate when plan or member changes and it's a NEW invoice
-    // OR when plan changes in edit mode.
-    if (selectedPlanId && plans && members && selectedMemberId) {
+    if (activeDialog === 'add' && selectedPlanId && plans && members && selectedMemberId) {
       const plan = plans.find(p => p.id === selectedPlanId);
       const member = members.find(m => m.id === selectedMemberId);
       
       if (plan && member) {
         form.setValue('totalAmount', plan.price);
         
-        // Automatic Expiry Date Calculation based on Plan Duration
         let startDate = startOfDay(new Date());
         if (member.membershipEndDate) {
           const currentExpiry = parseISO(member.membershipEndDate);
-          // If the plan is still active, extend it. Otherwise, start from today.
           if (!isPast(endOfDay(currentExpiry))) {
             startDate = currentExpiry;
           }
@@ -248,7 +244,7 @@ export default function InvoicingPage() {
         form.setValue('expiryDate', newExpiry);
       }
     }
-  }, [selectedPlanId, selectedMemberId, plans, members, form]);
+  }, [selectedPlanId, selectedMemberId, plans, members, form, activeDialog]);
 
   const totalPages = Math.ceil(totalRecords / INVOICES_PER_PAGE);
 
@@ -329,7 +325,6 @@ export default function InvoicingPage() {
       }
     }
 
-    // Use manualExpiryDate if provided, otherwise calculate based on plan duration
     const endDate = manualExpiryDate ? parseISO(manualExpiryDate) : addDays(startDate, plan.durationInDays);
     const membershipId = existingMembershipId || doc(collection(firestore, 'members', member.id, 'memberships')).id;
     const membershipRef = doc(firestore, 'members', member.id, 'memberships', membershipId);
@@ -352,6 +347,11 @@ export default function InvoicingPage() {
       membershipEndDate: format(endDate, 'yyyy-MM-dd'),
       activePlanId: plan.id,
       isActive: true,
+    });
+    
+    const publicProfileRef = doc(firestore, 'member_profiles_public', member.gymId);
+    updateDocumentNonBlocking(publicProfileRef, {
+        isActive: true,
     });
 
     return membershipId;
@@ -652,14 +652,14 @@ export default function InvoicingPage() {
               ) : filteredInvoices.length > 0 ? (
                 filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                  <TableCell className="font-medium text-xs">{invoice.invoiceNumber}</TableCell>
                   <TableCell>
-                    <div>{invoice.memberName}</div>
-                    {invoice.memberPhone && <div className="text-sm text-muted-foreground">{invoice.memberPhone}</div>}
+                    <div className="font-medium">{invoice.memberName}</div>
+                    {invoice.memberPhone && <div className="text-xs text-muted-foreground">{invoice.memberPhone}</div>}
                   </TableCell>
-                  <TableCell>{invoice.issueDate}</TableCell>
-                  <TableCell>{invoice.dueDate}</TableCell>
-                  <TableCell>₹{invoice.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-xs">{invoice.issueDate}</TableCell>
+                  <TableCell className="text-xs font-medium">{invoice.dueDate}</TableCell>
+                  <TableCell className="font-semibold">₹{invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[invoice.status]}>
                       {invoice.status}
@@ -889,7 +889,7 @@ export default function InvoicingPage() {
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
-                        <FormDescription>Calculated automatically but can be overridden.</FormDescription>
+                        <FormDescription>Calculated automatically based on plan duration.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -932,26 +932,26 @@ export default function InvoicingPage() {
                 <Separator />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                   <div>
-                    <h3 className="font-semibold text-muted-foreground mb-2">BILL TO</h3>
-                    <p className="font-bold text-foreground">{selectedInvoice.memberName}</p>
+                    <h3 className="font-semibold text-muted-foreground mb-2 text-xs uppercase">Bill To</h3>
+                    <p className="font-bold text-foreground text-lg">{selectedInvoice.memberName}</p>
                     <p className="text-muted-foreground break-words">{selectedInvoice.memberEmail}</p>
                     {selectedInvoice.memberPhone && <p className="text-muted-foreground">{selectedInvoice.memberPhone}</p>}
                   </div>
                   <div className="space-y-2 text-left sm:text-right">
                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Invoice Number:</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap text-xs uppercase">Invoice No</p>
                       <p className="text-foreground">{selectedInvoice.invoiceNumber}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Issue Date:</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap text-xs uppercase">Issue Date</p>
                       <p className="text-foreground">{selectedInvoice.issueDate}</p>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground text-nowrap">Plan Expiry:</p>
-                      <p className="text-foreground">{selectedInvoice.dueDate}</p>
+                      <p className="font-semibold text-muted-foreground text-nowrap text-xs uppercase">Plan Expiry</p>
+                      <p className="text-foreground font-bold">{selectedInvoice.dueDate}</p>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center sm:gap-4">
-                      <p className="font-semibold text-muted-foreground">Status:</p>
+                      <p className="font-semibold text-muted-foreground text-xs uppercase">Status</p>
                        <Badge variant={statusVariant[selectedInvoice.status]}>
                         {selectedInvoice.status}
                       </Badge>
@@ -967,7 +967,12 @@ export default function InvoicingPage() {
                   </TableHeader>
                   <TableBody>
                     <TableRow>
-                      <TableCell className="font-medium">{selectedInvoice.planName} Membership</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                            <span>{selectedInvoice.planName} Membership</span>
+                            <span className="text-xs text-muted-foreground">Membership valid until {selectedInvoice.dueDate}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">₹{selectedInvoice.totalAmount.toFixed(2)}</TableCell>
                     </TableRow>
                   </TableBody>

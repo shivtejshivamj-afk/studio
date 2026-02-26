@@ -48,9 +48,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -133,6 +132,12 @@ export default function MembersPage() {
       [firestore, user]
   );
   const { data: adminProfile, isLoading: isLoadingAdminProfile } = useDoc<{gymName: string; gymIdentifier: string}>(adminProfileRef);
+
+  const plansQuery = useMemoFirebase(
+    () => (firestore && adminProfile?.gymIdentifier ? query(collection(firestore, 'membership_plans'), where('gymIdentifier', '==', adminProfile.gymIdentifier)) : null),
+    [firestore, adminProfile]
+  );
+  const { data: plans } = useCollection<MembershipPlan>(plansQuery);
 
   useEffect(() => {
     if (firestore && adminProfile?.gymIdentifier) {
@@ -406,15 +411,21 @@ export default function MembersPage() {
               ) : filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => {
                   const isExpired = member.membershipEndDate ? isPast(endOfDay(parseISO(member.membershipEndDate))) : false;
+                  const plan = plans?.find(p => p.id === member.activePlanId);
                   
                   return (
                     <TableRow key={member.id}>
                       <TableCell>
                         <div>
                           <div className="font-medium">{`${member.firstName} ${member.lastName}`}</div>
-                          <div className="text-sm text-muted-foreground hidden sm:block">
+                          <div className="text-xs text-muted-foreground">
                             {member.email}
                           </div>
+                          {plan && (
+                            <div className="text-[10px] uppercase font-bold text-primary mt-0.5">
+                                {plan.name} Plan
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -432,7 +443,7 @@ export default function MembersPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
+                      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                         {member.phone}
                       </TableCell>
                       <TableCell>
@@ -606,9 +617,9 @@ export default function MembersPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel>Active Membership</FormLabel>
+                        <FormLabel>Manual Active Status</FormLabel>
                         <FormDescriptionComponent>
-                          Manual override for membership status.
+                          Override membership status manually.
                         </FormDescriptionComponent>
                       </div>
                       <FormControl>
@@ -658,22 +669,45 @@ export default function MembersPage() {
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
+              <div className="grid grid-cols-2 gap-4 mt-4 border-t pt-4">
                 <div>
-                  <span className="font-semibold">Member ID:</span> {selectedMember.gymId}
-                </div>
-                <div>
-                  <span className="font-semibold">Status:</span>{' '}
-                  <Badge variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>
-                    {selectedMember.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Member ID</span>
+                    <span className="text-base">{selectedMember.gymId}</span>
+                  </div>
                 </div>
                 <div>
-                  <span className="font-semibold">Join Date:</span> {selectedMember.joinDate}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Status</span>
+                    <Badge className="w-fit mt-1" variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>
+                        {selectedMember.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
                 </div>
-                 <div>
-                  <span className="font-semibold">Plan Expiry:</span> {selectedMember.membershipEndDate || 'N/A'}
+                <div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Join Date</span>
+                    <span className="text-base">{selectedMember.joinDate}</span>
+                  </div>
                 </div>
+                <div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase">Plan Expiry</span>
+                    <span className={`text-base font-medium ${selectedMember.membershipEndDate && isPast(endOfDay(parseISO(selectedMember.membershipEndDate))) ? 'text-destructive' : ''}`}>
+                      {selectedMember.membershipEndDate || 'No Active Plan'}
+                    </span>
+                  </div>
+                </div>
+                {selectedMember.activePlanId && (
+                  <div className="col-span-2">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-muted-foreground text-xs uppercase">Active Plan</span>
+                      <span className="text-base font-semibold text-primary">
+                        {plans?.find(p => p.id === selectedMember.activePlanId)?.name || 'Loading plan details...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
