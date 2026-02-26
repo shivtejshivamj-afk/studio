@@ -9,9 +9,8 @@ import {
   Mail,
   Copy,
   Building,
-  CheckCircle2,
 } from 'lucide-react';
-import { type Member, type Invoice } from '@/lib/data';
+import { type Member } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -45,7 +44,7 @@ import {
   useUser,
   useDoc,
 } from '@/firebase';
-import { collection, doc, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { differenceInDays, parseISO, startOfDay, endOfDay, isPast } from 'date-fns';
 
@@ -84,23 +83,7 @@ export default function DashboardPage() {
   const { data: members, isLoading: isLoadingMembers } =
     useCollection<Member>(membersQuery);
 
-  const recentPaidInvoicesQuery = useMemoFirebase(
-    () =>
-      firestore && adminProfile?.gymIdentifier
-        ? query(
-            collection(firestore, 'invoices'),
-            where('gymIdentifier', '==', adminProfile.gymIdentifier),
-            where('status', '==', 'Paid'),
-            orderBy('issueDate', 'desc'),
-            limit(5)
-          )
-        : null,
-    [firestore, adminProfile]
-  );
-  const { data: recentInvoices, isLoading: isLoadingInvoices } = 
-    useCollection<Invoice>(recentPaidInvoicesQuery);
-
-  const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingInvoices;
+  const isLoading = isLoadingAdminProfile || isLoadingMembers;
 
   useEffect(() => {
     setIsClient(true);
@@ -259,9 +242,9 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6">
           {/* Expiring Soon Table */}
-          <Card className="lg:col-span-1">
+          <Card>
             <CardHeader>
               <CardTitle>Expiring or Expired</CardTitle>
               <CardDescription>
@@ -273,7 +256,7 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead>Plan Expiry</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -344,67 +327,6 @@ export default function DashboardPage() {
                     <TableRow>
                       <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
                         No critical memberships found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Recent Activity Table */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Recent Paid Invoices</CardTitle>
-              <CardDescription>
-                The last 5 payments processed for your gym.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                     Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-5 w-16" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : recentInvoices && recentInvoices.length > 0 ? (
-                    recentInvoices.map((invoice) => {
-                      const member = members?.find(m => m.id === invoice.memberId);
-                      return (
-                        <TableRow key={invoice.id}>
-                          <TableCell>
-                            <div className="font-medium">{invoice.invoiceNumber}</div>
-                            <div className="text-xs text-muted-foreground">{invoice.issueDate}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              {member ? `${member.firstName} ${member.lastName}` : 'N/A'}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1 text-primary">
-                              <CheckCircle2 className="h-3 w-3" />
-                              <span className="font-semibold">₹{invoice.totalAmount.toFixed(2)}</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
-                        No recent payments recorded.
                       </TableCell>
                     </TableRow>
                   )}
