@@ -39,6 +39,7 @@ import {
   useDoc,
   useCollection,
   setDocumentNonBlocking,
+  deleteDocumentNonBlocking,
 } from '@/firebase';
 import {
   collection,
@@ -62,6 +63,7 @@ import {
     Download, 
     ChevronLeft,
     ChevronRight,
+    Trash2,
 } from 'lucide-react';
 import {
   Popover,
@@ -79,6 +81,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { type DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
@@ -108,6 +111,8 @@ export default function AttendancePage() {
   const firestore = useFirestore();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 
   // Pagination State
@@ -358,6 +363,49 @@ export default function AttendancePage() {
     doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
+  const handleDeleteRecord = (id: string) => {
+    if (!firestore) return;
+    const docRef = doc(firestore, 'attendance', id);
+    deleteDocumentNonBlocking(docRef);
+    toast({
+      title: 'Record Deleted',
+      description: 'The attendance record has been deleted.',
+      variant: 'destructive',
+    });
+    setRecordToDelete(null);
+  };
+
+  const handleBulkDelete = () => {
+    if (!firestore || selectedRecords.length === 0) return;
+    
+    selectedRecords.forEach(id => {
+      const docRef = doc(firestore, 'attendance', id);
+      deleteDocumentNonBlocking(docRef);
+    });
+
+    toast({
+      title: 'Records Deleted',
+      description: `${selectedRecords.length} attendance records have been deleted.`,
+      variant: 'destructive',
+    });
+    setSelectedRecords([]);
+    setIsBulkDeleteDialogOpen(false);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRecords.length === filteredAttendanceRecords.length) {
+      setSelectedRecords([]);
+    } else {
+      setSelectedRecords(filteredAttendanceRecords.map(r => r.id));
+    }
+  };
+
+  const toggleSelectRecord = (id: string) => {
+    setSelectedRecords(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers;
 
   return (
@@ -440,6 +488,17 @@ export default function AttendancePage() {
                     <Download className="h-4 w-4" />
                     Download Page
                 </Button>
+                {selectedRecords.length > 0 && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="gap-1"
+                    onClick={() => setIsBulkDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Selected ({selectedRecords.length})
+                  </Button>
+                )}
             </div>
           </div>
         </CardHeader>
@@ -447,16 +506,25 @@ export default function AttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox 
+                    checked={selectedRecords.length > 0 && selectedRecords.length === filteredAttendanceRecords.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
                 <TableHead>Check-in Time</TableHead>
-                <TableHead className="text-right">Status</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isDataLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                     <TableCell>
                       <Skeleton className="h-5 w-24" />
                     </TableCell>
@@ -466,8 +534,11 @@ export default function AttendancePage() {
                     <TableCell>
                       <Skeleton className="h-5 w-32" />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
                       <Skeleton className="h-6 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Skeleton className="h-8 w-8 ml-auto rounded-md" />
                     </TableCell>
                   </TableRow>
                 ))
@@ -475,22 +546,40 @@ export default function AttendancePage() {
                 filteredAttendanceRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
+                      <Checkbox 
+                        checked={selectedRecords.includes(record.id)}
+                        onCheckedChange={() => toggleSelectRecord(record.id)}
+                        aria-label={`Select ${record.memberName}`}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <div className="font-medium">{record.memberName}</div>
                     </TableCell>
                     <TableCell>{record.memberId}</TableCell>
                     <TableCell>
                       {record.checkIn}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
                       <Badge variant={statusVariant[record.status]}>
                         {record.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setRecordToDelete(record.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     No attendance records found.
                   </TableCell>
                 </TableRow>
@@ -527,19 +616,40 @@ export default function AttendancePage() {
         </CardFooter>
       </Card>
 
-      {/* Legacy Bulk Delete Dialog */}
+      {/* Bulk Delete Dialog */}
       <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. Bulk deletion has been disabled on the client. Please contact support for this functionality.
+              This action cannot be undone. You are about to delete {selectedRecords.length} attendance records permanently.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setIsBulkDeleteDialogOpen(false)}>
-              Understood
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Single Delete Dialog */}
+      <AlertDialog open={!!recordToDelete} onOpenChange={(open) => !open && setRecordToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Attendance Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this check-in record. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => recordToDelete && handleDeleteRecord(recordToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
