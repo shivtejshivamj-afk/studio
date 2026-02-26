@@ -277,8 +277,9 @@ export default function DashboardPage() {
                       const today = clientNow || startOfDay(new Date());
                       const endDate = endOfDay(parseISO(member.membershipEndDate!));
                       const daysLeft = differenceInDays(endDate, today);
+                      
                       const expiresInText = 
-                        daysLeft < 0 ? 'Expired' :
+                        daysLeft < 0 ? `Expired ${Math.abs(daysLeft)} ${Math.abs(daysLeft) === 1 ? 'day' : 'days'} ago` :
                         daysLeft === 0 ? 'Expires today' :
                         daysLeft === 1 ? 'Expires tomorrow' :
                         `Expires in ${daysLeft} days`;
