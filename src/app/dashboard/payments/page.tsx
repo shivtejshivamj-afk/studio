@@ -81,7 +81,7 @@ import {
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO, addDays, isPast, startOfDay, endOfDay, isValid } from 'date-fns';
-import jsPDF from 'jspdf';
+import jsPDF from 'jsPDF';
 import autoTable from 'jspdf-autotable';
 import {
   useFirestore,
@@ -538,6 +538,9 @@ export default function InvoicingPage() {
 
       <Dialog open={activeDialog === 'view'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
         <DialogContent className="sm:max-w-2xl bg-white text-black p-0 overflow-hidden border-none">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Invoice Details</DialogTitle>
+          </DialogHeader>
           {selectedInvoice && (
             <div className="p-10 space-y-8 font-sans">
               <div className="flex justify-between items-start">
