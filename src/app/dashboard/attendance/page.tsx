@@ -19,7 +19,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -36,11 +35,10 @@ import { format, startOfDay, endOfDay } from 'date-fns';
 import {
   useFirestore,
   useMemoFirebase,
-  setDocumentNonBlocking,
-  deleteDocumentNonBlocking,
   useUser,
   useDoc,
   useCollection,
+  setDocumentNonBlocking,
 } from '@/firebase';
 import {
   collection,
@@ -54,6 +52,7 @@ import {
   orderBy,
   limit,
   startAfter,
+  getDoc,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { type Attendance, type Member, type PublicMemberProfile } from '@/lib/data';
@@ -61,7 +60,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
     CalendarIcon, 
     Download, 
-    Trash2,
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
@@ -111,8 +109,6 @@ export default function AttendancePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
-  const [isSelectionDeleteDialogOpen, setIsSelectionDeleteDialogOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Pagination State
   const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
@@ -175,13 +171,6 @@ export default function AttendancePage() {
       orderBy('checkInTime', 'desc')
     );
 
-    if (dateRange?.from) {
-      q = query(q, where('checkInTime', '>=', startOfDay(dateRange.from)));
-    }
-    if (dateRange?.to) {
-        q = query(q, where('checkInTime', '<=', endOfDay(dateRange.to)));
-    }
-
     if (cursor) {
       q = query(q, startAfter(cursor), limit(ATTENDANCE_PER_PAGE));
     } else {
@@ -224,7 +213,6 @@ export default function AttendancePage() {
     if (page < totalPages) {
       setPageCursors(prev => [...prev, lastDoc]);
       setPage(prev => prev + 1);
-      setSelectedIds(new Set());
     }
   };
 
@@ -232,7 +220,6 @@ export default function AttendancePage() {
     if (page > 1) {
       setPageCursors(prev => prev.slice(0, -1));
       setPage(prev => prev - 1);
-      setSelectedIds(new Set());
     }
   };
 
@@ -371,41 +358,6 @@ export default function AttendancePage() {
     doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  const toggleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = new Set(filteredAttendanceRecords.map(rec => rec.id));
-      setSelectedIds(allIds);
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
-  const toggleSelectId = (id: string, checked: boolean) => {
-    const nextIds = new Set(selectedIds);
-    if (checked) {
-      nextIds.add(id);
-    } else {
-      nextIds.delete(id);
-    }
-    setSelectedIds(nextIds);
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!firestore) return;
-
-    selectedIds.forEach(id => {
-      const docRef = doc(firestore, 'attendance', id);
-      deleteDocumentNonBlocking(docRef);
-    });
-
-    toast({
-      title: 'Records Deleted',
-      description: `${selectedIds.size} attendance records have been deleted.`,
-    });
-    setSelectedIds(new Set());
-    setIsSelectionDeleteDialogOpen(false);
-  };
-
   const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers;
 
   return (
@@ -488,17 +440,6 @@ export default function AttendancePage() {
                     <Download className="h-4 w-4" />
                     Download Page
                 </Button>
-                {selectedIds.size > 0 && (
-                    <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        className="gap-1 animate-in fade-in zoom-in duration-300" 
-                        onClick={() => setIsSelectionDeleteDialogOpen(true)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                        Delete ({selectedIds.size})
-                    </Button>
-                )}
             </div>
           </div>
         </CardHeader>
@@ -506,13 +447,6 @@ export default function AttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox 
-                    checked={filteredAttendanceRecords.length > 0 && selectedIds.size === filteredAttendanceRecords.length}
-                    onCheckedChange={(checked) => toggleSelectAll(!!checked)}
-                    aria-label="Select all"
-                  />
-                </TableHead>
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
                 <TableHead>Check-in Time</TableHead>
@@ -523,7 +457,6 @@ export default function AttendancePage() {
               {isDataLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                     <TableCell>
                       <Skeleton className="h-5 w-24" />
                     </TableCell>
@@ -542,13 +475,6 @@ export default function AttendancePage() {
                 filteredAttendanceRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
-                      <Checkbox 
-                        checked={selectedIds.has(record.id)}
-                        onCheckedChange={(checked) => toggleSelectId(record.id, !!checked)}
-                        aria-label={`Select ${record.memberName}`}
-                      />
-                    </TableCell>
-                    <TableCell>
                       <div className="font-medium">{record.memberName}</div>
                     </TableCell>
                     <TableCell>{record.memberId}</TableCell>
@@ -564,7 +490,7 @@ export default function AttendancePage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     No attendance records found.
                   </TableCell>
                 </TableRow>
@@ -600,24 +526,6 @@ export default function AttendancePage() {
             </div>
         </CardFooter>
       </Card>
-      
-      {/* Delete Selection Confirmation */}
-      <AlertDialog open={isSelectionDeleteDialogOpen} onOpenChange={setIsSelectionDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Selected Records?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {selectedIds.size} selected attendance record(s). This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Legacy Bulk Delete Dialog */}
       <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
