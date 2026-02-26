@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -6,7 +5,6 @@ import {
   Dumbbell,
   UserX,
   Eye,
-  Mail,
   Copy,
   Building,
 } from 'lucide-react';
@@ -151,13 +149,6 @@ export default function DashboardPage() {
   const closeDialogs = () => {
     setActiveDialog(null);
     setSelectedMember(null);
-  };
-
-  const handleSendReminder = (member: Member) => {
-    toast({
-      title: 'Reminder Sent!',
-      description: `A renewal reminder has been sent to ${member.firstName} ${member.lastName}.`,
-    });
   };
 
   const handleCopy = (text: string) => {
@@ -312,14 +303,6 @@ export default function DashboardPage() {
                           <TableCell className="text-right">
                             {isClient ? (
                               <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title="Send Reminder"
-                                  onClick={() => handleSendReminder(member)}
-                                >
-                                  <Mail className="h-4 w-4" />
-                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
