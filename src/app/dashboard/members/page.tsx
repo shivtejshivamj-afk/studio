@@ -85,6 +85,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isPast, parseISO } from 'date-fns';
 
 const statusVariant = {
   active: 'default',
@@ -101,6 +102,7 @@ const memberFormSchema = z.object({
     .regex(/^\d+$/, 'Phone number must only contain digits.'),
   joinDate: z.string().min(1, 'Join date is required.'),
   isActive: z.boolean().default(false),
+  membershipEndDate: z.string().optional(),
 });
 
 type MemberFormValues = z.infer<typeof memberFormSchema>;
@@ -173,21 +175,11 @@ export default function MembersPage() {
         setIsLoading(false);
     }, (error) => {
         console.error("Error fetching members:", error);
-        if (error.code === 'failed-precondition') {
-             toast({
-                title: "Database Index Required",
-                description: "The query for members needs a database index. Please open the developer console for a direct link to create it in Firebase.",
-                variant: "destructive",
-                duration: 15000,
-             });
-        } else {
-            toast({ title: "Error", description: "Could not fetch members.", variant: "destructive" });
-        }
         setIsLoading(false);
     });
 
     return () => unsubscribe();
-}, [firestore, adminProfile, page, pageCursors, toast]);
+}, [firestore, adminProfile, page, pageCursors]);
 
 
   useEffect(() => {
@@ -225,6 +217,7 @@ export default function MembersPage() {
         phone: member.phone,
         joinDate: member.joinDate,
         isActive: member.isActive,
+        membershipEndDate: member.membershipEndDate || '',
       });
     } else if (dialog === 'add') {
       form.reset({
@@ -234,6 +227,7 @@ export default function MembersPage() {
         phone: '',
         joinDate: new Date().toISOString().split('T')[0],
         isActive: false,
+        membershipEndDate: '',
       });
     }
   };
@@ -257,13 +251,6 @@ export default function MembersPage() {
         title: 'Copied to clipboard!',
         description: `ID: ${text}`,
       });
-    }).catch(err => {
-      console.error('Failed to copy: ', err);
-      toast({
-        title: 'Copy Failed',
-        description: 'Could not copy to clipboard due to browser permissions. Please copy manually.',
-        variant: 'destructive',
-      });
     });
   };
   
@@ -272,7 +259,7 @@ export default function MembersPage() {
       toast({
         title: 'Cannot Add Member',
         description:
-          "Your gym name or identifier couldn't be found. Please ensure you have signed up correctly.",
+          "Your gym name or identifier couldn't be found.",
         variant: 'destructive',
       });
       return;
@@ -320,7 +307,7 @@ export default function MembersPage() {
       };
       updateDocumentNonBlocking(docRef, updatedMember);
       
-      // Update public profile's name fields if they changed
+      // Update public profile
       const publicProfileRef = doc(firestore, 'member_profiles_public', selectedMember.gymId);
       const publicProfileUpdate: Partial<PublicMemberProfile> = {
           firstName: values.firstName,
@@ -339,11 +326,8 @@ export default function MembersPage() {
 
   const handleDeleteConfirm = () => {
     if (selectedMember && firestore) {
-      // Delete public profile FIRST, as its security rule depends on the main member doc.
       const publicProfileRef = doc(firestore, 'member_profiles_public', selectedMember.gymId);
       deleteDocumentNonBlocking(publicProfileRef);
-
-      // Then delete the main member document.
       const docRef = doc(firestore, 'members', selectedMember.id);
       deleteDocumentNonBlocking(docRef);
 
@@ -402,9 +386,7 @@ export default function MembersPage() {
                 <TableHead>Member</TableHead>
                 <TableHead>Member ID</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Join Date
-                </TableHead>
+                <TableHead className="hidden md:table-cell">Expiry Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -426,6 +408,7 @@ export default function MembersPage() {
                 ))
               ) : filteredMembers.length > 0 ? (
                 filteredMembers.map((member) => {
+                  const isExpired = member.membershipEndDate ? isPast(parseISO(member.membershipEndDate)) : false;
                   return (
                     <TableRow key={member.id}>
                       <TableCell>
@@ -447,7 +430,6 @@ export default function MembersPage() {
                               onClick={() => handleCopy(member.gymId)}
                             >
                               <Copy className="h-4 w-4" />
-                              <span className="sr-only">Copy Member ID</span>
                             </Button>
                           )}
                         </div>
@@ -456,13 +438,15 @@ export default function MembersPage() {
                         {member.phone}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {member.joinDate}
+                        <span className={isExpired ? "text-destructive font-semibold" : ""}>
+                          {member.membershipEndDate || 'No Active Plan'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={statusVariant[member.isActive ? 'active' : 'inactive']}
+                          variant={statusVariant[member.isActive && !isExpired ? 'active' : 'inactive']}
                         >
-                          {member.isActive ? 'Active' : 'Inactive'}
+                          {member.isActive && !isExpired ? 'Active' : (isExpired ? 'Expired' : 'Inactive')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -474,7 +458,6 @@ export default function MembersPage() {
                               onClick={() => handleOpenDialog('view', member)}
                             >
                               <Eye className="h-4 w-4" />
-                              <span className="sr-only">View Member</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -482,7 +465,6 @@ export default function MembersPage() {
                               onClick={() => handleOpenDialog('edit', member)}
                             >
                               <Pencil className="h-4 w-4" />
-                              <span className="sr-only">Edit Member</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -491,7 +473,6 @@ export default function MembersPage() {
                               className="text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete Member</span>
                             </Button>
                           </div>
                         ) : (
@@ -541,11 +522,7 @@ export default function MembersPage() {
       {/* Add/Edit Member Dialog */}
       <Dialog
         open={activeDialog === 'add' || activeDialog === 'edit'}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            closeDialogs();
-          }
-        }}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
         <DialogContent className="sm:max-w-md">
           <Form {...form}>
@@ -615,19 +592,35 @@ export default function MembersPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="joinDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Join Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="joinDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Join Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
+                    name="membershipEndDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Expiry Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormDescriptionComponent>Manual override</FormDescriptionComponent>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
                   name="isActive"
@@ -636,14 +629,13 @@ export default function MembersPage() {
                       <div className="space-y-0.5">
                         <FormLabel>Active Membership</FormLabel>
                         <FormDescriptionComponent>
-                          Indicates if the member has an active subscription.
+                          Manual override for membership status.
                         </FormDescriptionComponent>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          aria-label={`Set member status to ${field.value ? 'inactive' : 'active'}`}
                         />
                       </FormControl>
                     </FormItem>
@@ -666,11 +658,7 @@ export default function MembersPage() {
       {/* View Details Dialog */}
       <Dialog
         open={activeDialog === 'view'}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            closeDialogs();
-          }
-        }}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
         <DialogContent>
           <DialogHeader>
@@ -693,35 +681,19 @@ export default function MembersPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold">Member ID:</span>
-                    {selectedMember.gymId}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => handleCopy(selectedMember.gymId)}
-                    >
-                      <Copy className="h-4 w-4" />
-                      <span className="sr-only">Copy Member ID</span>
-                    </Button>
-                  </div>
+                  <span className="font-semibold">Member ID:</span> {selectedMember.gymId}
                 </div>
                 <div>
                   <span className="font-semibold">Status:</span>{' '}
-                  <Badge
-                    variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}
-                  >
+                  <Badge variant={statusVariant[selectedMember.isActive ? 'active' : 'inactive']}>
                     {selectedMember.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 <div>
-                  <span className="font-semibold">Join Date:</span>{' '}
-                  {selectedMember.joinDate}
+                  <span className="font-semibold">Join Date:</span> {selectedMember.joinDate}
                 </div>
                  <div>
-                  <span className="font-semibold">Gym:</span>{' '}
-                  {selectedMember.gymName}
+                  <span className="font-semibold">Expiry Date:</span> {selectedMember.membershipEndDate || 'N/A'}
                 </div>
               </div>
             </div>
@@ -735,20 +707,13 @@ export default function MembersPage() {
       {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={activeDialog === 'delete'}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            closeDialogs();
-          }
-        }}
+        onOpenChange={(isOpen) => !isOpen && closeDialogs()}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Are you sure you want to delete this member?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescriptionComponent>
-              This action cannot be undone. This will permanently delete the
-              member "{selectedMember?.firstName} {selectedMember?.lastName}".
+              This will permanently delete "{selectedMember?.firstName} {selectedMember?.lastName}".
             </AlertDialogDescriptionComponent>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -762,5 +727,3 @@ export default function MembersPage() {
     </>
   );
 }
-
-    
