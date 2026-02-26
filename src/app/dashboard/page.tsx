@@ -100,8 +100,8 @@ export default function DashboardPage() {
         try {
             const endDate = endOfDay(parseISO(member.membershipEndDate));
             const diff = differenceInDays(endDate, today);
-            // Show if expired (diff < 0) or expiring within 14 days
-            return diff <= 14;
+            // Show if expired (diff < 0) or expiring within 7 days
+            return diff <= 7;
         } catch(e) {
             return false;
         }
@@ -248,7 +248,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Expiring or Expired</CardTitle>
               <CardDescription>
-                Members whose subscription has ended or ends soon (14 days).
+                Members whose subscription has ended or ends soon (7 days).
               </CardDescription>
             </CardHeader>
             <CardContent>
