@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -49,7 +48,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -79,11 +78,6 @@ import {
   query, 
   where, 
   orderBy, 
-  limit, 
-  startAfter,
-  getCountFromServer,
-  onSnapshot,
-  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isPast, parseISO, endOfDay } from 'date-fns';
@@ -115,17 +109,10 @@ export default function MembersPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { user } = useUser();
   const firestore = useFirestore();
-
-  // Pagination state
-  const [members, setMembers] = useState<Member[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [totalMembers, setTotalMembers] = useState(0);
 
   const adminProfileRef = useMemoFirebase(
       () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
@@ -139,54 +126,19 @@ export default function MembersPage() {
   );
   const { data: plans } = useCollection<MembershipPlan>(plansQuery);
 
-  useEffect(() => {
-    if (firestore && adminProfile?.gymIdentifier) {
-      const getCount = async () => {
-        const q = query(collection(firestore, 'members'), where('gymIdentifier', '==', adminProfile.gymIdentifier));
-        const snapshot = await getCountFromServer(q);
-        setTotalMembers(snapshot.data().count);
-      };
-      getCount();
-    }
-  }, [firestore, adminProfile]);
-  
-  useEffect(() => {
-    if (!firestore || !adminProfile?.gymIdentifier) return;
-
-    setIsLoading(true);
-
-    const cursor = pageCursors[page - 1];
-    
-    let q = query(
-        collection(firestore, 'members'),
-        where('gymIdentifier', '==', adminProfile.gymIdentifier),
-        orderBy('firstName')
-    );
-
-    if (cursor) {
-        q = query(q, startAfter(cursor), limit(MEMBERS_PER_PAGE));
-    } else {
-        q = query(q, limit(MEMBERS_PER_PAGE));
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        if (!snapshot.empty) {
-            const memberData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Member));
-            setMembers(memberData);
-            setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        } else {
-            setMembers([]);
-            setLastDoc(null);
-        }
-        setIsLoading(false);
-    }, (error) => {
-        console.error("Error fetching members:", error);
-        setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-}, [firestore, adminProfile, page, pageCursors]);
-
+  // Fetch ALL members for global search and client-side pagination
+  const membersQuery = useMemoFirebase(
+    () =>
+      firestore && adminProfile?.gymIdentifier
+        ? query(
+            collection(firestore, 'members'),
+            where('gymIdentifier', '==', adminProfile.gymIdentifier),
+            orderBy('firstName')
+          )
+        : null,
+    [firestore, adminProfile]
+  );
+  const { data: allMembers, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -195,20 +147,34 @@ export default function MembersPage() {
   const form = useForm<MemberFormValues>({
     resolver: zodResolver(memberFormSchema),
   });
-  
-  const totalPages = Math.ceil(totalMembers / MEMBERS_PER_PAGE);
+
+  const filteredMembers = useMemo(() => {
+    if (!allMembers) return [];
+    if (!searchQuery) return allMembers;
+    const q = searchQuery.toLowerCase();
+    return allMembers.filter(
+      (m) =>
+        `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q) ||
+        m.gymId.toLowerCase().includes(q)
+    );
+  }, [allMembers, searchQuery]);
+
+  const totalPages = Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE);
+  const paginatedMembers = useMemo(() => {
+    const start = (currentPage - 1) * MEMBERS_PER_PAGE;
+    return filteredMembers.slice(start, start + MEMBERS_PER_PAGE);
+  }, [filteredMembers, currentPage]);
 
   const goToNextPage = () => {
-    if (page < totalPages) {
-      setPageCursors(prev => [...prev, lastDoc]);
-      setPage(prev => prev + 1);
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
     }
   };
 
   const goToPrevPage = () => {
-    if (page > 1) {
-      setPageCursors(prev => prev.slice(0, -1));
-      setPage(prev => prev - 1);
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
     }
   };
 
@@ -344,15 +310,7 @@ export default function MembersPage() {
     }
   };
 
-  const filteredMembers =
-    members?.filter(
-      (member) =>
-        `${member.firstName} ${member.lastName}`
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.gymId.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
+  const isLoading = isLoadingAdminProfile || isLoadingMembers;
 
   return (
     <>
@@ -369,7 +327,10 @@ export default function MembersPage() {
               <Input
                 placeholder="Search by name, email, or ID..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full sm:max-w-xs"
               />
               <Button
@@ -395,7 +356,7 @@ export default function MembersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading || isLoadingAdminProfile ? (
+              {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell>
@@ -408,8 +369,8 @@ export default function MembersPage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
                   </TableRow>
                 ))
-              ) : filteredMembers.length > 0 ? (
-                filteredMembers.map((member) => {
+              ) : paginatedMembers.length > 0 ? (
+                paginatedMembers.map((member) => {
                   const isExpired = member.membershipEndDate ? isPast(endOfDay(parseISO(member.membershipEndDate))) : false;
                   const plan = plans?.find(p => p.id === member.activePlanId);
                   
@@ -497,14 +458,14 @@ export default function MembersPage() {
          <CardFooter>
           <div className="flex items-center justify-between w-full">
             <div className="text-xs text-muted-foreground">
-              Page {page} of {totalPages > 0 ? totalPages : 1}
+              Showing {paginatedMembers.length} of {filteredMembers.length} members (Page {currentPage} of {totalPages || 1})
             </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={goToPrevPage}
-                disabled={page <= 1}
+                disabled={currentPage <= 1}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Previous
@@ -513,7 +474,7 @@ export default function MembersPage() {
                 variant="outline"
                 size="sm"
                 onClick={goToNextPage}
-                disabled={page >= totalPages}
+                disabled={currentPage >= totalPages}
               >
                 Next
                 <ChevronRight className="h-4 w-4 ml-1" />

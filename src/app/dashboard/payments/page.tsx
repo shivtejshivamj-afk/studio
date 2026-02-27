@@ -101,15 +101,9 @@ import {
     query,
     where,
     orderBy,
-    limit,
-    startAfter,
-    getCountFromServer,
-    onSnapshot,
-    type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 
 const statusVariant = {
   Paid: 'default',
@@ -144,16 +138,9 @@ export default function InvoicingPage() {
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   
-  // New reliable searchable member state
   const [memberSearch, setMemberSearch] = useState('');
-
-  const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
     setIsClient(true);
@@ -180,49 +167,20 @@ export default function InvoicingPage() {
   );
   const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
   
-  useEffect(() => {
-     if (firestore && adminProfile?.gymIdentifier) {
-      const getCount = async () => {
-        const q = query(collection(firestore, 'invoices'), where('gymIdentifier', '==', adminProfile.gymIdentifier));
-        const snapshot = await getCountFromServer(q);
-        setTotalRecords(snapshot.data().count);
-      };
-      getCount();
-    }
-  }, [firestore, adminProfile]);
-  
-  useEffect(() => {
-    if (!firestore || !adminProfile?.gymIdentifier) return;
-    
-    setIsLoading(true);
-    const cursor = pageCursors[page - 1];
+  // Fetch ALL invoices for global search and client-side pagination
+  const invoicesQuery = useMemoFirebase(
+    () => (firestore && adminProfile?.gymIdentifier 
+      ? query(
+          collection(firestore, 'invoices'), 
+          where('gymIdentifier', '==', adminProfile.gymIdentifier),
+          orderBy('issueDate', 'desc')
+        ) 
+      : null),
+    [firestore, adminProfile]
+  );
+  const { data: allInvoices, isLoading: isLoadingInvoices } = useCollection<Invoice>(invoicesQuery);
 
-    let q = query(
-      collection(firestore, 'invoices'),
-      where('gymIdentifier', '==', adminProfile.gymIdentifier),
-      orderBy('issueDate', 'desc')
-    );
-
-    if (cursor) {
-      q = query(q, startAfter(cursor));
-    }
-    
-    q = query(q, limit(INVOICES_PER_PAGE));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice));
-      setInvoicesData(data);
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setIsLoading(false);
-    }, (error) => {
-      console.error('Failed to fetch invoices:', error);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [firestore, adminProfile, page, pageCursors]);
-
-  const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
+  const isDataLoading = isLoadingInvoices || isLoadingAdminProfile || isLoadingMembers || isLoadingPlans;
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -233,7 +191,7 @@ export default function InvoicingPage() {
 
   const filteredMembersList = useMemo(() => {
     if (!members) return [];
-    if (!memberSearch) return members.slice(0, 10); // Show first 10 if not searching
+    if (!memberSearch) return members.slice(0, 10);
     const q = memberSearch.toLowerCase();
     return members.filter(m => 
       `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||
@@ -262,25 +220,9 @@ export default function InvoicingPage() {
     }
   }, [selectedPlanId, selectedMemberId, plans, members, form, activeDialog]);
 
-  const totalPages = Math.ceil(totalRecords / INVOICES_PER_PAGE);
-
-  const goToNextPage = () => {
-    if (page < totalPages) {
-      setPageCursors(prev => [...prev, lastDoc]);
-      setPage(prev => prev + 1);
-    }
-  };
-
-  const goToPrevPage = () => {
-    if (page > 1) {
-      setPageCursors(prev => prev.slice(0, -1));
-      setPage(prev => prev - 1);
-    }
-  };
-
   const processedInvoices = useMemo(() => {
-    if (!invoicesData || !members || !plans) return [];
-    return invoicesData.map(inv => {
+    if (!allInvoices || !members || !plans) return [];
+    return allInvoices.map(inv => {
       const member = members.find(m => m.id === inv.memberId);
       const plan = plans.find(p => p.id === inv.planId);
       let displayStatus = inv.status;
@@ -300,7 +242,34 @@ export default function InvoicingPage() {
         planName: plan?.name || 'Standard',
       };
     });
-  }, [invoicesData, members, plans]);
+  }, [allInvoices, members, plans]);
+
+  const filteredInvoices = useMemo(() => {
+    if (!searchQuery) return processedInvoices;
+    const q = searchQuery.toLowerCase();
+    return processedInvoices.filter(i => 
+      i.memberName?.toLowerCase().includes(q) || 
+      i.invoiceNumber.toLowerCase().includes(q)
+    );
+  }, [processedInvoices, searchQuery]);
+
+  const totalPages = Math.ceil(filteredInvoices.length / INVOICES_PER_PAGE);
+  const paginatedInvoices = useMemo(() => {
+    const start = (currentPage - 1) * INVOICES_PER_PAGE;
+    return filteredInvoices.slice(start, start + INVOICES_PER_PAGE);
+  }, [filteredInvoices, currentPage]);
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
 
   const handleOpenDialog = (dialog: DialogType, invoice?: Invoice) => {
     setSelectedInvoice(invoice || null);
@@ -377,7 +346,7 @@ export default function InvoicingPage() {
       const membershipId = syncMemberWithInvoice(member.id, plan.id, values.expiryDate, values.status) || '';
       const newInvoiceData: Invoice = {
         id: newDocRef.id, 
-        invoiceNumber: `INV-${String((totalRecords || 0) + 1).padStart(3, '0')}`,
+        invoiceNumber: `INV-${String((allInvoices?.length || 0) + 1).padStart(3, '0')}`,
         memberId: member.id, 
         planId: plan.id, 
         membershipId: membershipId, 
@@ -426,7 +395,7 @@ export default function InvoicingPage() {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(adminProfile?.gymName || 'SJ fit', 196, 15, { align: 'right' });
+    doc.text(adminProfile?.gymName || 'GymTrack Pro', 196, 15, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.text(adminProfile?.gymAddress || '', 196, 20, { align: 'right' });
     doc.text(adminProfile?.gymEmail || '', 196, 25, { align: 'right' });
@@ -492,12 +461,6 @@ export default function InvoicingPage() {
     doc.save(`invoice-${invoice.invoiceNumber}.pdf`);
   };
 
-  const filteredInvoices = useMemo(() => {
-    if (!searchQuery) return processedInvoices;
-    const q = searchQuery.toLowerCase();
-    return processedInvoices.filter(i => i.memberName?.toLowerCase().includes(q) || i.invoiceNumber.toLowerCase().includes(q));
-  }, [processedInvoices, searchQuery]);
-
   return (
     <>
       <Card>
@@ -505,7 +468,15 @@ export default function InvoicingPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div><CardTitle>Invoicing</CardTitle><CardDescription>Manage billing and plans.</CardDescription></div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
-              <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full sm:max-w-xs" />
+              <Input 
+                placeholder="Search by name or invoice ID..." 
+                value={searchQuery} 
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }} 
+                className="w-full sm:max-w-xs" 
+              />
               <Button size="sm" className="gap-1" onClick={() => handleOpenDialog('add')}><PlusCircle className="h-4 w-4" /> Create</Button>
             </div>
           </div>
@@ -516,7 +487,7 @@ export default function InvoicingPage() {
             <TableBody>
               {isDataLoading ? Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
-              )) : filteredInvoices.map((inv) => (
+              )) : paginatedInvoices.map((inv) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-medium text-xs">{inv.invoiceNumber}</TableCell>
                   <TableCell><div><p className="font-bold">{inv.memberName}</p><p className="text-[10px] text-muted-foreground">{inv.planName}</p></div></TableCell>
@@ -540,10 +511,23 @@ export default function InvoicingPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {!isDataLoading && paginatedInvoices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">No invoices found.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter><div className="flex items-center justify-between w-full text-xs text-muted-foreground">Page {page} of {totalPages || 1}<div className="flex gap-2"><Button variant="outline" size="sm" onClick={goToPrevPage} disabled={page <= 1}>Prev</Button><Button variant="outline" size="sm" onClick={goToNextPage} disabled={page >= totalPages}>Next</Button></div></div></CardFooter>
+        <CardFooter>
+          <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
+            Showing {paginatedInvoices.length} of {filteredInvoices.length} invoices (Page {currentPage} of {totalPages || 1})
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={currentPage <= 1}>Prev</Button>
+              <Button variant="outline" size="sm" onClick={goToNextPage} disabled={currentPage >= totalPages}>Next</Button>
+            </div>
+          </div>
+        </CardFooter>
       </Card>
 
       <Dialog open={activeDialog === 'view'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
@@ -557,7 +541,7 @@ export default function InvoicingPage() {
               <div className="flex justify-between items-start gap-4">
                 <h1 className="text-4xl font-bold text-[#10b981] shrink-0">INVOICE</h1>
                 <div className="text-right text-sm space-y-0.5 max-w-[50%] ml-auto">
-                  <p className="font-bold break-words">{adminProfile?.gymName || 'SJ fit'}</p>
+                  <p className="font-bold break-words">{adminProfile?.gymName || 'GymTrack Pro'}</p>
                   <p className="break-words">{adminProfile?.gymAddress || ''}</p>
                   <p className="break-words text-xs text-gray-500">{adminProfile?.gymEmail || ''}</p>
                   <p className="break-words text-xs text-gray-500">{adminProfile?.gymContactNumber || ''}</p>
@@ -639,7 +623,6 @@ export default function InvoicingPage() {
               </DialogHeader>
               
               <div className="space-y-4">
-                {/* Simplified Member Selection Interface */}
                 <FormField
                   control={form.control}
                   name="memberId"

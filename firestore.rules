@@ -25,23 +25,24 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
-        // Backup check if the existence check is in-flight
         request.auth.token.role == 'admin'
       );
     }
     
     /**
-     * Gets the data of the currently authenticated admin user.
+     * Gets the data of the currently authenticated admin user safely.
      */
     function getAdminData() {
-      return get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data;
+      let adminPath = /databases/$(database)/documents/roles_admin/$(request.auth.uid);
+      return exists(adminPath) ? get(adminPath).data : null;
     }
 
     /**
      * Checks if the user is an admin for a specific gym.
      */
     function isGymAdmin(gymIdentifier) {
-      return isAdmin() && getAdminData().gymIdentifier == gymIdentifier;
+      let data = getAdminData();
+      return isAdmin() && data != null && data.gymIdentifier == gymIdentifier;
     }
     
     /**
@@ -61,11 +62,6 @@ service cloud.firestore {
       let memberGymId = incomingData.memberGymId;
       let publicProfilePath = /databases/$(database)/documents/member_profiles_public/$(memberGymId);
 
-      // 1. The profile must exist.
-      // 2. The member must be active.
-      // 3. The Gym Name from the check-in must match the one in the public profile.
-      // 4. The Gym Identifier must match.
-      // 5. The private member document ID must match.
       return exists(publicProfilePath) &&
              get(publicProfilePath).data.isActive == true &&
              get(publicProfilePath).data.gymName == incomingData.gymName &&
@@ -105,26 +101,24 @@ service cloud.firestore {
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
         allow list: if isAdmin();
-        allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
-        allow update, delete: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
+        allow create: if isAdmin();
+        allow update, delete: if isAdmin();
     }
 
     /**
      * @description Secures membership subscriptions.
      */
     match /members/{memberId}/memberships/{membershipId} {
-      allow get, list, delete: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId);
-      allow create: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == memberId;
-      allow update: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == resource.data.memberId;
+      allow get, list, delete: if isAdmin();
+      allow create, update: if isAdmin();
     }
 
     /**
      * @description Secures payment records.
      */
     match /members/{memberId}/payments/{paymentId} {
-      allow get, list, delete: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId);
-      allow create: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == memberId;
-      allow update: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == resource.data.memberId;
+      allow get, list, delete: if isAdmin();
+      allow create, update: if isAdmin();
     }
     
     /**
@@ -133,9 +127,7 @@ service cloud.firestore {
     match /attendance/{attendanceId} {
         allow get: if true; 
         allow list: if isAdmin();
-        // Allow create if authenticated admin OR valid public check-in
         allow create: if isAdmin() || isPublicCheckInValid();
-        // Allow update/delete for authenticated administrators
         allow update, delete: if isAdmin();
     }
     
