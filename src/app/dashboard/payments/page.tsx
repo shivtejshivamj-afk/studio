@@ -69,7 +69,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -77,7 +76,6 @@ import * as z from 'zod';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -257,7 +255,6 @@ export default function InvoicingPage() {
       if (plan && member) {
         form.setValue('totalAmount', plan.price);
         
-        // Logical expiry calculation
         let startDate = startOfDay(new Date());
         if (member.membershipEndDate) {
           const currentExpiry = parseISO(member.membershipEndDate);
@@ -425,7 +422,7 @@ export default function InvoicingPage() {
 
   const handleDownloadPdf = (invoice: any) => {
     const doc = new jsPDF();
-    const primaryColor = [16, 185, 129]; // #10b981
+    const primaryColor = [16, 185, 129];
     
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFontSize(30);
@@ -678,9 +675,8 @@ export default function InvoicingPage() {
                                     variant="ghost" 
                                     size="icon" 
                                     className="h-8 w-8 hover:bg-transparent" 
-                                    onClick={(e) => {
+                                    onMouseDown={(e) => {
                                       e.preventDefault();
-                                      e.stopPropagation();
                                       field.onChange('');
                                       setMemberSearch('');
                                     }}
@@ -704,12 +700,14 @@ export default function InvoicingPage() {
                                 filteredMembersList.map((m) => (
                                   <Button
                                     key={m.id}
+                                    type="button"
                                     variant="ghost"
                                     className={cn(
                                       "w-full justify-start font-normal h-auto py-2.5 px-3 border-b last:border-0",
                                       m.id === field.value && "bg-accent"
                                     )}
-                                    onClick={() => {
+                                    onMouseDown={(e) => {
+                                      e.preventDefault(); // Crucial: prevent input blur
                                       field.onChange(m.id);
                                       setIsMemberPopoverOpen(false);
                                       setMemberSearch('');
