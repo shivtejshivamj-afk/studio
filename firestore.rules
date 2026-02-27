@@ -23,7 +23,11 @@ service cloud.firestore {
      * Checks if the authenticated user has administrative privileges.
      */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) ||
+        // Backup check if the existence check is in-flight
+        request.auth.token.role == 'admin'
+      );
     }
     
     /**
@@ -90,9 +94,9 @@ service cloud.firestore {
      * @description Secures the main collection of gym member profiles.
      */
     match /members/{memberId} {
-      allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
+      allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
       allow list: if isAdmin();
-      allow create: if isGymAdmin(request.resource.data.gymIdentifier);
+      allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
     }
 
     /**
@@ -101,8 +105,8 @@ service cloud.firestore {
     match /member_profiles_public/{memberPubId} {
         allow get: if true;
         allow list: if isAdmin();
-        allow create: if isGymAdmin(request.resource.data.gymIdentifier);
-        allow update, delete: if isGymAdmin(request.resource.data.gymIdentifier);
+        allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
+        allow update, delete: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
     }
 
     /**
@@ -139,27 +143,27 @@ service cloud.firestore {
      * @description Secures the top-level invoices collection.
      */
     match /invoices/{invoiceId} {
-        allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
+        allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
         allow list: if isAdmin();
-        allow create: if isGymAdmin(request.resource.data.gymIdentifier);
+        allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
     }
 
     /**
      * @description Secures membership plans.
      */
     match /membership_plans/{planId} {
-      allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
+      allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
       allow list: if isAdmin();
-      allow create: if isGymAdmin(request.resource.data.gymIdentifier);
+      allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
     }
 
     /**
      * @description Secures trainer profiles.
      */
     match /trainers/{trainerId} {
-      allow get, update, delete: if isGymAdmin(resource.data.gymIdentifier);
+      allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
       allow list: if isAdmin();
-      allow create: if isGymAdmin(request.resource.data.gymIdentifier);
+      allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
     }
 
   }

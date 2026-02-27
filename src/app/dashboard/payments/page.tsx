@@ -12,10 +12,9 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
-  Check,
-  ChevronsUpDown,
   Search,
   X,
+  User,
 } from 'lucide-react';
 import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
 import {
@@ -108,12 +107,6 @@ import {
     type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  PopoverAnchor,
-} from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
@@ -151,9 +144,8 @@ export default function InvoicingPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isClient, setIsClient] = useState(false);
   
-  // Searchable member state
+  // New reliable searchable member state
   const [memberSearch, setMemberSearch] = useState('');
-  const [isMemberPopoverOpen, setIsMemberPopoverOpen] = useState(false);
 
   const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -240,7 +232,7 @@ export default function InvoicingPage() {
 
   const filteredMembersList = useMemo(() => {
     if (!members) return [];
-    if (!memberSearch) return members;
+    if (!memberSearch) return members.slice(0, 10); // Show first 10 if not searching
     const q = memberSearch.toLowerCase();
     return members.filter(m => 
       `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||
@@ -638,149 +630,125 @@ export default function InvoicingPage() {
       </Dialog>
 
       <Dialog open={activeDialog === 'add' || activeDialog === 'edit'} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSaveInvoice)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSaveInvoice)} className="space-y-6">
               <DialogHeader>
                 <DialogTitle>{activeDialog === 'edit' ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4">
+              
+              <div className="space-y-4">
+                {/* Simplified Member Selection Interface */}
                 <FormField
                   control={form.control}
                   name="memberId"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Member</FormLabel>
-                      <Popover open={isMemberPopoverOpen} onOpenChange={setIsMemberPopoverOpen} modal={false}>
-                        <div className="relative">
-                          <PopoverAnchor asChild>
-                            <div className="relative group">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Select member or type name/ID..."
-                                className="pl-9 pr-10 cursor-text"
-                                value={memberSearch !== '' ? memberSearch : (field.value ? `${members?.find(m => m.id === field.value)?.firstName} ${members?.find(m => m.id === field.value)?.lastName} (${members?.find(m => m.id === field.value)?.gymId})` : '')}
-                                onChange={(e) => {
-                                  setMemberSearch(e.target.value);
-                                  if (!isMemberPopoverOpen) setIsMemberPopoverOpen(true);
-                                  if (e.target.value === '') {
-                                    field.onChange('');
-                                  }
-                                }}
-                                onFocus={() => setIsMemberPopoverOpen(true)}
-                              />
-                              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
-                                {(field.value || memberSearch) && (
-                                  <Button 
-                                    type="button" 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8 hover:bg-transparent" 
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      field.onChange('');
+                    <FormItem className="flex flex-col space-y-2">
+                      <FormLabel>Member Selection</FormLabel>
+                      
+                      {field.value ? (
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-primary/5 border-primary/20">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                              <User className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm">
+                                {members?.find(m => m.id === field.value)?.firstName} {members?.find(m => m.id === field.value)?.lastName}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-tight">
+                                ID: {members?.find(m => m.id === field.value)?.gymId}
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              field.onChange('');
+                              setMemberSearch('');
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search by name, ID or email..."
+                              className="pl-9"
+                              value={memberSearch}
+                              onChange={(e) => setMemberSearch(e.target.value)}
+                            />
+                          </div>
+                          
+                          <ScrollArea className="h-[200px] border rounded-md p-2">
+                            <div className="grid gap-1">
+                              {filteredMembersList.length > 0 ? (
+                                filteredMembersList.map((m) => (
+                                  <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => {
+                                      field.onChange(m.id);
                                       setMemberSearch('');
                                     }}
+                                    className="flex flex-col items-start w-full p-2.5 rounded-md hover:bg-accent text-left transition-colors border-b last:border-0"
                                   >
-                                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                  </Button>
-                                )}
-                                <PopoverTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <ChevronsUpDown className="h-4 w-4 text-muted-foreground opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                              </div>
+                                    <span className="font-semibold text-sm">{m.firstName} {m.lastName}</span>
+                                    <span className="text-[10px] text-muted-foreground">{m.gymId} • {m.email}</span>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="p-8 text-center text-xs text-muted-foreground italic">
+                                  {memberSearch ? `No matches found for "${memberSearch}"` : 'Start typing to find a member...'}
+                                </div>
+                              )}
                             </div>
-                          </PopoverAnchor>
-                          <PopoverContent 
-                            className="w-[var(--radix-popover-trigger-width)] p-0" 
-                            align="start"
-                            onOpenAutoFocus={(e) => e.preventDefault()}
-                          >
-                            <ScrollArea className="max-h-72 overflow-y-auto">
-                              <div className="p-1">
-                                {filteredMembersList.length > 0 ? (
-                                  filteredMembersList.map((m) => (
-                                    <Button
-                                      key={m.id}
-                                      type="button"
-                                      variant="ghost"
-                                      className={cn(
-                                        "w-full justify-start font-normal h-auto py-2.5 px-3 border-b last:border-0",
-                                        m.id === field.value && "bg-accent"
-                                      )}
-                                      onMouseDown={(e) => {
-                                        e.preventDefault(); // Crucial: prevent input focus loss
-                                        field.onChange(m.id);
-                                        setIsMemberPopoverOpen(false);
-                                        setMemberSearch('');
-                                      }}
-                                    >
-                                      <div className="flex flex-col items-start overflow-hidden text-left">
-                                        <span className="truncate text-sm font-semibold">{m.firstName} {m.lastName}</span>
-                                        <span className="text-[10px] text-muted-foreground truncate">{m.gymId} • {m.email}</span>
-                                      </div>
-                                    </Button>
-                                  ))
-                                ) : (
-                                  <div className="p-4 text-center text-xs text-muted-foreground italic">
-                                    {memberSearch ? `No matches found for "${memberSearch}"` : 'No members found. Start typing...'}
-                                  </div>
-                                )}
-                              </div>
-                            </ScrollArea>
-                          </PopoverContent>
+                          </ScrollArea>
                         </div>
-                      </Popover>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
-                <FormField
-                  control={form.control}
-                  name="planId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Plan</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select plan" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {plans?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} - ₹{p.price}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="totalAmount"
+                    name="planId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Amount</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
+                        <FormLabel>Membership Plan</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select plan" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {plans?.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} - ₹{p.price}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
+                  
                   <FormField
                     control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Status</FormLabel>
+                        <FormLabel>Payment Status</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -793,12 +761,27 @@ export default function InvoicingPage() {
                             <SelectItem value="Overdue">Overdue</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount (₹)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
                   <FormField
                     control={form.control}
                     name="issueDate"
@@ -808,26 +791,33 @@ export default function InvoicingPage() {
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="expiryDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Plan Expiry</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+                
+                <FormField
+                  control={form.control}
+                  name="expiryDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Plan Expiry Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormDescription className="text-[10px]">
+                        The membership will be active until the end of this day.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
+              
               <DialogFooter>
                 <Button variant="outline" onClick={closeDialogs} type="button">Cancel</Button>
-                <Button type="submit">Save</Button>
+                <Button type="submit">Save Invoice</Button>
               </DialogFooter>
             </form>
           </Form>
