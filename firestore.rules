@@ -109,18 +109,18 @@ service cloud.firestore {
      * @description Secures membership subscriptions.
      */
     match /members/{memberId}/memberships/{membershipId} {
-      allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier;
-      allow create: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == memberId;
-      allow update: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == resource.data.memberId;
+      allow get, list, delete: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId);
+      allow create: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == memberId;
+      allow update: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == resource.data.memberId;
     }
 
     /**
      * @description Secures payment records.
      */
     match /members/{memberId}/payments/{paymentId} {
-      allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier;
-      allow create: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == memberId;
-      allow update: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == resource.data.memberId;
+      allow get, list, delete: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId);
+      allow create: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == memberId;
+      allow update: if isAdmin() && getAdminData().gymIdentifier == getParentMemberGymIdentifier(memberId) && request.resource.data.memberId == resource.data.memberId;
     }
     
     /**
@@ -130,8 +130,9 @@ service cloud.firestore {
         allow get: if true; 
         allow list: if isAdmin();
         // Allow create if authenticated admin OR valid public check-in
-        allow create: if (isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))) || isPublicCheckInValid();
-        allow update, delete: if isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        allow create: if isAdmin() || isPublicCheckInValid();
+        // Allow update/delete for authenticated administrators
+        allow update, delete: if isAdmin();
     }
     
     /**

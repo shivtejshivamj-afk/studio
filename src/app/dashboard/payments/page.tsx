@@ -112,6 +112,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  PopoverAnchor,
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -434,9 +435,9 @@ export default function InvoicingPage() {
     doc.setFont('helvetica', 'bold');
     doc.text(adminProfile?.gymName || 'SJ fit', 196, 15, { align: 'right' });
     doc.setFont('helvetica', 'normal');
-    doc.text(adminProfile?.gymAddress || 'Ghansoli', 196, 20, { align: 'right' });
-    doc.text(adminProfile?.gymEmail || 'warlucifer87@gmail.com', 196, 25, { align: 'right' });
-    doc.text(adminProfile?.gymContactNumber || '1234567890', 196, 30, { align: 'right' });
+    doc.text(adminProfile?.gymAddress || '', 196, 20, { align: 'right' });
+    doc.text(adminProfile?.gymEmail || '', 196, 25, { align: 'right' });
+    doc.text(adminProfile?.gymContactNumber || '', 196, 30, { align: 'right' });
     
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setLineWidth(1);
@@ -564,9 +565,9 @@ export default function InvoicingPage() {
                 <h1 className="text-4xl font-bold text-[#10b981] shrink-0">INVOICE</h1>
                 <div className="text-right text-sm space-y-0.5 max-w-[50%] ml-auto">
                   <p className="font-bold break-words">{adminProfile?.gymName || 'SJ fit'}</p>
-                  <p className="break-words">{adminProfile?.gymAddress || 'Ghansoli'}</p>
-                  <p className="break-words text-xs text-gray-500">{adminProfile?.gymEmail || 'warlucifer87@gmail.com'}</p>
-                  <p className="break-words text-xs text-gray-500">{adminProfile?.gymContactNumber || '1234567890'}</p>
+                  <p className="break-words">{adminProfile?.gymAddress || ''}</p>
+                  <p className="break-words text-xs text-gray-500">{adminProfile?.gymEmail || ''}</p>
+                  <p className="break-words text-xs text-gray-500">{adminProfile?.gymContactNumber || ''}</p>
                 </div>
               </div>
 
@@ -650,9 +651,9 @@ export default function InvoicingPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Member</FormLabel>
-                      <Popover open={isMemberPopoverOpen} onOpenChange={setIsMemberPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
+                      <Popover open={isMemberPopoverOpen} onOpenChange={setIsMemberPopoverOpen} modal={false}>
+                        <div className="relative">
+                          <PopoverAnchor asChild>
                             <div className="relative group">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                               <Input
@@ -684,49 +685,53 @@ export default function InvoicingPage() {
                                     <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                                   </Button>
                                 )}
-                                <ChevronsUpDown className="h-4 w-4 text-muted-foreground mr-2 opacity-50" />
+                                <PopoverTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <ChevronsUpDown className="h-4 w-4 text-muted-foreground opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
                               </div>
                             </div>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent 
-                          className="w-[var(--radix-popover-trigger-width)] p-0" 
-                          align="start"
-                          onOpenAutoFocus={(e) => e.preventDefault()}
-                        >
-                          <ScrollArea className="max-h-72 overflow-y-auto">
-                            <div className="p-1">
-                              {filteredMembersList.length > 0 ? (
-                                filteredMembersList.map((m) => (
-                                  <Button
-                                    key={m.id}
-                                    type="button"
-                                    variant="ghost"
-                                    className={cn(
-                                      "w-full justify-start font-normal h-auto py-2.5 px-3 border-b last:border-0",
-                                      m.id === field.value && "bg-accent"
-                                    )}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault(); // Crucial: prevent input blur
-                                      field.onChange(m.id);
-                                      setIsMemberPopoverOpen(false);
-                                      setMemberSearch('');
-                                    }}
-                                  >
-                                    <div className="flex flex-col items-start overflow-hidden text-left">
-                                      <span className="truncate text-sm font-semibold">{m.firstName} {m.lastName}</span>
-                                      <span className="text-[10px] text-muted-foreground truncate">{m.gymId} • {m.email}</span>
-                                    </div>
-                                  </Button>
-                                ))
-                              ) : (
-                                <div className="p-4 text-center text-xs text-muted-foreground italic">
-                                  {memberSearch ? `No matches found for "${memberSearch}"` : 'No members found. Start typing...'}
-                                </div>
-                              )}
-                            </div>
-                          </ScrollArea>
-                        </PopoverContent>
+                          </PopoverAnchor>
+                          <PopoverContent 
+                            className="w-[var(--radix-popover-trigger-width)] p-0" 
+                            align="start"
+                            onOpenAutoFocus={(e) => e.preventDefault()}
+                          >
+                            <ScrollArea className="max-h-72 overflow-y-auto">
+                              <div className="p-1">
+                                {filteredMembersList.length > 0 ? (
+                                  filteredMembersList.map((m) => (
+                                    <Button
+                                      key={m.id}
+                                      type="button"
+                                      variant="ghost"
+                                      className={cn(
+                                        "w-full justify-start font-normal h-auto py-2.5 px-3 border-b last:border-0",
+                                        m.id === field.value && "bg-accent"
+                                      )}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault(); // Crucial: prevent input focus loss
+                                        field.onChange(m.id);
+                                        setIsMemberPopoverOpen(false);
+                                        setMemberSearch('');
+                                      }}
+                                    >
+                                      <div className="flex flex-col items-start overflow-hidden text-left">
+                                        <span className="truncate text-sm font-semibold">{m.firstName} {m.lastName}</span>
+                                        <span className="text-[10px] text-muted-foreground truncate">{m.gymId} • {m.email}</span>
+                                      </div>
+                                    </Button>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-xs text-muted-foreground italic">
+                                    {memberSearch ? `No matches found for "${memberSearch}"` : 'No members found. Start typing...'}
+                                  </div>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </div>
                       </Popover>
                       <FormMessage />
                     </FormItem>
