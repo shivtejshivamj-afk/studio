@@ -3,12 +3,6 @@
  * All data access and modification are restricted to authenticated administrators who are explicitly
  * designated as administrators in the `/roles_admin` collection. Each piece of data is scoped
  * to a specific gym via a `gymIdentifier`, ensuring complete data isolation between different gyms.
- *
- * Public Check-in: A specific exception is made for the public member check-in feature. This is handled
- * by creating a parallel, publicly-readable collection (`member_profiles_public`) that contains only non-sensitive
- * information required for validation. The `attendance` collection allows unauthenticated `create` operations,
- * but the request is rigorously validated against the trusted data in `member_profiles_public`. This prevents
- * unauthorized reads of private member data while still allowing a public-facing feature.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -52,20 +46,6 @@ service cloud.firestore {
     function getParentMemberGymIdentifier(memberId) {
       let memberPath = /databases/$(database)/documents/members/$(memberId);
       return exists(memberPath) ? get(memberPath).data.gymIdentifier : null;
-    }
-
-    /**
-     * Ensures the incoming 'memberId' field matches the parent document's ID in the path.
-     */
-    function hasCorrectMemberIdOnCreate(memberId) {
-      return request.resource.data.memberId == memberId;
-    }
-
-    /**
-     * Ensures the 'memberId' field is immutable on updates.
-     */
-    function isMemberIdImmutable() {
-      return request.resource.data.memberId == resource.data.memberId;
     }
 
     /**
@@ -130,8 +110,8 @@ service cloud.firestore {
      */
     match /members/{memberId}/memberships/{membershipId} {
       allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier;
-      allow create: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && hasCorrectMemberIdOnCreate(memberId);
-      allow update: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && isMemberIdImmutable();
+      allow create: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == memberId;
+      allow update: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == resource.data.memberId;
     }
 
     /**
@@ -139,8 +119,8 @@ service cloud.firestore {
      */
     match /members/{memberId}/payments/{paymentId} {
       allow get, list, delete: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier;
-      allow create: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && hasCorrectMemberIdOnCreate(memberId);
-      allow update: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && isMemberIdImmutable();
+      allow create: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == memberId;
+      allow update: if getParentMemberGymIdentifier(memberId) == getAdminData().gymIdentifier && request.resource.data.memberId == resource.data.memberId;
     }
     
     /**
@@ -148,9 +128,9 @@ service cloud.firestore {
      */
     match /attendance/{attendanceId} {
         allow get: if true; 
-        allow update, delete: if isGymAdmin(resource.data.gymIdentifier);
         allow list: if isAdmin();
-        allow create: if isGymAdmin(request.resource.data.gymIdentifier) || isPublicCheckInValid();
+        allow create: if (isSignedIn() && isGymAdmin(request.resource.data.gymIdentifier)) || isPublicCheckInValid();
+        allow update, delete: if isSignedIn() && isGymAdmin(resource.data.gymIdentifier);
     }
     
     /**

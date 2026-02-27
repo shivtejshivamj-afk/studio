@@ -659,7 +659,7 @@ export default function InvoicingPage() {
                             <div className="relative group">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                               <Input
-                                placeholder="Type member name, ID or email..."
+                                placeholder="Select member or type name/ID..."
                                 className="pl-9 pr-10 cursor-text"
                                 value={memberSearch !== '' ? memberSearch : (field.value ? `${members?.find(m => m.id === field.value)?.firstName} ${members?.find(m => m.id === field.value)?.lastName} (${members?.find(m => m.id === field.value)?.gymId})` : '')}
                                 onChange={(e) => {
@@ -671,20 +671,25 @@ export default function InvoicingPage() {
                                 }}
                                 onFocus={() => setIsMemberPopoverOpen(true)}
                               />
-                              {(field.value || memberSearch) && (
-                                <Button 
-                                  type="button" 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent" 
-                                  onClick={() => {
-                                    field.onChange('');
-                                    setMemberSearch('');
-                                  }}
-                                >
-                                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                </Button>
-                              )}
+                              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
+                                {(field.value || memberSearch) && (
+                                  <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 hover:bg-transparent" 
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      field.onChange('');
+                                      setMemberSearch('');
+                                    }}
+                                  >
+                                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                  </Button>
+                                )}
+                                <ChevronsUpDown className="h-4 w-4 text-muted-foreground mr-2 opacity-50" />
+                              </div>
                             </div>
                           </FormControl>
                         </PopoverTrigger>
@@ -718,7 +723,7 @@ export default function InvoicingPage() {
                                 ))
                               ) : (
                                 <div className="p-4 text-center text-xs text-muted-foreground italic">
-                                  {memberSearch ? `No matches found for "${memberSearch}"` : 'Start typing to find members...'}
+                                  {memberSearch ? `No matches found for "${memberSearch}"` : 'No members found. Start typing...'}
                                 </div>
                               )}
                             </div>
