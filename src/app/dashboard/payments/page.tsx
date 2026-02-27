@@ -15,6 +15,7 @@ import {
   Check,
   ChevronsUpDown,
   Search,
+  X,
 } from 'lucide-react';
 import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
 import {
@@ -655,69 +656,73 @@ export default function InvoicingPage() {
                       <Popover open={isMemberPopoverOpen} onOpenChange={setIsMemberPopoverOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={isMemberPopoverOpen}
-                              className={cn(
-                                "w-full justify-between",
-                                !field.value && "text-muted-foreground"
+                            <div className="relative group">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Type member name, ID or email..."
+                                className="pl-9 pr-10 cursor-text"
+                                value={memberSearch !== '' ? memberSearch : (field.value ? `${members?.find(m => m.id === field.value)?.firstName} ${members?.find(m => m.id === field.value)?.lastName} (${members?.find(m => m.id === field.value)?.gymId})` : '')}
+                                onChange={(e) => {
+                                  setMemberSearch(e.target.value);
+                                  if (!isMemberPopoverOpen) setIsMemberPopoverOpen(true);
+                                  if (e.target.value === '') {
+                                    field.onChange('');
+                                  }
+                                }}
+                                onFocus={() => setIsMemberPopoverOpen(true)}
+                              />
+                              {(field.value || memberSearch) && (
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent" 
+                                  onClick={() => {
+                                    field.onChange('');
+                                    setMemberSearch('');
+                                  }}
+                                >
+                                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                </Button>
                               )}
-                            >
-                              {field.value
-                                ? members?.find((m) => m.id === field.value)
-                                  ? `${members.find((m) => m.id === field.value)?.firstName} ${members.find((m) => m.id === field.value)?.lastName} (${members.find((m) => m.id === field.value)?.gymId})`
-                                  : "Select member"
-                                : "Select member"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
+                            </div>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-full min-w-[300px] p-0" align="start">
-                          <div className="flex flex-col">
-                            <div className="flex items-center border-b px-3">
-                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                              <Input
-                                placeholder="Search member..."
-                                value={memberSearch}
-                                onChange={(e) => setMemberSearch(e.target.value)}
-                                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-none focus-visible:ring-0"
-                              />
+                        <PopoverContent 
+                          className="w-[var(--radix-popover-trigger-width)] p-0" 
+                          align="start"
+                          onOpenAutoFocus={(e) => e.preventDefault()}
+                        >
+                          <ScrollArea className="max-h-72 overflow-y-auto">
+                            <div className="p-1">
+                              {filteredMembersList.length > 0 ? (
+                                filteredMembersList.map((m) => (
+                                  <Button
+                                    key={m.id}
+                                    variant="ghost"
+                                    className={cn(
+                                      "w-full justify-start font-normal h-auto py-2.5 px-3 border-b last:border-0",
+                                      m.id === field.value && "bg-accent"
+                                    )}
+                                    onClick={() => {
+                                      field.onChange(m.id);
+                                      setIsMemberPopoverOpen(false);
+                                      setMemberSearch('');
+                                    }}
+                                  >
+                                    <div className="flex flex-col items-start overflow-hidden text-left">
+                                      <span className="truncate text-sm font-semibold">{m.firstName} {m.lastName}</span>
+                                      <span className="text-[10px] text-muted-foreground truncate">{m.gymId} • {m.email}</span>
+                                    </div>
+                                  </Button>
+                                ))
+                              ) : (
+                                <div className="p-4 text-center text-xs text-muted-foreground italic">
+                                  {memberSearch ? `No matches found for "${memberSearch}"` : 'Start typing to find members...'}
+                                </div>
+                              )}
                             </div>
-                            <ScrollArea className="max-h-72 overflow-y-auto">
-                              <div className="p-1">
-                                {filteredMembersList.length > 0 ? (
-                                  filteredMembersList.map((m) => (
-                                    <Button
-                                      key={m.id}
-                                      variant="ghost"
-                                      className="w-full justify-start font-normal h-auto py-2 px-3"
-                                      onClick={() => {
-                                        field.onChange(m.id);
-                                        setIsMemberPopoverOpen(false);
-                                        setMemberSearch('');
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4 shrink-0",
-                                          m.id === field.value ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      <div className="flex flex-col items-start overflow-hidden">
-                                        <span className="truncate text-sm font-medium">{m.firstName} {m.lastName}</span>
-                                        <span className="text-[10px] text-muted-foreground truncate">{m.gymId} • {m.email}</span>
-                                      </div>
-                                    </Button>
-                                  ))
-                                ) : (
-                                  <div className="p-4 text-center text-sm text-muted-foreground">
-                                    No members found.
-                                  </div>
-                                )}
-                              </div>
-                            </ScrollArea>
-                          </div>
+                          </ScrollArea>
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
