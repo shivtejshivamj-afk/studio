@@ -31,7 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useState, useMemo, useEffect } from 'react';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import {
   useFirestore,
   useMemoFirebase,
@@ -48,14 +48,9 @@ import {
   serverTimestamp,
   Timestamp,
   doc,
-  getCountFromServer,
-  onSnapshot,
   orderBy,
-  limit,
-  startAfter,
   getDoc,
   getDocs,
-  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { type Attendance, type Member, type PublicMemberProfile } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -101,6 +96,7 @@ type AttendanceRecord = {
   memberName: string;
   checkIn: string;
   status: 'Checked-in';
+  rawTime: Date;
 };
 
 const ATTENDANCE_PER_PAGE = 10;
@@ -113,14 +109,7 @@ export default function AttendancePage() {
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Pagination State
-  const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot | null)[]>([null]);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [totalRecords, setTotalRecords] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const adminProfileRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'roles_admin', user.uid) : null),
@@ -141,67 +130,18 @@ export default function AttendancePage() {
   );
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersQuery);
 
-  useEffect(() => {
-    if (!firestore || !adminProfile?.gymIdentifier) return;
-
-    const fetchCount = async () => {
-        let q = query(
+  const attendanceQuery = useMemoFirebase(
+    () =>
+      firestore && adminProfile?.gymIdentifier
+        ? query(
             collection(firestore, 'attendance'),
-            where('gymIdentifier', '==', adminProfile.gymIdentifier)
-        );
-
-        if (date?.from) {
-          q = query(q, where('checkInTime', '>=', Timestamp.fromDate(startOfDay(date.from))));
-        }
-        if (date?.to) {
-          q = query(q, where('checkInTime', '<=', Timestamp.fromDate(endOfDay(date.to))));
-        }
-
-        const snapshot = await getCountFromServer(q);
-        setTotalRecords(snapshot.data().count);
-    };
-
-    fetchCount();
-  }, [firestore, adminProfile, date]);
-
-
-  useEffect(() => {
-    if (!firestore || !adminProfile?.gymIdentifier) return;
-    
-    setIsLoading(true);
-    const cursor = pageCursors[page - 1];
-
-    let q = query(
-      collection(firestore, 'attendance'),
-      where('gymIdentifier', '==', adminProfile.gymIdentifier),
-      orderBy('checkInTime', 'desc')
-    );
-
-    if (date?.from) {
-      q = query(q, where('checkInTime', '>=', Timestamp.fromDate(startOfDay(date.from))));
-    }
-    if (date?.to) {
-      q = query(q, where('checkInTime', '<=', Timestamp.fromDate(endOfDay(date.to))));
-    }
-
-    if (cursor) {
-      q = query(q, startAfter(cursor), limit(ATTENDANCE_PER_PAGE));
-    } else {
-      q = query(q, limit(ATTENDANCE_PER_PAGE));
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Attendance));
-      setAttendanceData(data);
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setIsLoading(false);
-    }, (error) => {
-      console.error('Failed to fetch attendance data:', error);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [firestore, adminProfile, page, pageCursors, date]);
+            where('gymIdentifier', '==', adminProfile.gymIdentifier),
+            orderBy('checkInTime', 'desc')
+          )
+        : null,
+    [firestore, adminProfile]
+  );
+  const { data: allAttendance, isLoading: isLoadingAttendance } = useCollection<Attendance>(attendanceQuery);
 
   const form = useForm<z.infer<typeof checkInSchema>>({
     resolver: zodResolver(checkInSchema),
@@ -210,19 +150,71 @@ export default function AttendancePage() {
     },
   });
 
-  const totalPages = Math.ceil(totalRecords / ATTENDANCE_PER_PAGE);
+  const attendanceRecords: AttendanceRecord[] = useMemo(() => {
+    if (!allAttendance || !members) return [];
+
+    return allAttendance
+      .map((att) => {
+        const member = members.find((m) => m.id === att.memberId);
+        if (!member) return null;
+
+        const checkInDate = (att.checkInTime as Timestamp)?.toDate();
+        if (!checkInDate) return null;
+
+        return {
+          id: att.id,
+          memberId: member.gymId,
+          memberName: `${member.firstName} ${member.lastName}`,
+          checkIn: format(checkInDate, 'PP, p'),
+          status: 'Checked-in',
+          rawTime: checkInDate,
+        };
+      })
+      .filter((rec): rec is AttendanceRecord => rec !== null);
+  }, [allAttendance, members]);
+
+  const filteredAttendanceRecords = useMemo(() => {
+    let filtered = attendanceRecords;
+
+    // Filter by Date Range
+    if (date?.from && date?.to) {
+      filtered = filtered.filter(rec => 
+        isWithinInterval(rec.rawTime, { 
+          start: startOfDay(date.from!), 
+          end: endOfDay(date.to!) 
+        })
+      );
+    } else if (date?.from) {
+      filtered = filtered.filter(rec => rec.rawTime >= startOfDay(date.from!));
+    }
+
+    // Filter by Search Query
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(rec => 
+        rec.memberName.toLowerCase().includes(q) || 
+        rec.memberId.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [attendanceRecords, date, searchQuery]);
+
+  const totalPages = Math.ceil(filteredAttendanceRecords.length / ATTENDANCE_PER_PAGE);
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * ATTENDANCE_PER_PAGE;
+    return filteredAttendanceRecords.slice(start, start + ATTENDANCE_PER_PAGE);
+  }, [filteredAttendanceRecords, currentPage]);
 
   const goToNextPage = () => {
-    if (page < totalPages) {
-      setPageCursors(prev => [...prev, lastDoc]);
-      setPage(prev => prev + 1);
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
     }
   };
 
   const goToPrevPage = () => {
-    if (page > 1) {
-      setPageCursors(prev => prev.slice(0, -1));
-      setPage(prev => prev - 1);
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
     }
   };
 
@@ -285,7 +277,6 @@ export default function AttendancePage() {
         memberGymId: publicProfileSnap.id,
       };
 
-      // Changed: Use non-blocking operation for faster UI and better error handling
       setDocumentNonBlocking(attendanceDocRef, attendanceRecord, {});
 
       toast({
@@ -337,8 +328,7 @@ export default function AttendancePage() {
         description: `Successfully started deleting ${snapshot.size} records.`,
       });
       
-      setPage(1);
-      setPageCursors([null]);
+      setCurrentPage(1);
     } catch (error) {
       console.error('Error deleting range:', error);
       toast({
@@ -352,37 +342,6 @@ export default function AttendancePage() {
     }
   }
 
-  const attendanceRecords: AttendanceRecord[] = useMemo(() => {
-    if (!attendanceData || !members) return [];
-
-    return attendanceData
-      .map((att) => {
-        const member = members.find((m) => m.id === att.memberId);
-        if (!member) return null;
-
-        const checkInDate = (att.checkInTime as Timestamp)?.toDate();
-        if (!checkInDate) return null;
-
-        return {
-          id: att.id,
-          memberId: member.gymId,
-          memberName: `${member.firstName} ${member.lastName}`,
-          checkIn: format(checkInDate, 'PP, p'),
-          status: 'Checked-in',
-        };
-      })
-      .filter((rec): rec is AttendanceRecord => rec !== null);
-  }, [attendanceData, members]);
-
-  const filteredAttendanceRecords = useMemo(() => {
-    if (!searchQuery) return attendanceRecords;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return attendanceRecords.filter(record =>
-      record.memberName.toLowerCase().includes(lowercasedQuery) ||
-      record.memberId.toLowerCase().includes(lowercasedQuery)
-    );
-  }, [attendanceRecords, searchQuery]);
-
   const handleDownloadPdf = () => {
     const doc = new jsPDF();
     doc.text(`Attendance Report`, 14, 16);
@@ -394,7 +353,7 @@ export default function AttendancePage() {
     doc.save(`attendance.pdf`);
   };
 
-  const isDataLoading = isLoading || isLoadingAdminProfile || isLoadingMembers;
+  const isDataLoading = isLoadingAttendance || isLoadingAdminProfile || isLoadingMembers;
 
   return (
     <>
@@ -461,7 +420,10 @@ export default function AttendancePage() {
                     mode="range"
                     defaultMonth={date?.from}
                     selected={date}
-                    onSelect={setDate}
+                    onSelect={(val) => {
+                      setDate(val);
+                      setCurrentPage(1);
+                    }}
                     numberOfMonths={2}
                   />
                 </PopoverContent>
@@ -470,13 +432,16 @@ export default function AttendancePage() {
             <Input
               placeholder="Search by name or ID..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full sm:max-w-xs"
             />
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPdf}>
                   <Download className="h-4 w-4" />
-                  Download Page
+                  Download
               </Button>
               <Button 
                 variant="destructive" 
@@ -511,8 +476,8 @@ export default function AttendancePage() {
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                   </TableRow>
                 ))
-              ) : filteredAttendanceRecords.length > 0 ? (
-                filteredAttendanceRecords.map((record) => (
+              ) : paginatedRecords.length > 0 ? (
+                paginatedRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
                       <div className="font-medium">{record.memberName}</div>
@@ -539,14 +504,14 @@ export default function AttendancePage() {
         <CardFooter>
             <div className="flex items-center justify-between w-full">
                 <div className="text-xs text-muted-foreground">
-                    Page {page} of {totalPages > 0 ? totalPages : 1}
+                    Showing {paginatedRecords.length} of {filteredAttendanceRecords.length} records (Page {currentPage} of {totalPages || 1})
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={goToPrevPage}
-                        disabled={page <= 1}
+                        disabled={currentPage <= 1}
                     >
                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Previous
@@ -555,7 +520,7 @@ export default function AttendancePage() {
                         variant="outline"
                         size="sm"
                         onClick={goToNextPage}
-                        disabled={page >= totalPages}
+                        disabled={currentPage >= totalPages}
                     >
                         Next
                         <ChevronRight className="h-4 w-4 ml-1" />

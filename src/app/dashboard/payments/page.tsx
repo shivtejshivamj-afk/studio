@@ -167,7 +167,6 @@ export default function InvoicingPage() {
   );
   const { data: plans, isLoading: isLoadingPlans } = useCollection<MembershipPlan>(plansQuery);
   
-  // Fetch ALL invoices for global search and client-side pagination
   const invoicesQuery = useMemoFirebase(
     () => (firestore && adminProfile?.gymIdentifier 
       ? query(

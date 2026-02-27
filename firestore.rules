@@ -90,9 +90,9 @@ service cloud.firestore {
      * @description Secures the main collection of gym member profiles.
      */
     match /members/{memberId} {
-      allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
+      allow get, update, delete: if isAdmin();
       allow list: if isAdmin();
-      allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
+      allow create: if isAdmin();
     }
 
     /**
@@ -135,27 +135,27 @@ service cloud.firestore {
      * @description Secures the top-level invoices collection.
      */
     match /invoices/{invoiceId} {
-        allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
+        allow get, update, delete: if isAdmin();
         allow list: if isAdmin();
-        allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
+        allow create: if isAdmin();
     }
 
     /**
      * @description Secures membership plans.
      */
     match /membership_plans/{planId} {
-      allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
+      allow get, update, delete: if isAdmin();
       allow list: if isAdmin();
-      allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
+      allow create: if isAdmin();
     }
 
     /**
      * @description Secures trainer profiles.
      */
     match /trainers/{trainerId} {
-      allow get, update, delete: if isAdmin() && (resource.data.gymIdentifier == getAdminData().gymIdentifier);
+      allow get, update, delete: if isAdmin();
       allow list: if isAdmin();
-      allow create: if isAdmin() && (request.resource.data.gymIdentifier == getAdminData().gymIdentifier);
+      allow create: if isAdmin();
     }
 
   }
