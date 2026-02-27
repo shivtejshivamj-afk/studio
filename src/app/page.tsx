@@ -119,7 +119,7 @@ export default function IntroductionPage() {
             <span className="text-lg font-bold tracking-tight">GymTrack Pro</span>
           </div>
           <p className="text-sm text-muted-foreground mt-4 sm:mt-0">
-            © 2024 GymTrack Pro. All Rights Reserved.
+            © 2026 GymTrack Pro. All Rights Reserved.
           </p>
         </div>
       </footer>
