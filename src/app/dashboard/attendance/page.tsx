@@ -108,6 +108,8 @@ export default function AttendancePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSingleDeleteDialogOpen, setIsSingleDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -295,6 +297,23 @@ export default function AttendancePage() {
     form.reset();
   }
 
+  const handleDeleteSingle = (record: AttendanceRecord) => {
+    setRecordToDelete(record);
+    setIsSingleDeleteDialogOpen(true);
+  };
+
+  const handleConfirmSingleDelete = () => {
+    if (recordToDelete && firestore) {
+      deleteDocumentNonBlocking(doc(firestore, 'attendance', recordToDelete.id));
+      toast({
+        title: 'Record Deleted',
+        description: `Attendance record for ${recordToDelete.memberName} has been deleted.`,
+      });
+      setIsSingleDeleteDialogOpen(false);
+      setRecordToDelete(null);
+    }
+  };
+
   async function handleDeleteRange() {
     if (!firestore || !adminProfile?.gymIdentifier || !date?.from || !date?.to) return;
 
@@ -464,6 +483,7 @@ export default function AttendancePage() {
                 <TableHead>Member ID</TableHead>
                 <TableHead>Check-in Time</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -474,6 +494,7 @@ export default function AttendancePage() {
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-16" /></TableCell>
                   </TableRow>
                 ))
               ) : paginatedRecords.length > 0 ? (
@@ -489,11 +510,22 @@ export default function AttendancePage() {
                         {record.status}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteSingle(record)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No attendance records found.
                   </TableCell>
                 </TableRow>
@@ -557,6 +589,28 @@ export default function AttendancePage() {
               disabled={isDeleting}
             >
               {isDeleting ? 'Deleting...' : 'Delete Range'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isSingleDeleteDialogOpen} onOpenChange={setIsSingleDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Attendance Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the check-in record for{' '}
+              <span className="font-bold">{recordToDelete?.memberName}</span> at{' '}
+              <span className="font-bold">{recordToDelete?.checkIn}</span>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSingleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Record
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
