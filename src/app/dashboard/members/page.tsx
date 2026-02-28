@@ -411,7 +411,7 @@ export default function MembersPage() {
                         <Badge
                           variant={statusVariant[member.isActive && !isExpired ? 'active' : 'inactive']}
                         >
-                          {member.isActive && !isExpired ? 'Active' : (isExpired ? 'Expired' : 'Inactive')}
+                          {member.isActive && !isExpired ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

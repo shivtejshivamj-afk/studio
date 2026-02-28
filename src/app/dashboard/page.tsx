@@ -188,7 +188,7 @@ export default function DashboardPage() {
   const statCards = [
     { title: 'Total Members', value: members?.length ?? 0, icon: Users, loading: isLoading },
     { title: 'Active Members', value: activeMembersCount, icon: Dumbbell, loading: isLoading },
-    { title: 'Inactive/Expired', value: inactiveMembersCount, icon: UserX, loading: isLoading },
+    { title: 'Inactive', value: inactiveMembersCount, icon: UserX, loading: isLoading },
   ];
 
   return (
@@ -227,7 +227,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Expiring or Expired</CardTitle>
+              <CardTitle>Expiring or Inactive</CardTitle>
               <CardDescription>Members whose subscription ends within 7 days or has already lapsed.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                       const end = parseISO(member.membershipEndDate!);
                       const endDate = endOfDay(end);
                       const daysLeft = differenceInDays(endDate, today);
-                      const expiresInText = daysLeft < 0 ? `Expired ${Math.abs(daysLeft)} days ago` : daysLeft === 0 ? 'Expires today' : `Expires in ${daysLeft} days`;
+                      const expiresInText = daysLeft < 0 ? `Lapsed ${Math.abs(daysLeft)} days ago` : daysLeft === 0 ? 'Expires today' : `Expires in ${daysLeft} days`;
                       const plan = plans?.find(p => p.id === member.activePlanId);
                       return (
                         <TableRow key={member.id}>
@@ -263,7 +263,7 @@ export default function DashboardPage() {
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold">{plan?.name || 'Standard'} Plan</span>
                               <Badge variant={daysLeft < 0 ? 'destructive' : 'secondary'} className="mt-1 w-fit text-[10px]">
-                                {expiresInText}
+                                {daysLeft < 0 ? 'Inactive' : expiresInText}
                               </Badge>
                             </div>
                           </TableCell>
