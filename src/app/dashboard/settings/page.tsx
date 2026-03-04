@@ -32,7 +32,7 @@ import {
   setDocumentNonBlocking,
   deleteDocumentNonBlocking,
 } from '@/firebase';
-import { collection, doc, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import {
@@ -73,7 +73,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { type MembershipPlan, type Member, type Invoice, type Attendance } from '@/lib/data';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 const settingsFormSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
@@ -242,7 +242,6 @@ export default function SettingsPage() {
     
     setIsExporting(collectionName);
     try {
-      // 1. Fetch Members and Plans for comprehensive lookups
       const membersQ = query(
         collection(firestore, 'members'),
         where('gymIdentifier', '==', adminProfile.gymIdentifier)
@@ -259,7 +258,6 @@ export default function SettingsPage() {
       const plansMap = new Map<string, MembershipPlan>();
       plansSnap.docs.forEach(d => plansMap.set(d.id, d.data() as MembershipPlan));
 
-      // 2. Fetch the target data for export
       const q = query(
         collection(firestore, collectionName),
         where('gymIdentifier', '==', adminProfile.gymIdentifier)
@@ -302,16 +300,26 @@ export default function SettingsPage() {
         } else if (collectionName === 'attendance') {
           const att = raw as Attendance;
           const member = membersMap.get(att.memberId);
-          const checkInDate = att.checkInTime && typeof att.checkInTime.toDate === 'function' 
-            ? format(att.checkInTime.toDate(), 'yyyy-MM-dd HH:mm') 
-            : 'Unknown';
           
-          row['Date & Time'] = checkInDate;
+          let checkInDate = 'Unknown';
+          const ts = att.checkInTime;
+          
+          if (ts && typeof ts.toDate === 'function') {
+            checkInDate = format(ts.toDate(), 'yyyy-MM-dd HH:mm');
+          } else if (ts && ts.seconds) {
+            checkInDate = format(new Date(ts.seconds * 1000), 'yyyy-MM-dd HH:mm');
+          } else if (ts) {
+            const d = new Date(ts);
+            if (isValid(d)) {
+              checkInDate = format(d, 'yyyy-MM-dd HH:mm');
+            }
+          }
+          
+          row['Check-in Date & Time'] = checkInDate;
           row['Member Name'] = member ? `${member.firstName} ${member.lastName}` : 'Unknown';
           row['Member ID'] = att.memberGymId || (member ? member.gymId : 'Unknown');
           row['Gym Name'] = att.gymName;
         } else {
-          // Generic fallback
           for (const key in raw) {
             if (['id', 'memberId', 'planId', 'membershipId', 'gymIdentifier'].includes(key)) continue;
             let val = raw[key];
@@ -328,7 +336,7 @@ export default function SettingsPage() {
 
       const headers = Object.keys(processedData[0]);
       const csvRows = [
-        headers.join(','), // Header row
+        headers.join(','), 
         ...processedData.map(row => 
           headers.map(header => {
             const val = row[header] ?? '';
@@ -884,9 +892,9 @@ export default function SettingsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AccordionContent>
+            <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the <strong>{selectedPlan?.name}</strong> plan.
-            </AccordionContent>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
