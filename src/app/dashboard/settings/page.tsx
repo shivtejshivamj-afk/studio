@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -73,7 +72,7 @@ import { PlusCircle, Pencil, Trash2, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { type MembershipPlan } from '@/lib/data';
+import { type MembershipPlan, type Member } from '@/lib/data';
 import { format } from 'date-fns';
 
 const settingsFormSchema = z.object({
@@ -243,6 +242,16 @@ export default function SettingsPage() {
     
     setIsExporting(collectionName);
     try {
+      // 1. Fetch Members first to use as a lookup for names/IDs
+      const membersQ = query(
+        collection(firestore, 'members'),
+        where('gymIdentifier', '==', adminProfile.gymIdentifier)
+      );
+      const membersSnap = await getDocs(membersQ);
+      const membersMap = new Map<string, Member>();
+      membersSnap.docs.forEach(d => membersMap.set(d.id, d.data() as Member));
+
+      // 2. Fetch the target data
       const q = query(
         collection(firestore, collectionName),
         where('gymIdentifier', '==', adminProfile.gymIdentifier)
@@ -259,18 +268,34 @@ export default function SettingsPage() {
       
       const data = querySnapshot.docs.map(doc => {
         const docData = doc.data();
-        // Flatten some objects like timestamps for CSV
-        const processed: any = { id: doc.id };
+        const processed: any = {};
+        
+        // Add human-readable member info if the record has a memberId
+        if (docData.memberId && membersMap.has(docData.memberId)) {
+          const m = membersMap.get(docData.memberId)!;
+          processed['Member Name'] = `${m.firstName} ${m.lastName}`;
+          processed['Member Gym ID'] = m.gymId;
+        }
+
+        // Map and format other fields
         for (const key in docData) {
-          if (docData[key] && typeof docData[key] === 'object' && 'toDate' in docData[key]) {
-            processed[key] = docData[key].toDate().toISOString();
-          } else {
-            processed[key] = docData[key];
+          // Skip internal IDs for a cleaner Excel report
+          if (['id', 'memberId', 'planId', 'membershipId', 'gymIdentifier'].includes(key)) continue;
+
+          let val = docData[key];
+          
+          // Format Timestamps
+          if (val && typeof val === 'object' && 'toDate' in val) {
+            val = format(val.toDate(), 'yyyy-MM-dd HH:mm');
           }
+          
+          processed[key] = val ?? '';
         }
         return processed;
       });
       
+      if (data.length === 0) return;
+
       const headers = Object.keys(data[0]);
       const csvRows = [
         headers.join(','), // Header row
@@ -421,7 +446,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>Data Management</CardTitle>
             <CardDescription>
-              Download and backup your gym data for offline access.
+              Download and backup your gym data for offline access. Reports use human-readable Member IDs.
             </CardDescription>
           </CardHeader>
           <CardContent>
