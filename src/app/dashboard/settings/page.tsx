@@ -242,7 +242,7 @@ export default function SettingsPage() {
     
     setIsExporting(collectionName);
     try {
-      // 1. Fetch Members first to use as a lookup for names/IDs in other reports
+      // 1. Fetch Members and Plans for comprehensive lookups
       const membersQ = query(
         collection(firestore, 'members'),
         where('gymIdentifier', '==', adminProfile.gymIdentifier)
@@ -251,7 +251,15 @@ export default function SettingsPage() {
       const membersMap = new Map<string, Member>();
       membersSnap.docs.forEach(d => membersMap.set(d.id, d.data() as Member));
 
-      // 2. Fetch the target data
+      const plansQ = query(
+        collection(firestore, 'membership_plans'),
+        where('gymIdentifier', '==', adminProfile.gymIdentifier)
+      );
+      const plansSnap = await getDocs(plansQ);
+      const plansMap = new Map<string, MembershipPlan>();
+      plansSnap.docs.forEach(d => plansMap.set(d.id, d.data() as MembershipPlan));
+
+      // 2. Fetch the target data for export
       const q = query(
         collection(firestore, collectionName),
         where('gymIdentifier', '==', adminProfile.gymIdentifier)
@@ -276,18 +284,20 @@ export default function SettingsPage() {
           row['Member ID'] = m.gymId;
           row['Email'] = m.email;
           row['Phone'] = m.phone;
+          row['Membership Plan'] = m.activePlanId ? (plansMap.get(m.activePlanId)?.name || 'Unknown') : 'No Plan';
           row['Join Date'] = m.joinDate;
           row['Status'] = m.isActive ? 'Active' : 'Inactive';
-          row['Expiry Date'] = m.membershipEndDate || 'No Active Plan';
+          row['Plan Expiry'] = m.membershipEndDate || 'None';
         } else if (collectionName === 'invoices') {
           const inv = raw as Invoice;
           const member = membersMap.get(inv.memberId);
-          row['Invoice Number'] = inv.invoiceNumber;
+          row['Invoice No'] = inv.invoiceNumber;
           row['Member Name'] = member ? `${member.firstName} ${member.lastName}` : 'Unknown';
           row['Member ID'] = member ? member.gymId : 'Unknown';
+          row['Membership Plan'] = inv.planId ? (plansMap.get(inv.planId)?.name || 'Unknown') : 'Standard';
           row['Amount (INR)'] = inv.totalAmount;
           row['Issue Date'] = inv.issueDate;
-          row['Due/Expiry Date'] = inv.dueDate;
+          row['Plan Expiry'] = inv.dueDate;
           row['Status'] = inv.status;
         } else if (collectionName === 'attendance') {
           const att = raw as Attendance;
@@ -296,12 +306,12 @@ export default function SettingsPage() {
             ? format(att.checkInTime.toDate(), 'yyyy-MM-dd HH:mm') 
             : 'Unknown';
           
-          row['Check-in Time'] = checkInDate;
+          row['Date & Time'] = checkInDate;
           row['Member Name'] = member ? `${member.firstName} ${member.lastName}` : 'Unknown';
           row['Member ID'] = att.memberGymId || (member ? member.gymId : 'Unknown');
           row['Gym Name'] = att.gymName;
         } else {
-          // Generic fallback for any other collection
+          // Generic fallback
           for (const key in raw) {
             if (['id', 'memberId', 'planId', 'membershipId', 'gymIdentifier'].includes(key)) continue;
             let val = raw[key];
@@ -333,14 +343,14 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `${collectionName}_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute('download', `${collectionName}_professional_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       toast({
-        title: 'Export Successful',
-        description: `Your ${collectionName} report is ready.`,
+        title: 'Report Generated',
+        description: `Professional ${collectionName} report is ready.`,
       });
     } catch (error) {
       console.error('Export error:', error);
@@ -464,7 +474,7 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Data Management & Reports</CardTitle>
+            <CardTitle>Data Management & Professional Reports</CardTitle>
             <CardDescription>
               Download high-quality professional reports for your gym. All files use human-readable Names and IDs.
             </CardDescription>
@@ -478,7 +488,7 @@ export default function SettingsPage() {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isExporting === 'members' ? 'Generating Report...' : 'Member Report'}
+                {isExporting === 'members' ? 'Generating...' : 'Member Report'}
               </Button>
               <Button 
                 variant="outline" 
@@ -487,7 +497,7 @@ export default function SettingsPage() {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isExporting === 'invoices' ? 'Generating Report...' : 'Financial Report'}
+                {isExporting === 'invoices' ? 'Generating...' : 'Financial Report'}
               </Button>
               <Button 
                 variant="outline" 
@@ -496,7 +506,7 @@ export default function SettingsPage() {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isExporting === 'attendance' ? 'Generating Report...' : 'Attendance Report'}
+                {isExporting === 'attendance' ? 'Generating...' : 'Attendance Report'}
               </Button>
             </div>
           </CardContent>
