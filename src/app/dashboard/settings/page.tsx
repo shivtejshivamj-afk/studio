@@ -72,7 +72,7 @@ import { PlusCircle, Pencil, Trash2, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { type MembershipPlan, type Member } from '@/lib/data';
+import { type MembershipPlan, type Member, type Invoice, type Attendance } from '@/lib/data';
 import { format } from 'date-fns';
 
 const settingsFormSchema = z.object({
@@ -242,7 +242,7 @@ export default function SettingsPage() {
     
     setIsExporting(collectionName);
     try {
-      // 1. Fetch Members first to use as a lookup for names/IDs
+      // 1. Fetch Members first to use as a lookup for names/IDs in other reports
       const membersQ = query(
         collection(firestore, 'members'),
         where('gymIdentifier', '==', adminProfile.gymIdentifier)
@@ -266,40 +266,60 @@ export default function SettingsPage() {
         return;
       }
       
-      const data = querySnapshot.docs.map(doc => {
-        const docData = doc.data();
-        const processed: any = {};
+      const processedData = querySnapshot.docs.map(doc => {
+        const raw = doc.data();
+        const row: any = {};
         
-        // Add human-readable member info if the record has a memberId
-        if (docData.memberId && membersMap.has(docData.memberId)) {
-          const m = membersMap.get(docData.memberId)!;
-          processed['Member Name'] = `${m.firstName} ${m.lastName}`;
-          processed['Member Gym ID'] = m.gymId;
-        }
-
-        // Map and format other fields
-        for (const key in docData) {
-          // Skip internal IDs for a cleaner Excel report
-          if (['id', 'memberId', 'planId', 'membershipId', 'gymIdentifier'].includes(key)) continue;
-
-          let val = docData[key];
+        if (collectionName === 'members') {
+          const m = raw as Member;
+          row['Member Name'] = `${m.firstName} ${m.lastName}`;
+          row['Member ID'] = m.gymId;
+          row['Email'] = m.email;
+          row['Phone'] = m.phone;
+          row['Join Date'] = m.joinDate;
+          row['Status'] = m.isActive ? 'Active' : 'Inactive';
+          row['Expiry Date'] = m.membershipEndDate || 'No Active Plan';
+        } else if (collectionName === 'invoices') {
+          const inv = raw as Invoice;
+          const member = membersMap.get(inv.memberId);
+          row['Invoice Number'] = inv.invoiceNumber;
+          row['Member Name'] = member ? `${member.firstName} ${member.lastName}` : 'Unknown';
+          row['Member ID'] = member ? member.gymId : 'Unknown';
+          row['Amount (INR)'] = inv.totalAmount;
+          row['Issue Date'] = inv.issueDate;
+          row['Due/Expiry Date'] = inv.dueDate;
+          row['Status'] = inv.status;
+        } else if (collectionName === 'attendance') {
+          const att = raw as Attendance;
+          const member = membersMap.get(att.memberId);
+          const checkInDate = att.checkInTime && typeof att.checkInTime.toDate === 'function' 
+            ? format(att.checkInTime.toDate(), 'yyyy-MM-dd HH:mm') 
+            : 'Unknown';
           
-          // Format Timestamps
-          if (val && typeof val === 'object' && 'toDate' in val) {
-            val = format(val.toDate(), 'yyyy-MM-dd HH:mm');
+          row['Check-in Time'] = checkInDate;
+          row['Member Name'] = member ? `${member.firstName} ${member.lastName}` : 'Unknown';
+          row['Member ID'] = att.memberGymId || (member ? member.gymId : 'Unknown');
+          row['Gym Name'] = att.gymName;
+        } else {
+          // Generic fallback for any other collection
+          for (const key in raw) {
+            if (['id', 'memberId', 'planId', 'membershipId', 'gymIdentifier'].includes(key)) continue;
+            let val = raw[key];
+            if (val && typeof val === 'object' && 'toDate' in val) {
+              val = format(val.toDate(), 'yyyy-MM-dd HH:mm');
+            }
+            row[key] = val ?? '';
           }
-          
-          processed[key] = val ?? '';
         }
-        return processed;
+        return row;
       });
       
-      if (data.length === 0) return;
+      if (processedData.length === 0) return;
 
-      const headers = Object.keys(data[0]);
+      const headers = Object.keys(processedData[0]);
       const csvRows = [
         headers.join(','), // Header row
-        ...data.map(row => 
+        ...processedData.map(row => 
           headers.map(header => {
             const val = row[header] ?? '';
             const escaped = String(val).replace(/"/g, '""');
@@ -313,20 +333,20 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `${collectionName}_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute('download', `${collectionName}_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       toast({
         title: 'Export Successful',
-        description: `Your ${collectionName} data has been exported.`,
+        description: `Your ${collectionName} report is ready.`,
       });
     } catch (error) {
       console.error('Export error:', error);
       toast({
         title: 'Export Failed',
-        description: 'An error occurred while exporting your data.',
+        description: 'An error occurred while generating the report.',
         variant: 'destructive',
       });
     } finally {
@@ -444,9 +464,9 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Data Management</CardTitle>
+            <CardTitle>Data Management & Reports</CardTitle>
             <CardDescription>
-              Download and backup your gym data for offline access. Reports use human-readable Member IDs.
+              Download high-quality professional reports for your gym. All files use human-readable Names and IDs.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -458,7 +478,7 @@ export default function SettingsPage() {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isExporting === 'members' ? 'Exporting...' : 'Export Members'}
+                {isExporting === 'members' ? 'Generating Report...' : 'Member Report'}
               </Button>
               <Button 
                 variant="outline" 
@@ -467,7 +487,7 @@ export default function SettingsPage() {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isExporting === 'invoices' ? 'Exporting...' : 'Export Invoices'}
+                {isExporting === 'invoices' ? 'Generating Report...' : 'Financial Report'}
               </Button>
               <Button 
                 variant="outline" 
@@ -476,7 +496,7 @@ export default function SettingsPage() {
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isExporting === 'attendance' ? 'Exporting...' : 'Export Attendance'}
+                {isExporting === 'attendance' ? 'Generating Report...' : 'Attendance Report'}
               </Button>
             </div>
           </CardContent>
@@ -590,8 +610,7 @@ export default function SettingsPage() {
                   <li>
                     <strong>Memberships Expiring Soon:</strong> A crucial table
                     listing members whose subscriptions are ending within the
-                    next 7 days. You can send them a reminder email directly
-                    from this table.
+                    next 7 days.
                   </li>
                 </ul>
               </AccordionContent>
@@ -855,9 +874,9 @@ export default function SettingsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AccordionContent>
               This action cannot be undone. This will permanently delete the <strong>{selectedPlan?.name}</strong> plan.
-            </AlertDialogDescription>
+            </AccordionContent>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
