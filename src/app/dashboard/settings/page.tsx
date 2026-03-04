@@ -33,7 +33,7 @@ import {
   setDocumentNonBlocking,
   deleteDocumentNonBlocking,
 } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import {
@@ -69,11 +69,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { type MembershipPlan } from '@/lib/data';
+import { format } from 'date-fns';
 
 const settingsFormSchema = z.object({
   ownerName: z.string().min(1, 'Owner name is required.'),
@@ -113,6 +114,7 @@ export default function SettingsPage() {
 
   const [dialogState, setDialogState] = useState<'add' | 'edit' | 'delete' | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null);
+  const [isExporting, setIsExporting] = useState<string | null>(null);
 
   const planForm = useForm<PlanFormValues>({
     resolver: zodResolver(planFormSchema),
@@ -236,6 +238,77 @@ export default function SettingsPage() {
     });
   }
 
+  const exportToCSV = async (collectionName: string) => {
+    if (!firestore || !adminProfile?.gymIdentifier) return;
+    
+    setIsExporting(collectionName);
+    try {
+      const q = query(
+        collection(firestore, collectionName),
+        where('gymIdentifier', '==', adminProfile.gymIdentifier)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        toast({
+          title: 'No Data',
+          description: `No ${collectionName} records found to export.`,
+        });
+        return;
+      }
+      
+      const data = querySnapshot.docs.map(doc => {
+        const docData = doc.data();
+        // Flatten some objects like timestamps for CSV
+        const processed: any = { id: doc.id };
+        for (const key in docData) {
+          if (docData[key] && typeof docData[key] === 'object' && 'toDate' in docData[key]) {
+            processed[key] = docData[key].toDate().toISOString();
+          } else {
+            processed[key] = docData[key];
+          }
+        }
+        return processed;
+      });
+      
+      const headers = Object.keys(data[0]);
+      const csvRows = [
+        headers.join(','), // Header row
+        ...data.map(row => 
+          headers.map(header => {
+            const val = row[header] ?? '';
+            const escaped = String(val).replace(/"/g, '""');
+            return `"${escaped}"`;
+          }).join(',')
+        )
+      ];
+      
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${collectionName}_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Export Successful',
+        description: `Your ${collectionName} data has been exported.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'An error occurred while exporting your data.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
   const isLoading = isLoadingAdminProfile || isLoadingPlans;
 
   return (
@@ -341,6 +414,46 @@ export default function SettingsPage() {
                 </form>
               </Form>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Data Management</CardTitle>
+            <CardDescription>
+              Download and backup your gym data for offline access.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => exportToCSV('members')} 
+                disabled={!!isExporting}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {isExporting === 'members' ? 'Exporting...' : 'Export Members'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => exportToCSV('invoices')} 
+                disabled={!!isExporting}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {isExporting === 'invoices' ? 'Exporting...' : 'Export Invoices'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => exportToCSV('attendance')} 
+                disabled={!!isExporting}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {isExporting === 'attendance' ? 'Exporting...' : 'Export Attendance'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
