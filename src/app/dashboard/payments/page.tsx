@@ -15,6 +15,7 @@ import {
   Search,
   X,
   User,
+  Filter,
 } from 'lucide-react';
 import { type Member, type Invoice, type MembershipPlan, type Membership } from '@/lib/data';
 import {
@@ -41,7 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -133,6 +134,7 @@ const INVOICES_PER_PAGE = 10;
 
 export default function InvoicingPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const { toast } = useToast();
   type DialogType = 'add' | 'edit' | 'view' | 'delete' | null;
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
@@ -244,13 +246,24 @@ export default function InvoicingPage() {
   }, [allInvoices, members, plans]);
 
   const filteredInvoices = useMemo(() => {
-    if (!searchQuery) return processedInvoices;
-    const q = searchQuery.toLowerCase();
-    return processedInvoices.filter(i => 
-      i.memberName?.toLowerCase().includes(q) || 
-      i.invoiceNumber.toLowerCase().includes(q)
-    );
-  }, [processedInvoices, searchQuery]);
+    let results = processedInvoices;
+
+    // Filter by Status
+    if (statusFilter !== 'all') {
+      results = results.filter(i => i.status === statusFilter);
+    }
+
+    // Filter by Search Query
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      results = results.filter(i => 
+        i.memberName?.toLowerCase().includes(q) || 
+        i.invoiceNumber.toLowerCase().includes(q)
+      );
+    }
+
+    return results;
+  }, [processedInvoices, searchQuery, statusFilter]);
 
   const totalPages = Math.ceil(filteredInvoices.length / INVOICES_PER_PAGE);
   const paginatedInvoices = useMemo(() => {
@@ -466,17 +479,33 @@ export default function InvoicingPage() {
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div><CardTitle>Invoicing</CardTitle><CardDescription>Manage billing and plans.</CardDescription></div>
-            <div className="flex w-full items-center gap-2 sm:w-auto">
-              <Input 
-                placeholder="Search by name or invoice ID..." 
-                value={searchQuery} 
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }} 
-                className="w-full sm:max-w-xs" 
-              />
-              <Button size="sm" className="gap-1" onClick={() => handleOpenDialog('add')}><PlusCircle className="h-4 w-4" /> Create</Button>
+            <div className="flex w-full flex-col sm:flex-row items-start sm:items-center gap-2 sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Paid">Paid</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative w-full sm:max-w-[200px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search name/ID..." 
+                    value={searchQuery} 
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }} 
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={() => handleOpenDialog('add')}><PlusCircle className="h-4 w-4" /> Create</Button>
             </div>
           </div>
         </CardHeader>
