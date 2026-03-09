@@ -8,6 +8,7 @@ import {
   Copy,
   Building,
   FileText,
+  MessageCircle,
 } from 'lucide-react';
 import { type Member, type MembershipPlan, type Invoice } from '@/lib/data';
 import {
@@ -183,6 +184,14 @@ export default function DashboardPage() {
     });
   };
 
+  const sendWhatsAppReminder = (member: Member) => {
+    const gymName = adminProfile?.gymName || 'your gym';
+    const message = `Hello ${member.firstName}, this is ${gymName}. Your membership expires on ${member.membershipEndDate || 'soon'}.`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${member.phone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const isLoading = isLoadingAdminProfile || isLoadingMembers || isLoadingPlans || isLoadingRecentInvoices || !isClient;
 
   const statCards = [
@@ -268,9 +277,20 @@ export default function DashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('view', member)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => sendWhatsAppReminder(member)}
+                                className="text-primary hover:text-primary hover:bg-primary/10"
+                                title="Send Renewal Reminder"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenDialog('view', member)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
