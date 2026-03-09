@@ -8,6 +8,7 @@ import {
   Copy,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
 } from 'lucide-react';
 import { type Member, type PublicMemberProfile, type MembershipPlan } from '@/lib/data';
 import {
@@ -310,6 +311,14 @@ export default function MembersPage() {
     }
   };
 
+  const sendWhatsAppReminder = (member: Member) => {
+    const gymName = adminProfile?.gymName || 'your gym';
+    const message = `Hello ${member.firstName}, this is ${gymName}. Your membership expires on ${member.membershipEndDate || 'soon'}.`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${member.phone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const isLoading = isLoadingAdminProfile || isLoadingMembers;
 
   return (
@@ -372,7 +381,6 @@ export default function MembersPage() {
               ) : paginatedMembers.length > 0 ? (
                 paginatedMembers.map((member) => {
                   const isExpired = member.membershipEndDate ? isPast(endOfDay(parseISO(member.membershipEndDate))) : false;
-                  const plan = plans?.find(p => p.id === member.activePlanId);
                   
                   return (
                     <TableRow key={member.id}>
@@ -382,11 +390,6 @@ export default function MembersPage() {
                           <div className="text-xs text-muted-foreground">
                             {member.email}
                           </div>
-                          {plan && (
-                            <div className="text-[10px] uppercase font-bold text-primary mt-0.5">
-                                {plan.name} Plan
-                            </div>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -417,6 +420,15 @@ export default function MembersPage() {
                       <TableCell className="text-right">
                         {isClient ? (
                           <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => sendWhatsAppReminder(member)}
+                              className="text-primary hover:text-primary hover:bg-primary/10"
+                              title="Send Reminder"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
